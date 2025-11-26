@@ -11,6 +11,7 @@ import logging
 import ipaddress
 import qrcode
 import io
+import re
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -220,8 +221,8 @@ class WireGuardManager:
 
         return f"{server_ip}:{port}"
 
-    def create_user(self, username, description=''):
-        """Create a new WireGuard user"""
+    def create_user(self, username, description='', private_key=None, public_key=None):
+        """Create a new WireGuard user with option to use existing keys"""
         try:
             self.ensure_users_directory()
 
@@ -229,10 +230,15 @@ class WireGuardManager:
             user_dir = os.path.join(self.users_dir, username)
             os.makedirs(user_dir, mode=0o755, exist_ok=True)
 
-            # Generate keypair
-            private_key, public_key = self.generate_keypair()
+            # Generate or use provided keypair
             if not private_key or not public_key:
-                return None
+                private_key, public_key = self.generate_keypair()
+                if not private_key or not public_key:
+                    return None
+            else:
+                # Validate provided keys
+                private_key = private_key.strip()
+                public_key = public_key.strip()
 
             # Get next available IP
             client_ip = self.get_next_ip()
@@ -366,7 +372,7 @@ PersistentKeepalive = 25
             return []
 
     def delete_user(self, username):
-        """Delete a WireGuard user"""
+        """Delete a WireGuard user and all associated comments"""
         try:
             user_dir = os.path.join(self.users_dir, username)
 
@@ -384,28 +390,50 @@ PersistentKeepalive = 25
             # Remove from server config
             if public_key:
                 server_config = self.read_server_config()
+                lines = server_config.split('\n')
                 new_config_lines = []
-                skip_lines = 0
+                i = 0
 
-                for i, line in enumerate(server_config.split('\n')):
-                    if skip_lines > 0:
-                        skip_lines -= 1
-                        continue
+                while i < len(lines):
+                    line = lines[i]
 
                     # Check if this line contains the public key
-                    if public_key in line:
-                        # Skip this peer section (typically 4-5 lines)
-                        # Go back and remove the comment line too
-                        if new_config_lines and new_config_lines[-1].strip().startswith('#'):
-                            new_config_lines.pop()
-                        if new_config_lines and new_config_lines[-1].strip().startswith('[Peer]'):
-                            new_config_lines.pop()
-                        skip_lines = 3  # Skip AllowedIPs, PersistentKeepalive, and blank line
+                    if public_key in line and 'PublicKey' in line:
+                        # Found the peer to delete
+                        # Go backwards to remove comment lines
+                        while new_config_lines and (
+                            new_config_lines[-1].strip().startswith('#') or
+                            new_config_lines[-1].strip() == '' or
+                            new_config_lines[-1].strip() == '[Peer]'
+                        ):
+                            removed = new_config_lines.pop()
+                            # Stop if we hit a non-comment, non-blank, non-[Peer] line
+                            if removed.strip() and not removed.strip().startswith('#') and removed.strip() != '[Peer]':
+                                new_config_lines.append(removed)
+                                break
+
+                        # Skip forward through this peer's configuration
+                        i += 1
+                        while i < len(lines):
+                            next_line = lines[i].strip()
+                            # Stop when we hit the next section or peer
+                            if next_line.startswith('[') or (next_line.startswith('#') and i + 1 < len(lines) and lines[i + 1].strip().startswith('[')):
+                                break
+                            i += 1
                         continue
 
                     new_config_lines.append(line)
+                    i += 1
+
+                # Clean up any trailing blank lines
+                while new_config_lines and new_config_lines[-1].strip() == '':
+                    new_config_lines.pop()
 
                 new_config = '\n'.join(new_config_lines)
+                # Ensure file ends with newline
+                if not new_config.endswith('\n'):
+                    new_config += '\n'
+
                 self.write_server_config(new_config)
 
             # Delete user directory
@@ -510,6 +538,8 @@ def create_user():
     data = request.get_json()
     username = data.get('username')
     description = data.get('description', '')
+    private_key = data.get('private_key', '').strip()
+    public_key = data.get('public_key', '').strip()
 
     if not username:
         return jsonify({'success': False, 'error': 'Username is required'}), 400
@@ -518,7 +548,11 @@ def create_user():
     if not username.replace('_', '').replace('-', '').isalnum():
         return jsonify({'success': False, 'error': 'Invalid username format'}), 400
 
-    result = wg_manager.create_user(username, description)
+    # If keys are provided, both must be present
+    if (private_key and not public_key) or (public_key and not private_key):
+        return jsonify({'success': False, 'error': 'Both private and public keys must be provided'}), 400
+
+    result = wg_manager.create_user(username, description, private_key or None, public_key or None)
     if result:
         return jsonify({'success': True, 'user': result})
 
