@@ -1,4 +1,7 @@
-Flask==2.3.3
-Flask-SQLAlchemy==3.0.5
-PyMySQL==1.1.0
-cryptography==41.0.3
+Flask
+Flask-SQLAlchemy
+PyMySQL
+cryptography
+requests
+Werkzeug
+urllib3
