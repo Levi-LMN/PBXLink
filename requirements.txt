@@ -8,3 +8,4 @@ urllib3
 paramiko
 qrcode[pil]
 pillow
+python-dotenv
