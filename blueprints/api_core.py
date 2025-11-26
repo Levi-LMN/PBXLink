@@ -123,25 +123,32 @@ def test_api():
 def reload_config():
     """Apply configuration changes (doreload)"""
     try:
+        # CORRECT: doreload requires an empty input object {}
+        # This is the standard way to reload FreePBX configuration
         query = '''
         mutation {
-            doreload {
+            doreload(input: {}) {
                 status
                 message
+                transaction_id
             }
         }
         '''
         data = api.graphql_query(query)
+        reload_result = data.get('doreload', {})
 
-        if data.get('doreload', {}).get('status'):
+        if reload_result.get('status'):
+            transaction_id = reload_result.get('transaction_id', 'N/A')
+            logger.info(f"✅ Configuration reload initiated (transaction: {transaction_id})")
             return jsonify({
                 'status': 'success',
-                'message': 'Configuration reloaded successfully'
+                'message': 'Configuration reloaded successfully',
+                'transaction_id': transaction_id
             })
         else:
             return jsonify({
                 'status': 'error',
-                'message': data.get('doreload', {}).get('message', 'Reload failed')
+                'message': reload_result.get('message', 'Reload failed')
             }), 500
     except Exception as e:
         logger.error(f"Error reloading config: {str(e)}")

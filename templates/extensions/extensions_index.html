@@ -1,324 +1,180 @@
 {% extends "base.html" %}
 
-{% block title %}Extensions Management - FreePBX{% endblock %}
+{% block title %}Extensions - FreePBX Dashboard{% endblock %}
 {% block page_title %}Extensions Management{% endblock %}
 
-{% block extra_css %}
-<style>
-    .extension-card {
-        transition: all 0.3s;
-    }
-
-    .extension-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-    }
-
-    .tech-badge {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        border-radius: 4px;
-        font-weight: 600;
-    }
-
-    .tech-pjsip {
-        background: rgba(13,110,253,0.1);
-        color: #0d6efd;
-    }
-
-    .tech-sip {
-        background: rgba(25,135,84,0.1);
-        color: #198754;
-    }
-
-    .status-badge {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        border-radius: 4px;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-    }
-
-    .status-online {
-        background: rgba(25,135,84,0.1);
-        color: #198754;
-    }
-
-    .status-offline {
-        background: rgba(220,53,69,0.1);
-        color: #dc3545;
-    }
-
-    .status-unavailable {
-        background: rgba(255,193,7,0.1);
-        color: #ffc107;
-    }
-
-    .status-unknown {
-        background: rgba(108,117,125,0.1);
-        color: #6c757d;
-    }
-
-    .status-indicator {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        display: inline-block;
-    }
-
-    .indicator-online {
-        background: #198754;
-        box-shadow: 0 0 4px #198754;
-    }
-
-    .indicator-offline {
-        background: #dc3545;
-    }
-
-    .indicator-unavailable {
-        background: #ffc107;
-    }
-
-    .indicator-unknown {
-        background: #6c757d;
-    }
-
-    .action-btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-
-    .modal-body label {
-        font-weight: 600;
-        margin-top: 0.75rem;
-    }
-
-    .form-text {
-        font-size: 0.8rem;
-    }
-
-    .auto-refresh {
-        font-size: 0.8rem;
-        color: #6c757d;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="row g-4">
-    <!-- Header Actions -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="mb-1">
-                            <i class="fas fa-phone"></i> Extension Management
-                        </h5>
-                        <p class="text-muted mb-0">Manage PBX extensions and user settings</p>
-                    </div>
-                    <div>
-                        <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#createExtensionModal">
-                            <i class="fas fa-plus"></i> Create Extension
-                        </button>
-                        <button class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#bulkCreateModal">
-                            <i class="fas fa-layer-group"></i> Bulk Create
-                        </button>
-                        <button class="btn btn-primary" onclick="loadExtensions()">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <small class="auto-refresh">
-                        <i class="fas fa-clock"></i> Auto-refreshing every 30 seconds
-                    </small>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Statistics -->
-    <div class="col-md-3">
+<div class="row mb-4">
+    <!-- Stats Cards -->
+    <div class="col-md-6 col-lg-3 mb-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(13,110,253,0.1); color: #0d6efd;">
-                <i class="fas fa-phone"></i>
-            </div>
-            <h3 class="stat-value" id="total-extensions">0</h3>
-            <p class="stat-label">Total Extensions</p>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(25,135,84,0.1); color: #198754;">
+            <div class="stat-icon" style="background: #d4edda; color: #28a745;">
                 <i class="fas fa-check-circle"></i>
             </div>
-            <h3 class="stat-value" id="online-count">0</h3>
+            <p class="stat-value" id="online-count">-</p>
             <p class="stat-label">Online</p>
         </div>
     </div>
-
-    <div class="col-md-3">
+    <div class="col-md-6 col-lg-3 mb-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(220,53,69,0.1); color: #dc3545;">
+            <div class="stat-icon" style="background: #f8d7da; color: #dc3545;">
                 <i class="fas fa-times-circle"></i>
             </div>
-            <h3 class="stat-value" id="offline-count">0</h3>
+            <p class="stat-value" id="offline-count">-</p>
             <p class="stat-label">Offline</p>
         </div>
     </div>
-
-    <div class="col-md-3">
+    <div class="col-md-6 col-lg-3 mb-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(255,193,7,0.1); color: #ffc107;">
-                <i class="fas fa-network-wired"></i>
+            <div class="stat-icon" style="background: #cfe2ff; color: #0d6efd;">
+                <i class="fas fa-phone-alt"></i>
             </div>
-            <h3 class="stat-value" id="pjsip-count">0</h3>
-            <p class="stat-label">PJSIP Extensions</p>
+            <p class="stat-value" id="total-count">-</p>
+            <p class="stat-label">Total Extensions</p>
         </div>
     </div>
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #fff3cd; color: #ffc107;">
+                <i class="fas fa-sync-alt"></i>
+            </div>
+            <p class="stat-label mb-2">Actions</p>
+            <button class="btn btn-sm btn-warning me-1" onclick="refreshStatus()" title="Refresh Status Cache">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="reloadAsterisk()" title="Apply Config (Reload Asterisk)">
+                <i class="fas fa-redo"></i>
+            </button>
+        </div>
+    </div>
+</div>
 
-    <!-- Extensions Table -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-list"></i> Extensions List</span>
-                    <div class="d-flex gap-2">
-                        <select class="form-select form-select-sm" style="max-width: 150px;" id="status-filter">
-                            <option value="all">All Status</option>
-                            <option value="online">Online Only</option>
-                            <option value="offline">Offline Only</option>
-                        </select>
-                        <input type="text" class="form-control form-control-sm" style="max-width: 300px;"
-                               id="search-input" placeholder="Search extensions...">
-                    </div>
+<!-- Actions Bar -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6 mb-2 mb-md-0">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="search-input" placeholder="Search extensions...">
                 </div>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Status</th>
-                                <th>Extension</th>
-                                <th>Name</th>
-                                <th>Technology</th>
-                                <th>Display Name</th>
-                                <th>Outbound CID</th>
-                                <th>Contacts</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="extensions-table">
-                            <tr>
-                                <td colspan="8" class="text-center py-4">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="col-md-6 text-end">
+                <button class="btn btn-primary" onclick="showCreateModal()">
+                    <i class="fas fa-plus"></i> Add Extension
+                </button>
+                <button class="btn btn-outline-primary" onclick="showBulkCreateModal()">
+                    <i class="fas fa-plus-square"></i> Bulk Create
+                </button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Extensions Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-list"></i> Extensions</span>
+        <span class="badge bg-secondary" id="filtered-count">0</span>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="extensions-table">
+                <thead>
+                    <tr>
+                        <th>Extension</th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Caller ID</th>
+                        <th>Tech</th>
+                        <th>Device Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="extensions-tbody">
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Create Extension Modal -->
-<div class="modal fade" id="createExtensionModal" tabindex="-1">
+<div class="modal fade" id="createModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-plus-circle"></i> Create New Extension
-                </h5>
+                <h5 class="modal-title">Add New Extension</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="create-extension-form">
+                <form id="create-form">
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Extension Number *</label>
                             <input type="text" class="form-control" name="extensionId" required>
-                            <div class="form-text">e.g., 1000, 2001</div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Display Name *</label>
                             <input type="text" class="form-control" name="name" required>
-                            <div class="form-text">User's full name</div>
                         </div>
                     </div>
-
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Technology</label>
                             <select class="form-select" name="tech">
                                 <option value="pjsip" selected>PJSIP</option>
                                 <option value="sip">SIP</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Email</label>
                             <input type="email" class="form-control" name="email">
-                            <div class="form-text">For voicemail notifications</div>
                         </div>
                     </div>
-
                     <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">Caller ID</label>
-                            <input type="text" class="form-control" name="callerId">
-                            <div class="form-text">Format: "Name" &lt;number&gt;</div>
-                        </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Outbound CID</label>
                             <input type="text" class="form-control" name="outboundCid">
                         </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Emergency CID</label>
                             <input type="text" class="form-control" name="emergencyCid">
                         </div>
-                        <div class="col-md-6">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Caller ID</label>
+                            <input type="text" class="form-control" name="callerId">
+                        </div>
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Max Contacts</label>
                             <input type="number" class="form-control" name="maxContacts" value="1" min="1">
                         </div>
                     </div>
-
                     <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">Voicemail</label>
+                        <div class="col-md-6 mb-3">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="vmEnable" id="vmEnable" checked>
-                                <label class="form-check-label fw-normal" for="vmEnable">
-                                    Enable Voicemail
-                                </label>
+                                <input class="form-check-input" type="checkbox" name="vmEnable" checked>
+                                <label class="form-check-label">Enable Voicemail</label>
                             </div>
-                            <input type="text" class="form-control mt-2" name="vmPassword" placeholder="VM Password">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">User Management</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="umEnable" id="umEnable" checked>
-                                <label class="form-check-label fw-normal" for="umEnable">
-                                    Enable User Portal
-                                </label>
-                            </div>
-                            <input type="text" class="form-control mt-2" name="umPassword" placeholder="Portal Password">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">VM Password</label>
+                            <input type="text" class="form-control" name="vmPassword">
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="createExtension()">
+                <button type="button" class="btn btn-primary" onclick="createExtension()">
                     <i class="fas fa-save"></i> Create Extension
                 </button>
             </div>
@@ -326,64 +182,92 @@
     </div>
 </div>
 
-<!-- Edit Extension Modal -->
-<div class="modal fade" id="editExtensionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<!-- Bulk Create Modal -->
+<div class="modal fade" id="bulkCreateModal" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-edit"></i> Edit Extension
-                </h5>
+                <h5 class="modal-title">Bulk Create Extensions</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="edit-extension-form">
-                    <input type="hidden" name="extensionId" id="edit-extensionId">
+                <form id="bulk-create-form">
+                    <div class="mb-3">
+                        <label class="form-label">Start Extension *</label>
+                        <input type="number" class="form-control" name="startExtension" required>
+                        <small class="text-muted">Starting extension number</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Extensions *</label>
+                        <input type="number" class="form-control" name="numberOfExtensions" required min="1">
+                        <small class="text-muted">How many extensions to create</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name Template</label>
+                        <input type="text" class="form-control" name="name" placeholder="Extension">
+                        <small class="text-muted">Names will be: "Extension 1000", "Extension 1001", etc.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Technology</label>
+                        <select class="form-select" name="tech">
+                            <option value="pjsip" selected>PJSIP</option>
+                            <option value="sip">SIP</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="bulkCreateExtensions()">
+                    <i class="fas fa-plus-square"></i> Create Extensions
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
+<!-- Edit Extension Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Extension</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-form">
+                    <input type="hidden" id="edit-extension-id">
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Extension Number</label>
-                            <input type="text" class="form-control" id="edit-extension-display" disabled>
+                            <input type="text" class="form-control" id="edit-ext-number" disabled>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Display Name *</label>
                             <input type="text" class="form-control" name="name" id="edit-name" required>
                         </div>
                     </div>
-
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Technology</label>
                             <select class="form-select" name="tech" id="edit-tech">
                                 <option value="pjsip">PJSIP</option>
                                 <option value="sip">SIP</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Email</label>
                             <input type="email" class="form-control" name="email" id="edit-email">
                         </div>
                     </div>
-
                     <div class="row">
-                        <div class="col-md-6">
-                            <label class="form-label">Caller ID</label>
-                            <input type="text" class="form-control" name="callerId" id="edit-callerId">
-                        </div>
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Outbound CID</label>
-                            <input type="text" class="form-control" name="outboundCid" id="edit-outboundCid">
+                            <input type="text" class="form-control" name="outboundCid" id="edit-outbound-cid">
                         </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Emergency CID</label>
-                            <input type="text" class="form-control" name="emergencyCid" id="edit-emergencyCid">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Max Contacts</label>
-                            <input type="number" class="form-control" name="maxContacts" id="edit-maxContacts" value="1" min="1">
+                            <input type="text" class="form-control" name="emergencyCid" id="edit-emergency-cid">
                         </div>
                     </div>
                 </form>
@@ -397,208 +281,240 @@
         </div>
     </div>
 </div>
-
-<!-- Bulk Create Modal -->
-<div class="modal fade" id="bulkCreateModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-layer-group"></i> Bulk Create Extensions
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="bulk-create-form">
-                    <label class="form-label">Starting Extension *</label>
-                    <input type="number" class="form-control" name="startExtension" required>
-                    <div class="form-text">e.g., 1000</div>
-
-                    <label class="form-label">Number of Extensions *</label>
-                    <input type="number" class="form-control" name="numberOfExtensions" required min="1" max="100">
-                    <div class="form-text">How many extensions to create</div>
-
-                    <label class="form-label">Name Template</label>
-                    <input type="text" class="form-control" name="name" placeholder="User">
-                    <div class="form-text">Each extension will be named "Name-1000", "Name-1001", etc.</div>
-
-                    <label class="form-label">Technology</label>
-                    <select class="form-select" name="tech">
-                        <option value="pjsip" selected>PJSIP</option>
-                        <option value="sip">SIP</option>
-                    </select>
-
-                    <div class="form-check mt-3">
-                        <input class="form-check-input" type="checkbox" name="vmEnable" id="bulk-vmEnable" checked>
-                        <label class="form-check-label" for="bulk-vmEnable">
-                            Enable Voicemail
-                        </label>
-                    </div>
-
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="umEnable" id="bulk-umEnable" checked>
-                        <label class="form-check-label" for="bulk-umEnable">
-                            Enable User Portal
-                        </label>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-info" onclick="bulkCreateExtensions()">
-                    <i class="fas fa-plus"></i> Create Extensions
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 let allExtensions = [];
-let refreshInterval = null;
+let createModalInstance, bulkCreateModalInstance, editModalInstance;
 
-// Load extensions
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    createModalInstance = new bootstrap.Modal(document.getElementById('createModal'));
+    bulkCreateModalInstance = new bootstrap.Modal(document.getElementById('bulkCreateModal'));
+    editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
+
+    loadExtensions();
+    loadStatus();
+
+    // Setup search
+    document.getElementById('search-input').addEventListener('input', filterExtensions);
+
+    // Auto-refresh status every 30 seconds
+    setInterval(loadStatus, 30000);
+});
+
+// Load extensions list
 async function loadExtensions() {
     try {
         const response = await fetch('/extensions/api/list');
         const data = await response.json();
 
-        if (data.status !== 'success') {
+        if (data.status === 'success') {
+            allExtensions = data.extensions;
+            document.getElementById('total-count').textContent = data.total;
+            renderExtensions(allExtensions);
+        } else {
             throw new Error(data.message);
         }
-
-        allExtensions = data.extensions;
-        displayExtensions(allExtensions);
-        updateStats(allExtensions);
     } catch (error) {
         handleError(error);
     }
 }
 
-// Display extensions
-function displayExtensions(extensions) {
-    const tbody = document.getElementById('extensions-table');
-    tbody.innerHTML = '';
+// Load status information
+async function loadStatus() {
+    try {
+        const response = await fetch('/extensions/api/status');
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            document.getElementById('online-count').textContent = data.online_count;
+            document.getElementById('offline-count').textContent = data.offline_count;
+        }
+    } catch (error) {
+        console.error('Error loading status:', error);
+    }
+}
+
+// Render extensions table
+function renderExtensions(extensions) {
+    const tbody = document.getElementById('extensions-tbody');
+    document.getElementById('filtered-count').textContent = extensions.length;
 
     if (extensions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No extensions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No extensions found</td></tr>';
         return;
     }
 
-    extensions.forEach(ext => {
-        // Determine status class based on status string
-        let statusClass = 'unknown';
-        let statusText = ext.status || 'Unknown';
-
-        if (ext.registered && ext.status.includes('Online')) {
-            statusClass = 'online';
-        } else if (ext.status.includes('Unavailable')) {
-            statusClass = 'unavailable';
-        } else if (!ext.registered) {
-            statusClass = 'offline';
-        }
-
-        const row = `
-            <tr>
-                <td>
-                    <span class="status-badge status-${statusClass}">
-                        <span class="status-indicator indicator-${statusClass}"></span>
-                        ${statusText}
-                    </span>
-                </td>
-                <td><strong>${ext.extension_id}</strong></td>
-                <td>${ext.name || '-'}</td>
-                <td>
-                    <span class="tech-badge tech-${ext.tech}">${ext.tech.toUpperCase()}</span>
-                </td>
-                <td>${ext.caller_id || '-'}</td>
-                <td>${ext.outbound_cid || '-'}</td>
-                <td>
-                    <span class="badge bg-secondary">${ext.contact_count}</span>
-                </td>
-                <td class="text-end">
-                    <button class="btn btn-sm btn-outline-primary action-btn me-1"
-                            onclick="editExtension('${ext.extension_id}')"
-                            title="Edit">
+    tbody.innerHTML = extensions.map(ext => `
+        <tr>
+            <td><strong>${ext.extension_id}</strong></td>
+            <td>${ext.name}</td>
+            <td>
+                ${ext.registered
+                    ? '<span class="badge bg-success"><i class="fas fa-check-circle"></i> ' + ext.status + '</span>'
+                    : '<span class="badge bg-secondary"><i class="fas fa-times-circle"></i> Offline</span>'
+                }
+                ${ext.contact_count > 0 ? `<small class="text-muted">(${ext.contact_count})</small>` : ''}
+            </td>
+            <td>${ext.caller_id || '-'}</td>
+            <td><span class="badge bg-info">${ext.tech.toUpperCase()}</span></td>
+            <td>${ext.device_type || '-'}</td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary btn-icon" onclick="editExtension('${ext.extension_id}')" title="Edit">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger action-btn"
-                            onclick="confirmDelete('${ext.extension_id}')"
-                            title="Delete">
+                    <button class="btn btn-outline-danger btn-icon" onclick="confirmDelete('${ext.extension_id}')" title="Delete">
                         <i class="fas fa-trash"></i>
                     </button>
-                </td>
-            </tr>
-        `;
-        tbody.insertAdjacentHTML('beforeend', row);
-    });
+                </div>
+            </td>
+        </tr>
+    `).join('');
 }
 
-// Update statistics
-function updateStats(extensions) {
-    const onlineCount = extensions.filter(e => e.registered).length;
-    const offlineCount = extensions.filter(e => !e.registered && e.status !== 'Unknown').length;
-
-    document.getElementById('total-extensions').textContent = extensions.length;
-    document.getElementById('online-count').textContent = onlineCount;
-    document.getElementById('offline-count').textContent = offlineCount;
-    document.getElementById('pjsip-count').textContent =
-        extensions.filter(e => e.tech === 'pjsip').length;
-}
-
-// Filter and search
+// Filter extensions
 function filterExtensions() {
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const statusFilter = document.getElementById('status-filter').value;
-
-    let filtered = allExtensions.filter(ext => {
-        const matchesSearch = ext.extension_id.includes(searchTerm) ||
-            (ext.name && ext.name.toLowerCase().includes(searchTerm)) ||
-            (ext.description && ext.description.toLowerCase().includes(searchTerm));
-
-        const matchesStatus = statusFilter === 'all' ||
-            (statusFilter === 'online' && ext.registered) ||
-            (statusFilter === 'offline' && !ext.registered);
-
-        return matchesSearch && matchesStatus;
-    });
-
-    displayExtensions(filtered);
+    const filtered = allExtensions.filter(ext =>
+        ext.extension_id.toLowerCase().includes(searchTerm) ||
+        ext.name.toLowerCase().includes(searchTerm) ||
+        (ext.caller_id && ext.caller_id.toLowerCase().includes(searchTerm))
+    );
+    renderExtensions(filtered);
 }
 
-// Search extensions
-document.getElementById('search-input')?.addEventListener('input', filterExtensions);
-document.getElementById('status-filter')?.addEventListener('change', filterExtensions);
+// Refresh status
+async function refreshStatus() {
+    try {
+        showToast('Refreshing status cache...', 'info');
+        const response = await fetch('/extensions/api/refresh-status', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            showToast('Status cache cleared, refreshing data...', 'success');
+            setTimeout(() => {
+                loadStatus();
+                loadExtensions();
+            }, 1000);
+        }
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Reload Asterisk configuration
+async function reloadAsterisk() {
+    try {
+        if (!confirm('Apply configuration changes and reload Asterisk? This may briefly interrupt calls.')) {
+            return;
+        }
+
+        showToast('Reloading Asterisk configuration...', 'info');
+        const response = await fetch('/extensions/api/reload', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            showToast('Asterisk configuration reloaded successfully!', 'success');
+            setTimeout(() => {
+                loadStatus();
+                loadExtensions();
+            }, 2000);
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Show create modal
+function showCreateModal() {
+    document.getElementById('create-form').reset();
+    createModalInstance.show();
+}
 
 // Create extension
 async function createExtension() {
+    const form = document.getElementById('create-form');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // Convert checkbox
+    data.vmEnable = form.querySelector('[name="vmEnable"]').checked;
+
     try {
-        const form = document.getElementById('create-extension-form');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData);
-
-        // Convert checkboxes to boolean
-        data.vmEnable = document.getElementById('vmEnable').checked;
-        data.umEnable = document.getElementById('umEnable').checked;
-
-        // Ensure maxContacts is a number
-        data.maxContacts = parseInt(data.maxContacts) || 1;
-
+        showToast('Creating extension...', 'info');
         const response = await fetch('/extensions/api/create', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
 
         const result = await response.json();
 
         if (result.status === 'success') {
-            showToast('Extension created successfully!', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('createExtensionModal')).hide();
-            form.reset();
-            loadExtensions();
+            createModalInstance.hide();
+
+            // Show message based on reload status
+            if (result.reloaded) {
+                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
+            } else {
+                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
+            }
+
+            // Refresh data after a short delay to allow Asterisk to process
+            setTimeout(() => {
+                loadExtensions();
+                loadStatus();
+            }, 2000);
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Show bulk create modal
+function showBulkCreateModal() {
+    document.getElementById('bulk-create-form').reset();
+    bulkCreateModalInstance.show();
+}
+
+// Bulk create extensions
+async function bulkCreateExtensions() {
+    const form = document.getElementById('bulk-create-form');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+        showToast('Creating extensions...', 'info');
+        const response = await fetch('/extensions/api/bulk-create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            bulkCreateModalInstance.hide();
+
+            // Show message based on reload status
+            if (result.reloaded) {
+                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
+            } else {
+                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
+            }
+
+            // Refresh data after a short delay
+            setTimeout(() => {
+                loadExtensions();
+                loadStatus();
+            }, 2000);
         } else {
             throw new Error(result.message);
         }
@@ -613,25 +529,20 @@ async function editExtension(extensionId) {
         const response = await fetch(`/extensions/api/get/${extensionId}`);
         const data = await response.json();
 
-        if (data.status !== 'success') {
+        if (data.status === 'success') {
+            const ext = data.extension;
+            document.getElementById('edit-extension-id').value = ext.extension_id;
+            document.getElementById('edit-ext-number').value = ext.extension_id;
+            document.getElementById('edit-name').value = ext.name;
+            document.getElementById('edit-tech').value = ext.tech;
+            document.getElementById('edit-email').value = ext.email || '';
+            document.getElementById('edit-outbound-cid').value = ext.outbound_cid || '';
+            document.getElementById('edit-emergency-cid').value = ext.emergency_cid || '';
+
+            editModalInstance.show();
+        } else {
             throw new Error(data.message);
         }
-
-        const ext = data.extension;
-
-        // Populate form
-        document.getElementById('edit-extensionId').value = ext.extension_id;
-        document.getElementById('edit-extension-display').value = ext.extension_id;
-        document.getElementById('edit-name').value = ext.name || '';
-        document.getElementById('edit-tech').value = ext.tech || 'pjsip';
-        document.getElementById('edit-email').value = ext.email || '';
-        document.getElementById('edit-callerId').value = ext.caller_id || '';
-        document.getElementById('edit-outboundCid').value = ext.outbound_cid || '';
-        document.getElementById('edit-emergencyCid').value = ext.emergency_cid || '';
-        document.getElementById('edit-maxContacts').value = ext.max_contacts || 1;
-
-        // Show modal
-        new bootstrap.Modal(document.getElementById('editExtensionModal')).show();
     } catch (error) {
         handleError(error);
     }
@@ -639,27 +550,35 @@ async function editExtension(extensionId) {
 
 // Update extension
 async function updateExtension() {
+    const extensionId = document.getElementById('edit-extension-id').value;
+    const form = document.getElementById('edit-form');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
     try {
-        const form = document.getElementById('edit-extension-form');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData);
-        const extensionId = data.extensionId;
-
-        // Ensure maxContacts is a number
-        data.maxContacts = parseInt(data.maxContacts) || 1;
-
+        showToast('Updating extension...', 'info');
         const response = await fetch(`/extensions/api/update/${extensionId}`, {
             method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
 
         const result = await response.json();
 
         if (result.status === 'success') {
-            showToast('Extension updated successfully!', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('editExtensionModal')).hide();
-            loadExtensions();
+            editModalInstance.hide();
+
+            // Show message based on reload status
+            if (result.reloaded) {
+                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
+            } else {
+                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
+            }
+
+            // Refresh data
+            setTimeout(() => {
+                loadExtensions();
+            }, 2000);
         } else {
             throw new Error(result.message);
         }
@@ -670,7 +589,7 @@ async function updateExtension() {
 
 // Confirm delete
 function confirmDelete(extensionId) {
-    if (confirm(`Are you sure you want to delete extension ${extensionId}?\n\nThis action cannot be undone.`)) {
+    if (confirm(`Are you sure you want to delete extension ${extensionId}?`)) {
         deleteExtension(extensionId);
     }
 }
@@ -678,6 +597,7 @@ function confirmDelete(extensionId) {
 // Delete extension
 async function deleteExtension(extensionId) {
     try {
+        showToast('Deleting extension...', 'info');
         const response = await fetch(`/extensions/api/delete/${extensionId}`, {
             method: 'DELETE'
         });
@@ -685,8 +605,18 @@ async function deleteExtension(extensionId) {
         const result = await response.json();
 
         if (result.status === 'success') {
-            showToast('Extension deleted successfully!', 'success');
-            loadExtensions();
+            // Show message based on reload status
+            if (result.reloaded) {
+                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
+            } else {
+                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
+            }
+
+            // Refresh data
+            setTimeout(() => {
+                loadExtensions();
+                loadStatus();
+            }, 2000);
         } else {
             throw new Error(result.message);
         }
@@ -694,86 +624,5 @@ async function deleteExtension(extensionId) {
         handleError(error);
     }
 }
-
-// Bulk create extensions
-async function bulkCreateExtensions() {
-    try {
-        const form = document.getElementById('bulk-create-form');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData);
-
-        // Convert checkboxes to boolean
-        data.vmEnable = document.getElementById('bulk-vmEnable').checked;
-        data.umEnable = document.getElementById('bulk-umEnable').checked;
-
-        // Convert to numbers
-        data.startExtension = parseInt(data.startExtension);
-        data.numberOfExtensions = parseInt(data.numberOfExtensions);
-
-        const response = await fetch('/extensions/api/bulk-create', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            showToast('Extensions created successfully!', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('bulkCreateModal')).hide();
-            form.reset();
-            loadExtensions();
-        } else {
-            throw new Error(result.message);
-        }
-    } catch (error) {
-        handleError(error);
-    }
-}
-
-// Error handler
-function handleError(error) {
-    console.error('Error:', error);
-    const message = error.message || 'An error occurred';
-    showToast(message, 'error');
-}
-
-// Toast notification - FIXED to prevent infinite recursion
-function showToast(message, type = 'info') {
-    // Check if base template has showToast function
-    if (typeof window.showToast === 'function' && window.showToast !== showToast) {
-        window.showToast(message, type);
-    } else {
-        // Fallback: use alert or create a simple toast
-        console.log(`[${type.toUpperCase()}] ${message}`);
-        alert(`${type.toUpperCase()}: ${message}`);
-    }
-}
-
-// Auto-refresh
-function startAutoRefresh() {
-    // Refresh every 30 seconds
-    refreshInterval = setInterval(() => {
-        loadExtensions();
-    }, 30000);
-}
-
-function stopAutoRefresh() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-    }
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    loadExtensions();
-    startAutoRefresh();
-});
-
-// Clean up on page unload
-window.addEventListener('beforeunload', function() {
-    stopAutoRefresh();
-});
 </script>
 {% endblock %}

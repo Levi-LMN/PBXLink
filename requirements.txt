@@ -5,3 +5,4 @@ cryptography
 requests
 Werkzeug
 urllib3
+paramiko

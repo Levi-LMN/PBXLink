@@ -1,29 +1,136 @@
 """
-Extensions Management Blueprint with Status Monitoring via SSH
-Handles CRUD operations for PBX extensions + registration status
+Extensions Management Blueprint with Status Monitoring
+Uses centralized SSH manager for Asterisk commands
+Automatically reloads Asterisk after configuration changes
 """
 
-from flask import Blueprint, render_template, jsonify, request, current_app
+from flask import Blueprint, render_template, jsonify, request
 import logging
-import subprocess
-import re
+import threading
+import time
+from functools import wraps
 from blueprints.api_core import api
+from ssh_manager import ssh_manager  # Import centralized SSH manager
 
 logger = logging.getLogger(__name__)
 
 extensions_bp = Blueprint('extensions', __name__, template_folder='../templates/extensions')
 
 
-@extensions_bp.route('/')
-def index():
-    """Extensions management page"""
-    return render_template('extensions_index.html')
+# ============================================================================
+# CACHING LAYER - Prevents hammering Asterisk with SSH requests
+# ============================================================================
+
+class StatusCache:
+    """Cache for extension status with TTL"""
+    def __init__(self, ttl=10):
+        self.cache = {}
+        self.ttl = ttl  # Time to live in seconds
+        self.lock = threading.Lock()
+
+    def get(self, key):
+        """Get cached value if not expired"""
+        with self.lock:
+            if key in self.cache:
+                value, timestamp = self.cache[key]
+                if time.time() - timestamp < self.ttl:
+                    logger.debug(f"📦 Cache HIT for {key} (age: {time.time() - timestamp:.1f}s)")
+                    return value
+                else:
+                    logger.debug(f"⏰ Cache EXPIRED for {key}")
+                    del self.cache[key]
+        return None
+
+    def set(self, key, value):
+        """Set cached value with timestamp"""
+        with self.lock:
+            self.cache[key] = (value, time.time())
+            logger.debug(f"💾 Cached {key}")
+
+    def clear(self):
+        """Clear all cached values"""
+        with self.lock:
+            self.cache.clear()
+            logger.debug("🗑️ Cache cleared")
 
 
+# Global cache instance (10 second TTL - prevents excessive SSH calls)
+status_cache = StatusCache(ttl=10)
+
+
+def cache_result(cache_key_func, ttl=10):
+    """Decorator to cache function results"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Generate cache key
+            cache_key = cache_key_func(*args, **kwargs) if callable(cache_key_func) else cache_key_func
+
+            # Try to get from cache
+            cached = status_cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+            # Call function and cache result
+            result = func(*args, **kwargs)
+            status_cache.set(cache_key, result)
+            return result
+        return wrapper
+    return decorator
+
+
+# ============================================================================
+# ASTERISK RELOAD FUNCTION
+# ============================================================================
+
+def reload_asterisk():
+    """
+    Reload Asterisk configuration after changes
+    This applies the changes made via GraphQL mutations
+    Equivalent to clicking the "Apply Config" button in FreePBX GUI
+    """
+    try:
+        logger.info("🔄 Reloading Asterisk configuration...")
+
+        # CORRECT: doreload requires an empty input object {}
+        # Note: transaction_id can be used to track async operations
+        mutation = '''
+        mutation {
+            doreload(input: {}) {
+                status
+                message
+                transaction_id
+            }
+        }
+        '''
+
+        result = api.graphql_query(mutation)
+        reload_result = result.get('doreload', {})
+
+        if reload_result.get('status'):
+            transaction_id = reload_result.get('transaction_id', 'N/A')
+            logger.info(f"✅ Asterisk reload initiated successfully (transaction: {transaction_id})")
+            logger.info(f"   Message: {reload_result.get('message', '')}")
+            return True
+        else:
+            logger.error(f"❌ Asterisk reload failed: {reload_result.get('message', '')}")
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ Error reloading Asterisk: {str(e)}")
+        return False
+
+
+# ============================================================================
+# EXTENSION STATUS FUNCTIONS - Now using centralized SSH manager
+# ============================================================================
+
+@cache_result(cache_key_func=lambda: 'extension_status', ttl=10)
 def get_extension_status():
     """
-    Get extension registration status from Asterisk using pjsip show aors via SSH
+    Get extension registration status from Asterisk using pjsip show aors
     Returns dict with extension_id as key and status info
+    CACHED for 10 seconds to prevent excessive SSH calls
 
     Status values from Asterisk:
     - Avail: Contact is available (registered and qualified)
@@ -32,42 +139,18 @@ def get_extension_status():
     - Unknown: Contact status unknown
     """
     try:
-        # Get FreePBX host from config
-        freepbx_host = current_app.config.get('FREEPBX_HOST', 'http://10.200.200.2:80')
+        # Use centralized SSH manager
+        output = ssh_manager.get_pjsip_aors(timeout=10)
 
-        # Extract hostname/IP from URL
-        freepbx_ip = freepbx_host.replace('http://', '').replace('https://', '').split(':')[0]
-
-        # SSH credentials from config
-        ssh_user = current_app.config.get('FREEPBX_SSH_USER', 'root')
-        ssh_key = current_app.config.get('FREEPBX_SSH_KEY', None)
-        ssh_password = current_app.config.get('FREEPBX_SSH_PASSWORD', None)
-
-        # Build SSH command
-        if ssh_key:
-            # Use SSH key authentication (preferred)
-            cmd = f'ssh -i {ssh_key} -o StrictHostKeyChecking=no -o ConnectTimeout=5 {ssh_user}@{freepbx_ip} "asterisk -rx \'pjsip show aors\'"'
-        elif ssh_password:
-            # Use sshpass for password authentication
-            cmd = f'sshpass -p "{ssh_password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 {ssh_user}@{freepbx_ip} "asterisk -rx \'pjsip show aors\'"'
-        else:
-            logger.error("No SSH authentication method configured (FREEPBX_SSH_KEY or FREEPBX_SSH_PASSWORD)")
-            return {}
-
-        logger.debug(f"Executing SSH command to {freepbx_ip}")
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
-
-        if result.returncode != 0:
-            logger.error(f"Failed to get extension status via SSH: {result.stderr}")
+        if not output:
+            logger.error("Failed to get extension status via SSH")
             return {}
 
         status_dict = {}
         current_aor = None
 
         # Parse the output
-        # Format: Aor: <name> <max_contacts>
-        #         Contact: <aor>/<uri> <hash> <Status> <RTT>
-        lines = result.stdout.split('\n')
+        lines = output.split('\n')
 
         for line in lines:
             line = line.strip()
@@ -89,7 +172,7 @@ def get_extension_status():
                     }
                 continue
 
-            # Look for Contact lines (e.g., "Contact: 1000/sip:1000@192.168.1.100:5060 abcd1234 Avail 10.5")
+            # Look for Contact lines
             if current_aor and line.startswith('Contact:'):
                 parts = line.split()
                 if len(parts) >= 3:
@@ -102,10 +185,6 @@ def get_extension_status():
                     status_dict[current_aor]['contact_status'].append(contact_status)
 
                     # Determine overall status
-                    # Avail = registered and qualified
-                    # Unavail = registered but not responding
-                    # NonQual = registered but qualify disabled
-                    # Unknown = status unknown
                     if contact_status == 'Avail':
                         status_dict[current_aor]['registered'] = True
                         status_dict[current_aor]['status'] = 'Online'
@@ -115,28 +194,28 @@ def get_extension_status():
                     elif contact_status == 'Unavail':
                         status_dict[current_aor]['registered'] = True
                         status_dict[current_aor]['status'] = 'Unavailable'
-                    # If Unknown or empty, leave as Offline
 
         logger.debug(f"Retrieved status for {len(status_dict)} extensions")
         return status_dict
 
-    except subprocess.TimeoutExpired:
-        logger.error("Timeout while getting extension status via SSH")
-        return {}
-    except FileNotFoundError as e:
-        if 'sshpass' in str(e):
-            logger.error("sshpass not found. Please install: apt-get install sshpass (Ubuntu) or yum install sshpass (CentOS)")
-        else:
-            logger.error(f"SSH command not found: {str(e)}")
-        return {}
     except Exception as e:
         logger.error(f"Error getting extension status via SSH: {str(e)}")
         return {}
 
 
+# ============================================================================
+# FLASK ROUTES
+# ============================================================================
+
+@extensions_bp.route('/')
+def index():
+    """Extensions management page"""
+    return render_template('extensions_index.html')
+
+
 @extensions_bp.route('/api/status')
 def get_status():
-    """Get registration status for all extensions"""
+    """Get registration status for all extensions (CACHED)"""
     try:
         status_dict = get_extension_status()
 
@@ -147,7 +226,8 @@ def get_status():
             'status': 'success',
             'online_count': online_count,
             'offline_count': offline_count,
-            'extensions': status_dict
+            'extensions': status_dict,
+            'cached': True  # Indicate this may be cached data
         })
     except Exception as e:
         logger.error(f"Error in status endpoint: {str(e)}")
@@ -156,7 +236,7 @@ def get_status():
 
 @extensions_bp.route('/api/list')
 def list_extensions():
-    """Get all extensions with registration status"""
+    """Get all extensions with registration status (CACHED)"""
     try:
         # Get extensions from GraphQL
         query = '''
@@ -198,7 +278,7 @@ def list_extensions():
                 'message': result.get('message', 'Failed to fetch extensions')
             }), 500
 
-        # Get registration status via SSH
+        # Get registration status via SSH (CACHED - won't hammer server)
         status_dict = get_extension_status()
 
         extensions = []
@@ -244,7 +324,7 @@ def list_extensions():
 
 @extensions_bp.route('/api/get/<extension_id>')
 def get_extension(extension_id):
-    """Get single extension details with status"""
+    """Get single extension details with status (CACHED)"""
     try:
         query = f'''
         {{
@@ -290,7 +370,7 @@ def get_extension(extension_id):
         user = result.get('user', {})
         device = result.get('coreDevice', {})
 
-        # Get status via SSH
+        # Get status via SSH (CACHED)
         status_dict = get_extension_status()
         ext_status = status_dict.get(extension_id, {
             'registered': False,
@@ -330,6 +410,21 @@ def get_extension(extension_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@extensions_bp.route('/api/refresh-status', methods=['POST'])
+def refresh_status():
+    """Force refresh extension status (clears cache)"""
+    try:
+        status_cache.clear()
+        logger.info("🔄 Extension status cache cleared")
+        return jsonify({
+            'status': 'success',
+            'message': 'Status cache cleared, next request will fetch fresh data'
+        })
+    except Exception as e:
+        logger.error(f"Error refreshing status: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 @extensions_bp.route('/api/create', methods=['POST'])
 def create_extension():
     """Create new extension"""
@@ -357,8 +452,9 @@ def create_extension():
         um_enable = data.get('umEnable', True)
         um_password = data.get('umPassword', '')
         um_groups = data.get('umGroups', '1')
-        max_contacts = int(data.get('maxContacts', 1))
+        max_contacts = data.get('maxContacts', 1)
 
+        # maxContacts must be passed as a STRING even though it's an integer type
         mutation = f'''
         mutation {{
             addExtension(
@@ -375,7 +471,7 @@ def create_extension():
                     umEnable: {str(um_enable).lower()}
                     umPassword: "{um_password}"
                     umGroups: "{um_groups}"
-                    maxContacts: {max_contacts}
+                    maxContacts: "{max_contacts}"
                     clientMutationId: "create_{extension_id}"
                 }}
             ) {{
@@ -389,13 +485,18 @@ def create_extension():
         add_result = result.get('addExtension', {})
 
         if add_result.get('status'):
-            # Clear extensions cache
+            # Clear caches
             api.clear_cache('extensions')
+            status_cache.clear()
+
+            # RELOAD ASTERISK after creating extension
+            reload_success = reload_asterisk()
 
             return jsonify({
                 'status': 'success',
                 'message': add_result.get('message', 'Extension created successfully'),
-                'extension_id': extension_id
+                'extension_id': extension_id,
+                'reloaded': reload_success
             })
         else:
             return jsonify({
@@ -434,8 +535,9 @@ def update_extension(extension_id):
         um_password = data.get('umPassword', '')
         um_groups = data.get('umGroups', '1')
         ext_password = data.get('extPassword', '')
-        max_contacts = int(data.get('maxContacts', 1))
+        max_contacts = data.get('maxContacts', 1)
 
+        # maxContacts must be passed as a STRING even though it's an integer type
         mutation = f'''
         mutation {{
             updateExtension(
@@ -453,7 +555,7 @@ def update_extension(extension_id):
                     umPassword: "{um_password}"
                     umGroups: "{um_groups}"
                     extPassword: "{ext_password}"
-                    maxContacts: {max_contacts}
+                    maxContacts: "{max_contacts}"
                     clientMutationId: "update_{extension_id}"
                 }}
             ) {{
@@ -468,12 +570,17 @@ def update_extension(extension_id):
         update_result = result.get('updateExtension', {})
 
         if update_result.get('status'):
-            # Clear extensions cache
+            # Clear caches
             api.clear_cache('extensions')
+            status_cache.clear()
+
+            # RELOAD ASTERISK after updating extension
+            reload_success = reload_asterisk()
 
             return jsonify({
                 'status': 'success',
-                'message': update_result.get('message', 'Extension updated successfully')
+                'message': update_result.get('message', 'Extension updated successfully'),
+                'reloaded': reload_success
             })
         else:
             return jsonify({
@@ -505,12 +612,17 @@ def delete_extension(extension_id):
         delete_result = result.get('deleteExtension', {})
 
         if delete_result.get('status'):
-            # Clear extensions cache
+            # Clear caches
             api.clear_cache('extensions')
+            status_cache.clear()
+
+            # RELOAD ASTERISK after deleting extension
+            reload_success = reload_asterisk()
 
             return jsonify({
                 'status': 'success',
-                'message': delete_result.get('message', 'Extension deleted successfully')
+                'message': delete_result.get('message', 'Extension deleted successfully'),
+                'reloaded': reload_success
             })
         else:
             return jsonify({
@@ -548,6 +660,7 @@ def bulk_create_extensions():
         um_enable = data.get('umEnable', True)
         um_groups = data.get('umGroups', '1')
 
+        # startExtension and numberOfExtensions should be passed as integers (not strings)
         mutation = f'''
         mutation {{
             createRangeofExtension(
@@ -576,12 +689,17 @@ def bulk_create_extensions():
         create_result = result.get('createRangeofExtension', {})
 
         if create_result.get('status'):
-            # Clear extensions cache
+            # Clear caches
             api.clear_cache('extensions')
+            status_cache.clear()
+
+            # RELOAD ASTERISK after bulk creating extensions
+            reload_success = reload_asterisk()
 
             return jsonify({
                 'status': 'success',
-                'message': create_result.get('message', 'Extensions created successfully')
+                'message': create_result.get('message', 'Extensions created successfully'),
+                'reloaded': reload_success
             })
         else:
             return jsonify({
@@ -591,4 +709,29 @@ def bulk_create_extensions():
 
     except Exception as e:
         logger.error(f"Error bulk creating extensions: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@extensions_bp.route('/api/reload', methods=['POST'])
+def manual_reload():
+    """Manual Asterisk reload endpoint"""
+    try:
+        reload_success = reload_asterisk()
+
+        if reload_success:
+            # Clear status cache after reload
+            status_cache.clear()
+
+            return jsonify({
+                'status': 'success',
+                'message': 'Asterisk configuration reloaded successfully'
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to reload Asterisk configuration'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error in manual reload: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
