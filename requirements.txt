@@ -6,3 +6,5 @@ requests
 Werkzeug
 urllib3
 paramiko
+qrcode[pil]
+pillow
