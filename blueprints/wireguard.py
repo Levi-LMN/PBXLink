@@ -1,7 +1,7 @@
 """
 WireGuard management blueprint
 Handles WireGuard VPN configuration, user management, and QR code generation
-Updated to work with /home/sibasi/wireguard and existing config structure
+Updated with enhanced status parsing and UI-friendly output
 """
 
 from flask import Blueprint, render_template, request, jsonify, send_file, Response
@@ -12,7 +12,7 @@ import ipaddress
 import qrcode
 import io
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -474,8 +474,158 @@ PersistentKeepalive = 25
             logger.error(f"Error restarting WireGuard: {e}")
             return False
 
+    def parse_wireguard_status(self):
+        """Parse WireGuard status into structured, UI-friendly format"""
+        try:
+            result = subprocess.run(
+                ['sudo', 'wg', 'show', self.interface],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            raw_status = result.stdout
+            return self._format_status_for_ui(raw_status)
+
+        except Exception as e:
+            logger.error(f"Error getting WireGuard status: {e}")
+            return None
+
+    def _format_status_for_ui(self, raw_status):
+        """Convert raw WireGuard status to UI-friendly format"""
+        if not raw_status:
+            return None
+
+        lines = raw_status.strip().split('\n')
+        status_data = {
+            'interface': {},
+            'peers': []
+        }
+
+        current_peer = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Interface section
+            if line.startswith('interface:'):
+                status_data['interface']['name'] = line.split(':')[1].strip()
+            elif line.startswith('public key:'):
+                if current_peer is None:
+                    status_data['interface']['public_key'] = line.split(':')[1].strip()
+                else:
+                    current_peer['public_key'] = line.split(':')[1].strip()
+            elif line.startswith('listening port:'):
+                status_data['interface']['port'] = line.split(':')[1].strip()
+
+            # Peer section
+            elif line.startswith('peer:'):
+                if current_peer:
+                    status_data['peers'].append(current_peer)
+                current_peer = {
+                    'public_key_short': line.split(':')[1].strip()[:16] + '...',
+                    'public_key_full': line.split(':')[1].strip()
+                }
+            elif line.startswith('endpoint:'):
+                if current_peer:
+                    endpoint = line.split(':')[1].strip()
+                    current_peer['endpoint'] = endpoint
+                    current_peer['ip'] = endpoint.split(':')[0] if ':' in endpoint else endpoint
+            elif line.startswith('allowed ips:'):
+                if current_peer:
+                    current_peer['allowed_ips'] = line.split(':')[1].strip()
+                    # Extract client IP for display
+                    ips = current_peer['allowed_ips'].split(',')
+                    for ip in ips:
+                        ip_clean = ip.strip()
+                        if ip_clean.endswith('/32'):
+                            current_peer['client_ip'] = ip_clean.replace('/32', '')
+                            break
+            elif line.startswith('latest handshake:'):
+                if current_peer:
+                    handshake = line.split(':', 1)[1].strip()
+                    current_peer['latest_handshake'] = handshake
+                    current_peer['status'] = self._determine_peer_status(handshake)
+            elif line.startswith('transfer:'):
+                if current_peer:
+                    transfer = line.split(':', 1)[1].strip()
+                    # Parse transfer data
+                    received, sent = self._parse_transfer_data(transfer)
+                    current_peer['transfer_received'] = received
+                    current_peer['transfer_sent'] = sent
+                    current_peer['transfer_total'] = self._calculate_total_transfer(received, sent)
+
+        # Don't forget the last peer
+        if current_peer:
+            status_data['peers'].append(current_peer)
+
+        return status_data
+
+    def _determine_peer_status(self, handshake_text):
+        """Determine peer status based on handshake time"""
+        if not handshake_text or 'never' in handshake_text.lower():
+            return 'offline'
+
+        # Parse time components
+        time_components = handshake_text.split(',')
+        total_seconds = 0
+
+        for component in time_components:
+            component = component.strip()
+            if 'minute' in component:
+                minutes = int(component.split()[0])
+                total_seconds += minutes * 60
+            elif 'second' in component:
+                seconds = int(component.split()[0])
+                total_seconds += seconds
+
+        # Consider peer online if handshake was within last 3 minutes
+        if total_seconds <= 180:  # 3 minutes
+            return 'online'
+        else:
+            return 'stale'
+
+    def _parse_transfer_data(self, transfer_text):
+        """Parse transfer data into readable format"""
+        try:
+            # Example: "387.37 KiB received, 214.28 KiB sent"
+            received_part, sent_part = transfer_text.split(',')
+            received = received_part.strip().split()[0] + ' ' + received_part.strip().split()[1]
+            sent = sent_part.strip().split()[0] + ' ' + sent_part.strip().split()[1]
+            return received, sent
+        except:
+            return '0 B', '0 B'
+
+    def _calculate_total_transfer(self, received, sent):
+        """Calculate total transfer"""
+        try:
+            rec_value, rec_unit = received.split()
+            sent_value, sent_unit = sent.split()
+
+            # Convert to common unit (bytes) for calculation
+            units = {'B': 1, 'KiB': 1024, 'MiB': 1024**2, 'GiB': 1024**3}
+
+            rec_bytes = float(rec_value) * units.get(rec_unit, 1)
+            sent_bytes = float(sent_value) * units.get(sent_unit, 1)
+            total_bytes = rec_bytes + sent_bytes
+
+            # Convert back to appropriate unit
+            if total_bytes >= units['GiB']:
+                return f"{total_bytes/units['GiB']:.2f} GiB"
+            elif total_bytes >= units['MiB']:
+                return f"{total_bytes/units['MiB']:.2f} MiB"
+            elif total_bytes >= units['KiB']:
+                return f"{total_bytes/units['KiB']:.2f} KiB"
+            else:
+                return f"{total_bytes:.0f} B"
+
+        except:
+            return '0 B'
+
     def get_wireguard_status(self):
-        """Get WireGuard interface status"""
+        """Get WireGuard interface status (legacy method)"""
         try:
             result = subprocess.run(
                 ['sudo', 'wg', 'show', self.interface],
@@ -625,8 +775,18 @@ def get_user_qr(username):
 
 @wireguard_bp.route('/api/status')
 def get_status():
-    """Get WireGuard status"""
+    """Get WireGuard status (raw)"""
     status = wg_manager.get_wireguard_status()
+    if status:
+        return jsonify({'success': True, 'status': status})
+
+    return jsonify({'success': False, 'error': 'Failed to get WireGuard status'}), 500
+
+
+@wireguard_bp.route('/api/status-ui')
+def get_status_ui():
+    """Get WireGuard status in UI-friendly format"""
+    status = wg_manager.parse_wireguard_status()
     if status:
         return jsonify({'success': True, 'status': status})
 
