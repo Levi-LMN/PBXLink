@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - FreePBX Management{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Welcome Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4><i class="fas fa-tachometer-alt text-primary"></i> Welcome to FreePBX Management Dashboard</h4>
+                <p class="text-muted mb-0">Manage your PBX system with ease. View call analytics, manage extensions, and monitor system health.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Stats -->
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(13,110,253,0.1); color: #0d6efd;">
+                <i class="fas fa-phone"></i>
+            </div>
+            <h3 class="stat-value" id="total-calls">-</h3>
+            <p class="stat-label">Total Calls (7d)</p>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(25,135,84,0.1); color: #198754;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 class="stat-value" id="answered-calls">-</h3>
+            <p class="stat-label">Answered Calls</p>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(220,53,69,0.1); color: #dc3545;">
+                <i class="fas fa-phone-slash"></i>
+            </div>
+            <h3 class="stat-value" id="missed-calls">-</h3>
+            <p class="stat-label">Missed Calls</p>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(255,193,7,0.1); color: #ffc107;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <h3 class="stat-value" id="avg-duration">-</h3>
+            <p class="stat-label">Avg Duration</p>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-bolt"></i> Quick Actions
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <a href="/cdr/" class="btn btn-lg btn-outline-primary w-100">
+                            <i class="fas fa-chart-line me-2"></i>
+                            View Call Records
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="/extensions/" class="btn btn-lg btn-outline-success w-100">
+                            <i class="fas fa-phone me-2"></i>
+                            Manage Extensions
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-lg btn-outline-info w-100" onclick="testConnection()">
+                            <i class="fas fa-wifi me-2"></i>
+                            Test API Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Activity & System Info -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-history"></i> Recent Activity
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-center" style="min-height: 200px;">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-info-circle fa-3x mb-3"></i>
+                        <p>Navigate to <strong>Call Records</strong> to view recent calls</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-server"></i> System Information
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td><i class="fas fa-network-wired text-primary"></i> Server</td>
+                            <td class="text-end" id="server-host">-</td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-plug text-success"></i> API Status</td>
+                            <td class="text-end" id="api-status">
+                                <span class="badge bg-secondary">Unknown</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-calendar text-info"></i> Dashboard Version</td>
+                            <td class="text-end">v1.0.0</td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-code-branch text-warning"></i> API Version</td>
+                            <td class="text-end">GraphQL</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Features Overview -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-star"></i> Features
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <h6><i class="fas fa-chart-bar text-primary"></i> Call Analytics</h6>
+                        <p class="text-muted small">
+                            View detailed call records, statistics, and hourly/daily distributions. 
+                            Analyze call patterns and identify top callers.
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6><i class="fas fa-users text-success"></i> Extension Management</h6>
+                        <p class="text-muted small">
+                            Create, update, and delete extensions. Bulk operations supported. 
+                            Configure voicemail and user settings.
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6><i class="fas fa-rocket text-info"></i> Real-time Updates</h6>
+                        <p class="text-muted small">
+                            Live data updates with smart caching. 
+                            Efficient GraphQL queries for optimal performance.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load quick stats
+    async function loadStats() {
+        try {
+            const response = await fetch('/cdr/api/stats?days=7');
+            const data = await response.json();
+            
+            document.getElementById('total-calls').textContent = data.total_calls || 0;
+            document.getElementById('answered-calls').textContent = data.answered_calls || 0;
+            document.getElementById('missed-calls').textContent = data.missed_calls || 0;
+            document.getElementById('avg-duration').textContent = data.avg_duration_formatted || '0s';
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+    
+    // Test API connection
+    async function testConnection() {
+        try {
+            const response = await fetch('/api/test');
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                document.getElementById('api-status').innerHTML = 
+                    '<span class="badge bg-success"><i class="fas fa-check"></i> Connected</span>';
+                showToast('API connection successful!', 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            document.getElementById('api-status').innerHTML = 
+                '<span class="badge bg-danger"><i class="fas fa-times"></i> Disconnected</span>';
+            showToast('API connection failed: ' + error.message, 'danger');
+        }
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStats();
+        testConnection();
+        
+        // Show server host
+        document.getElementById('server-host').textContent = 
+            window.location.protocol + '//' + window.location.host;
+    });
+</script>
+{% endblock %}
