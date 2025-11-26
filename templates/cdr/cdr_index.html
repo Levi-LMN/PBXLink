@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+
+{% block title %}Call Detail Records - FreePBX{% endblock %}
+{% block page_title %}Call Detail Records{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+
+    .filter-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .disposition-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .disposition-ANSWERED {
+        background: rgba(25,135,84,0.1);
+        color: #198754;
+    }
+
+    .disposition-NO_ANSWER,
+    .disposition-BUSY,
+    .disposition-FAILED {
+        background: rgba(220,53,69,0.1);
+        color: #dc3545;
+    }
+
+    .pagination-info {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Filters -->
+    <div class="col-12">
+        <div class="filter-section">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Time Period</label>
+                    <select class="form-select" id="days-filter">
+                        <option value="1">Last 24 Hours</option>
+                        <option value="7" selected>Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="90">Last 90 Days</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Records per Page</label>
+                    <select class="form-select" id="per-page-filter">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button class="btn btn-primary" onclick="loadAllData()">
+                        <i class="fas fa-sync-alt"></i> Refresh Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(13,110,253,0.1); color: #0d6efd;">
+                <i class="fas fa-phone-volume"></i>
+            </div>
+            <h3 class="stat-value" id="total-calls">0</h3>
+            <p class="stat-label">Total Calls</p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(25,135,84,0.1); color: #198754;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 class="stat-value" id="answered-calls">0</h3>
+            <p class="stat-label">Answered</p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(220,53,69,0.1); color: #dc3545;">
+                <i class="fas fa-phone-slash"></i>
+            </div>
+            <h3 class="stat-value" id="missed-calls">0</h3>
+            <p class="stat-label">Missed</p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(255,193,7,0.1); color: #ffc107;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <h3 class="stat-value" id="avg-duration">0m</h3>
+            <p class="stat-label">Avg Duration</p>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-bar"></i> Hourly Distribution
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="hourly-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-line"></i> Daily Trends
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="daily-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Callers & Destinations -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-user-friends"></i> Top Callers
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Number</th>
+                                <th class="text-end">Calls</th>
+                                <th class="text-end">Answered</th>
+                                <th class="text-end">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-callers-table">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-phone-square"></i> Top Destinations
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Number</th>
+                                <th class="text-end">Calls</th>
+                                <th class="text-end">Answered</th>
+                                <th class="text-end">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-destinations-table">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Records Table -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-list"></i> Call Records</span>
+                <span class="pagination-info" id="pagination-info">-</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Caller ID</th>
+                                <th>Source</th>
+                                <th>Destination</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calls-table">
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white">
+                <nav>
+                    <ul class="pagination mb-0 justify-content-center" id="pagination">
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let hourlyChart, dailyChart;
+
+// Load statistics
+async function loadStats() {
+    try {
+        const days = document.getElementById('days-filter').value;
+        const response = await fetch(`/cdr/api/stats?days=${days}`);
+        const data = await response.json();
+
+        document.getElementById('total-calls').textContent = data.total_calls || 0;
+        document.getElementById('answered-calls').textContent = data.answered_calls || 0;
+        document.getElementById('missed-calls').textContent = data.missed_calls || 0;
+        document.getElementById('avg-duration').textContent = data.avg_duration_formatted || '0s';
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Load call records
+async function loadCalls(page = 1) {
+    try {
+        const days = document.getElementById('days-filter').value;
+        const perPage = document.getElementById('per-page-filter').value;
+
+        const response = await fetch(`/cdr/api/calls?days=${days}&page=${page}&per_page=${perPage}`);
+        const data = await response.json();
+
+        const tbody = document.getElementById('calls-table');
+        tbody.innerHTML = '';
+
+        if (data.calls.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No call records found</td></tr>';
+            return;
+        }
+
+        data.calls.forEach(call => {
+            const row = `
+                <tr>
+                    <td>${call.calldate}</td>
+                    <td>${call.caller_id}</td>
+                    <td>${call.source}</td>
+                    <td>${call.destination}</td>
+                    <td>${call.duration_formatted}</td>
+                    <td>
+                        <span class="disposition-badge disposition-${call.disposition.replace(' ', '_')}">
+                            ${call.disposition}
+                        </span>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+        // Update pagination
+        updatePagination(data.pagination);
+        currentPage = page;
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Update pagination
+function updatePagination(pagination) {
+    const info = document.getElementById('pagination-info');
+    const start = ((pagination.page - 1) * pagination.per_page) + 1;
+    const end = Math.min(pagination.page * pagination.per_page, pagination.total_records);
+    info.textContent = `Showing ${start}-${end} of ${pagination.total_records} records`;
+
+    const paginationEl = document.getElementById('pagination');
+    paginationEl.innerHTML = '';
+
+    // Previous button
+    const prevDisabled = pagination.page === 1 ? 'disabled' : '';
+    paginationEl.insertAdjacentHTML('beforeend', `
+        <li class="page-item ${prevDisabled}">
+            <a class="page-link" href="#" onclick="loadCalls(${pagination.page - 1}); return false;">Previous</a>
+        </li>
+    `);
+
+    // Page numbers
+    const maxPages = 5;
+    let startPage = Math.max(1, pagination.page - 2);
+    let endPage = Math.min(pagination.total_pages, startPage + maxPages - 1);
+
+    for (let i = startPage; i <= endPage; i++) {
+        const active = i === pagination.page ? 'active' : '';
+        paginationEl.insertAdjacentHTML('beforeend', `
+            <li class="page-item ${active}">
+                <a class="page-link" href="#" onclick="loadCalls(${i}); return false;">${i}</a>
+            </li>
+        `);
+    }
+
+    // Next button
+    const nextDisabled = pagination.page === pagination.total_pages ? 'disabled' : '';
+    paginationEl.insertAdjacentHTML('beforeend', `
+        <li class="page-item ${nextDisabled}">
+            <a class="page-link" href="#" onclick="loadCalls(${pagination.page + 1}); return false;">Next</a>
+        </li>
+    `);
+}
+
+// Load hourly stats
+async function loadHourlyStats() {
+    try {
+        const days = document.getElementById('days-filter').value;
+        const response = await fetch(`/cdr/api/hourly-stats?days=${days}`);
+        const result = await response.json();
+
+        const ctx = document.getElementById('hourly-chart').getContext('2d');
+
+        if (hourlyChart) {
+            hourlyChart.destroy();
+        }
+
+        hourlyChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: result.data.map(d => `${d.hour}:00`),
+                datasets: [{
+                    label: 'Calls',
+                    data: result.data.map(d => d.calls),
+                    backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                    borderColor: 'rgb(13, 110, 253)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Load daily stats
+async function loadDailyStats() {
+    try {
+        const days = document.getElementById('days-filter').value;
+        const response = await fetch(`/cdr/api/daily-stats?days=${days}`);
+        const result = await response.json();
+
+        const ctx = document.getElementById('daily-chart').getContext('2d');
+
+        if (dailyChart) {
+            dailyChart.destroy();
+        }
+
+        dailyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: result.data.map(d => d.date),
+                datasets: [
+                    {
+                        label: 'Total',
+                        data: result.data.map(d => d.total),
+                        borderColor: 'rgb(13, 110, 253)',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Answered',
+                        data: result.data.map(d => d.answered),
+                        borderColor: 'rgb(25, 135, 84)',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Missed',
+                        data: result.data.map(d => d.missed),
+                        borderColor: 'rgb(220, 53, 69)',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Load top callers
+async function loadTopCallers() {
+    try {
+        const days = document.getElementById('days-filter').value;
+        const response = await fetch(`/cdr/api/top-callers?days=${days}&limit=10`);
+        const result = await response.json();
+
+        const tbody = document.getElementById('top-callers-table');
+        tbody.innerHTML = '';
+
+        if (result.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No data available</td></tr>';
+            return;
+        }
+
+        result.data.forEach(caller => {
+            const row = `
+                <tr>
+                    <td>${caller.number}</td>
+                    <td class="text-end">${caller.total_calls}</td>
+                    <td class="text-end">${caller.answered_calls}</td>
+                    <td class="text-end">${caller.total_duration_formatted}</td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Load top destinations
+async function loadTopDestinations() {
+    try {
+        const days = document.getElementById('days-filter').value;
+        const response = await fetch(`/cdr/api/top-destinations?days=${days}&limit=10`);
+        const result = await response.json();
+
+        const tbody = document.getElementById('top-destinations-table');
+        tbody.innerHTML = '';
+
+        if (result.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No data available</td></tr>';
+            return;
+        }
+
+        result.data.forEach(dest => {
+            const row = `
+                <tr>
+                    <td>${dest.number}</td>
+                    <td class="text-end">${dest.total_calls}</td>
+                    <td class="text-end">${dest.answered_calls}</td>
+                    <td class="text-end">${dest.total_duration_formatted}</td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+// Load all data
+function loadAllData() {
+    loadStats();
+    loadCalls(1);
+    loadHourlyStats();
+    loadDailyStats();
+    loadTopCallers();
+    loadTopDestinations();
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllData();
+
+    // Add event listeners to filters
+    document.getElementById('days-filter').addEventListener('change', loadAllData);
+    document.getElementById('per-page-filter').addEventListener('change', () => loadCalls(1));
+});
+</script>
+{% endblock %}

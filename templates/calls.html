@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FreePBX Call Logs</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        tr:nth-child(even) { background-color: #fafafa; }
+    </style>
+</head>
+<body>
+    <h1>Call Logs</h1>
+    {% if error %}
+        <p style="color: red;">Error: {{ error }}</p>
+    {% endif %}
+    {% if calls %}
+    <table>
+        <thead>
+            <tr>
+                <th>Date/Time</th>
+                <th>Caller</th>
+                <th>Destination</th>
+                <th>Duration (s)</th>
+                <th>Disposition</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for call in calls %}
+            <tr>
+                <td>{{ call.calldate }}</td>
+                <td>{{ call.src }}</td>
+                <td>{{ call.dst }}</td>
+                <td>{{ call.duration }}</td>
+                <td>{{ call.disposition }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No calls found.</p>
+    {% endif %}
+</body>
+</html>
