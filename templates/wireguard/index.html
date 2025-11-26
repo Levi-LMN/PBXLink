@@ -1,74 +1,276 @@
 {% extends "base.html" %}
 
-{% block title %}WireGuard Management{% endblock %}
+{% block title %}WireGuard VPN - FreePBX Dashboard{% endblock %}
 {% block page_title %}WireGuard VPN Management{% endblock %}
 
+{% block extra_css %}
+<style>
+    .section-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #212529;
+        margin: 0;
+    }
+
+    .status-box {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+
+    .status-box pre {
+        background: #212529;
+        color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-size: 0.875rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    .users-table {
+        margin: 0;
+    }
+
+    .users-table thead th {
+        background: #f8f9fa;
+        color: #495057;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .users-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .modal-content {
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+    }
+
+    .modal-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .modal-title {
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .config-display {
+        background: #212529;
+        color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 400px;
+        overflow-y: auto;
+        margin: 0;
+    }
+
+    .qr-code-container {
+        text-align: center;
+        padding: 1.5rem;
+    }
+
+    .qr-code-container img {
+        max-width: 100%;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+    }
+
+    .loading-spinner {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .info-card {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 6px;
+        border-left: 4px solid #0d6efd;
+    }
+
+    .info-card label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .info-card .value {
+        font-size: 1rem;
+        color: #212529;
+        font-weight: 500;
+        word-break: break-all;
+    }
+
+    .btn-group-sm > .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-shield-alt me-2"></i>WireGuard Server Status</span>
-                <button class="btn btn-sm btn-primary" onclick="refreshStatus()">
+<div class="container-fluid">
+    <!-- Server Status Section -->
+    <div class="section-card">
+        <div class="section-header">
+            <h2 class="section-title">
+                <i class="fas fa-server text-primary"></i> Server Status
+            </h2>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary me-2" onclick="refreshStatus()">
                     <i class="fas fa-sync-alt"></i> Refresh
                 </button>
-            </div>
-            <div class="card-body">
-                <pre id="wg-status" class="mb-0" style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 1rem; border-radius: 4px;">Loading...</pre>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-file-code me-2"></i>Server Configuration</span>
-                <div>
-                    <button class="btn btn-sm btn-warning" onclick="editServerConfig()">
-                        <i class="fas fa-edit"></i> Edit
-                    </button>
-                    <button class="btn btn-sm btn-success" onclick="restartWireGuard()">
-                        <i class="fas fa-redo"></i> Restart Service
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <pre id="server-config" class="mb-0" style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 1rem; border-radius: 4px;">Loading...</pre>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-users me-2"></i>VPN Users</span>
-                <button class="btn btn-sm btn-success" onclick="showAddUserModal()">
-                    <i class="fas fa-plus"></i> Add User
+                <button class="btn btn-sm btn-primary me-2" onclick="restartWireGuard()">
+                    <i class="fas fa-redo"></i> Restart Service
+                </button>
+                <button class="btn btn-sm btn-success" onclick="initializeUsersDirectory()">
+                    <i class="fas fa-folder-plus"></i> Initialize Users Directory
                 </button>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover" id="users-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>IP Address</th>
-                                <th>Public Key</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-tbody">
-                            <tr>
-                                <td colspan="4" class="text-center">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+        </div>
+        <div class="status-box">
+            <div id="statusLoading" class="loading-spinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
+                <p class="mt-2">Loading status...</p>
             </div>
+            <pre id="serverStatus" style="display: none;"></pre>
+        </div>
+    </div>
+
+    <!-- VPN Users Section -->
+    <div class="section-card">
+        <div class="section-header">
+            <h2 class="section-title">
+                <i class="fas fa-users text-primary"></i> VPN Users
+            </h2>
+            <button class="btn btn-success" onclick="showAddUserModal()">
+                <i class="fas fa-user-plus"></i> Add New User
+            </button>
+        </div>
+
+        <div id="usersLoading" class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading users...</p>
+        </div>
+
+        <div id="usersTableContainer" style="display: none;">
+            <div class="table-responsive">
+                <table class="table table-hover users-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>IP Address</th>
+                            <th>Public Key</th>
+                            <th>Status</th>
+                            <th style="width: 300px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="noUsers" class="empty-state" style="display: none;">
+            <i class="fas fa-user-slash"></i>
+            <p class="mb-0">No users found. Click "Add New User" to create one.</p>
+        </div>
+    </div>
+
+    <!-- Server Configuration Section -->
+    <div class="section-card">
+        <div class="section-header">
+            <h2 class="section-title">
+                <i class="fas fa-cog text-primary"></i> Server Configuration
+            </h2>
+            <button class="btn btn-sm btn-primary" onclick="showEditConfigModal()">
+                <i class="fas fa-edit"></i> Edit Config
+            </button>
+        </div>
+        <div class="status-box">
+            <div id="configLoading" class="loading-spinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading configuration...</p>
+            </div>
+            <pre id="serverConfig" style="display: none;"></pre>
         </div>
     </div>
 </div>
@@ -78,206 +280,277 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add New VPN User</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus text-success"></i> Add New VPN User
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" class="form-control" id="username" placeholder="e.g., john_doe" required>
-                    <small class="text-muted">Only alphanumeric characters, underscores, and hyphens allowed</small>
+                    <label for="newUsername" class="form-label">Username <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="newUsername" placeholder="e.g., john_doe" required>
+                    <div class="form-text">Only letters, numbers, underscores, and hyphens allowed</div>
                 </div>
                 <div class="mb-3">
-                    <label for="description" class="form-label">Description (Optional)</label>
-                    <input type="text" class="form-control" id="description" placeholder="e.g., John's iPhone">
+                    <label for="newDescription" class="form-label">Description (Optional)</label>
+                    <input type="text" class="form-control" id="newDescription" placeholder="e.g., John Doe - Sales Manager">
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="createUser()">
-                    <i class="fas fa-plus"></i> Create User
+                <button type="button" class="btn btn-success" onclick="createUser()">
+                    <i class="fas fa-check"></i> Create User
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Edit Config Modal -->
-<div class="modal fade" id="editConfigModal" tabindex="-1">
+<!-- View User Modal -->
+<div class="modal fade" id="viewUserModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Server Configuration</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-user text-primary"></i> User Configuration
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <strong>Warning:</strong> Editing the server configuration incorrectly can break your VPN. Make sure you know what you're doing.
-                </div>
-                <textarea class="form-control font-monospace" id="config-editor" rows="20" style="font-size: 0.875rem;"></textarea>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveServerConfig()">
-                    <i class="fas fa-save"></i> Save Configuration
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- View Config Modal -->
-<div class="modal fade" id="viewConfigModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="viewConfigTitle">User Configuration</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <div class="d-flex justify-content-center mb-3">
-                        <img id="qr-code" src="" alt="QR Code" style="max-width: 300px; display: none;" class="border rounded">
-                        <div id="qr-loading" class="text-center">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2">Generating QR Code...</p>
-                        </div>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <label>Username</label>
+                        <div class="value" id="viewUsername">-</div>
                     </div>
-                    <small class="text-muted d-block text-center mb-3">Scan with WireGuard mobile app</small>
+                    <div class="info-card">
+                        <label>IP Address</label>
+                        <div class="value" id="viewUserIP">-</div>
+                    </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Configuration File</label>
-                    <pre id="user-config-content" class="mb-0" style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 1rem; border-radius: 4px; font-size: 0.875rem;"></pre>
+                    <label class="form-label">Client Configuration</label>
+                    <div class="config-display" id="viewUserConfig">Loading...</div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="download-config-btn">
-                    <i class="fas fa-download"></i> Download Config
+                <button type="button" class="btn btn-primary" onclick="downloadConfigFromModal()">
+                    <i class="fas fa-download"></i> Download
                 </button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- QR Code Modal -->
+<div class="modal fade" id="qrModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-qrcode text-primary"></i> QR Code
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="qr-code-container">
+                    <img id="qrImage" src="" alt="QR Code" class="img-fluid" />
+                    <p class="text-muted mt-3 mb-0">
+                        <i class="fas fa-mobile-alt"></i> Scan this QR code with the WireGuard mobile app
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Server Config Modal -->
+<div class="modal fade" id="editConfigModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit text-primary"></i> Edit Server Configuration
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> Be careful when editing the server configuration. Invalid configurations may break your VPN.
+                </div>
+                <div class="mb-3">
+                    <label for="configEditor" class="form-label">Configuration File</label>
+                    <textarea class="form-control font-monospace" id="configEditor" rows="20" style="font-size: 0.875rem;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveConfig()">
+                    <i class="fas fa-save"></i> Save & Restart
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let currentUsername = null;
-    const addUserModal = new bootstrap.Modal(document.getElementById('addUserModal'));
-    const editConfigModal = new bootstrap.Modal(document.getElementById('editConfigModal'));
-    const viewConfigModal = new bootstrap.Modal(document.getElementById('viewConfigModal'));
+    let currentUser = null;
+    let addUserModalInstance = null;
+    let viewUserModalInstance = null;
+    let qrModalInstance = null;
+    let editConfigModalInstance = null;
 
-    // Load initial data
+    // Initialize modals on page load
     document.addEventListener('DOMContentLoaded', function() {
-        loadUsers();
+        addUserModalInstance = new bootstrap.Modal(document.getElementById('addUserModal'));
+        viewUserModalInstance = new bootstrap.Modal(document.getElementById('viewUserModal'));
+        qrModalInstance = new bootstrap.Modal(document.getElementById('qrModal'));
+        editConfigModalInstance = new bootstrap.Modal(document.getElementById('editConfigModal'));
+
+        loadServerStatus();
         loadServerConfig();
-        refreshStatus();
+        loadUsers();
     });
 
-    // Load users list
+    // Load server status
+    async function loadServerStatus() {
+        const statusDiv = document.getElementById('serverStatus');
+        const loadingDiv = document.getElementById('statusLoading');
+        
+        try {
+            const response = await fetch('/wireguard/api/status');
+            const data = await response.json();
+            
+            loadingDiv.style.display = 'none';
+            statusDiv.style.display = 'block';
+            
+            if (data.success) {
+                statusDiv.textContent = data.status;
+            } else {
+                statusDiv.textContent = 'Failed to load status';
+                showToast('Failed to load server status', 'warning');
+            }
+        } catch (error) {
+            console.error('Error loading status:', error);
+            loadingDiv.style.display = 'none';
+            statusDiv.style.display = 'block';
+            statusDiv.textContent = 'Error loading status';
+            showToast('Error loading server status', 'danger');
+        }
+    }
+
+    // Load server config
+    async function loadServerConfig() {
+        const configDiv = document.getElementById('serverConfig');
+        const loadingDiv = document.getElementById('configLoading');
+        
+        try {
+            const response = await fetch('/wireguard/api/config');
+            const data = await response.json();
+            
+            loadingDiv.style.display = 'none';
+            configDiv.style.display = 'block';
+            
+            if (data.success) {
+                configDiv.textContent = data.config;
+            } else {
+                configDiv.textContent = 'Failed to load configuration';
+                showToast('Failed to load server configuration', 'warning');
+            }
+        } catch (error) {
+            console.error('Error loading config:', error);
+            loadingDiv.style.display = 'none';
+            configDiv.style.display = 'block';
+            configDiv.textContent = 'Error loading configuration';
+            showToast('Error loading server configuration', 'danger');
+        }
+    }
+
+    // Load users
     async function loadUsers() {
+        const tbody = document.getElementById('usersTableBody');
+        const loading = document.getElementById('usersLoading');
+        const tableContainer = document.getElementById('usersTableContainer');
+        const noUsers = document.getElementById('noUsers');
+        
+        loading.style.display = 'block';
+        tableContainer.style.display = 'none';
+        noUsers.style.display = 'none';
+        
         try {
             const response = await fetch('/wireguard/api/users');
             const data = await response.json();
-
-            const tbody = document.getElementById('users-tbody');
-
+            
+            loading.style.display = 'none';
+            
             if (data.success && data.users.length > 0) {
+                tableContainer.style.display = 'block';
                 tbody.innerHTML = data.users.map(user => `
                     <tr>
-                        <td><strong>${escapeHtml(user.username)}</strong></td>
-                        <td><code>${escapeHtml(user.ip)}</code></td>
-                        <td><code style="font-size: 0.75rem;">${escapeHtml(user.public_key.substring(0, 20))}...</code></td>
+                        <td><strong>${user.username}</strong></td>
+                        <td><code class="text-primary">${user.ip}</code></td>
+                        <td><small><code style="font-size: 0.75rem;">${user.public_key.substring(0, 40)}...</code></small></td>
                         <td>
-                            <button class="btn btn-sm btn-info" onclick="viewUserConfig('${escapeHtml(user.username)}')" title="View Config">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn btn-sm btn-primary" onclick="downloadUserConfig('${escapeHtml(user.username)}')" title="Download">
-                                <i class="fas fa-download"></i>
-                            </button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteUser('${escapeHtml(user.username)}')" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            ${user.config_exists ? 
+                                '<span class="badge bg-success">Active</span>' : 
+                                '<span class="badge bg-warning">No Config</span>'}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm action-buttons" role="group">
+                                <button class="btn btn-outline-primary" onclick="viewUser('${user.username}')" title="View Configuration">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="showQRCode('${user.username}')" title="Show QR Code">
+                                    <i class="fas fa-qrcode"></i>
+                                </button>
+                                <button class="btn btn-outline-info" onclick="downloadUserConfig('${user.username}')" title="Download Config">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" onclick="deleteUser('${user.username}')" title="Delete User">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `).join('');
             } else {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No users found</td></tr>';
+                noUsers.style.display = 'block';
             }
         } catch (error) {
             console.error('Error loading users:', error);
-            showToast('Failed to load users', 'danger');
-        }
-    }
-
-    // Load server configuration
-    async function loadServerConfig() {
-        try {
-            const response = await fetch('/wireguard/api/config');
-            const data = await response.json();
-
-            if (data.success) {
-                document.getElementById('server-config').textContent = data.config;
-            } else {
-                document.getElementById('server-config').textContent = 'Failed to load configuration';
-            }
-        } catch (error) {
-            console.error('Error loading server config:', error);
-            document.getElementById('server-config').textContent = 'Error loading configuration';
-        }
-    }
-
-    // Refresh WireGuard status
-    async function refreshStatus() {
-        try {
-            const response = await fetch('/wireguard/api/status');
-            const data = await response.json();
-
-            if (data.success) {
-                document.getElementById('wg-status').textContent = data.status || 'No active connections';
-            } else {
-                document.getElementById('wg-status').textContent = 'Failed to get status';
-            }
-        } catch (error) {
-            console.error('Error loading status:', error);
-            document.getElementById('wg-status').textContent = 'Error loading status';
+            loading.style.display = 'none';
+            noUsers.style.display = 'block';
+            showToast('Error loading users', 'danger');
         }
     }
 
     // Show add user modal
     function showAddUserModal() {
-        document.getElementById('username').value = '';
-        document.getElementById('description').value = '';
-        addUserModal.show();
+        document.getElementById('newUsername').value = '';
+        document.getElementById('newDescription').value = '';
+        addUserModalInstance.show();
     }
 
-    // Create new user
+    // Create user
     async function createUser() {
-        const username = document.getElementById('username').value.trim();
-        const description = document.getElementById('description').value.trim();
+        const username = document.getElementById('newUsername').value.trim();
+        const description = document.getElementById('newDescription').value.trim();
 
         if (!username) {
-            showToast('Please enter a username', 'warning');
-            return;
-        }
-
-        // Validate username
-        if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-            showToast('Username can only contain letters, numbers, underscores, and hyphens', 'warning');
+            showToast('Username is required', 'warning');
             return;
         }
 
         try {
             const response = await fetch('/wireguard/api/users', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, description })
             });
 
@@ -285,9 +558,9 @@
 
             if (data.success) {
                 showToast(`User ${username} created successfully!`, 'success');
-                addUserModal.hide();
+                addUserModalInstance.hide();
                 loadUsers();
-                refreshStatus();
+                loadServerConfig();
             } else {
                 showToast(data.error || 'Failed to create user', 'danger');
             }
@@ -297,9 +570,55 @@
         }
     }
 
+    // View user details
+    async function viewUser(username) {
+        currentUser = username;
+        
+        try {
+            const response = await fetch(`/wireguard/api/users/${username}/config`);
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('viewUsername').textContent = username;
+                document.getElementById('viewUserConfig').textContent = data.config;
+                
+                // Try to parse IP from config
+                const ipMatch = data.config.match(/Address\s*=\s*([^\n]+)/);
+                if (ipMatch) {
+                    document.getElementById('viewUserIP').textContent = ipMatch[1].trim();
+                }
+                
+                viewUserModalInstance.show();
+            } else {
+                showToast('Failed to load user configuration', 'danger');
+            }
+        } catch (error) {
+            console.error('Error loading user:', error);
+            showToast('Error loading user configuration', 'danger');
+        }
+    }
+
+    // Download user config from modal
+    function downloadConfigFromModal() {
+        if (currentUser) {
+            downloadUserConfig(currentUser);
+        }
+    }
+
+    // Download user config
+    function downloadUserConfig(username) {
+        window.location.href = `/wireguard/api/users/${username}/download`;
+    }
+
+    // Show QR code
+    function showQRCode(username) {
+        document.getElementById('qrImage').src = `/wireguard/api/users/${username}/qr?t=${new Date().getTime()}`;
+        qrModalInstance.show();
+    }
+
     // Delete user
     async function deleteUser(username) {
-        if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+        if (!confirm(`Are you sure you want to delete user "${username}"?\n\nThis action cannot be undone.`)) {
             return;
         }
 
@@ -313,7 +632,7 @@
             if (data.success) {
                 showToast(`User ${username} deleted successfully`, 'success');
                 loadUsers();
-                refreshStatus();
+                loadServerConfig();
             } else {
                 showToast(data.error || 'Failed to delete user', 'danger');
             }
@@ -323,88 +642,46 @@
         }
     }
 
-    // View user configuration
-    async function viewUserConfig(username) {
-        currentUsername = username;
-        document.getElementById('viewConfigTitle').textContent = `Configuration for ${username}`;
-
-        // Show loading state
-        document.getElementById('qr-loading').style.display = 'block';
-        document.getElementById('qr-code').style.display = 'none';
-        document.getElementById('user-config-content').textContent = 'Loading...';
-
-        viewConfigModal.show();
-
+    // Show edit config modal
+    async function showEditConfigModal() {
         try {
-            // Load config text
-            const configResponse = await fetch(`/wireguard/api/users/${username}/config`);
-            const configData = await configResponse.json();
+            const response = await fetch('/wireguard/api/config');
+            const data = await response.json();
 
-            if (configData.success) {
-                document.getElementById('user-config-content').textContent = configData.config;
+            if (data.success) {
+                document.getElementById('configEditor').value = data.config;
+                editConfigModalInstance.show();
             } else {
-                document.getElementById('user-config-content').textContent = 'Failed to load configuration';
+                showToast('Failed to load configuration', 'danger');
             }
-
-            // Load QR code
-            const qrImg = document.getElementById('qr-code');
-            qrImg.src = `/wireguard/api/users/${username}/qr`;
-            qrImg.onload = function() {
-                document.getElementById('qr-loading').style.display = 'none';
-                qrImg.style.display = 'block';
-            };
-            qrImg.onerror = function() {
-                document.getElementById('qr-loading').innerHTML = '<p class="text-danger">Failed to generate QR code</p>';
-            };
-
         } catch (error) {
-            console.error('Error loading user config:', error);
-            document.getElementById('user-config-content').textContent = 'Error loading configuration';
-            document.getElementById('qr-loading').innerHTML = '<p class="text-danger">Error loading QR code</p>';
+            console.error('Error loading config:', error);
+            showToast('Error loading configuration', 'danger');
         }
-
-        // Setup download button
-        document.getElementById('download-config-btn').onclick = function() {
-            window.location.href = `/wireguard/api/users/${username}/download`;
-        };
     }
 
-    // Download user configuration
-    function downloadUserConfig(username) {
-        window.location.href = `/wireguard/api/users/${username}/download`;
-    }
+    // Save config
+    async function saveConfig() {
+        const config = document.getElementById('configEditor').value;
 
-    // Edit server configuration
-    function editServerConfig() {
-        const currentConfig = document.getElementById('server-config').textContent;
-        document.getElementById('config-editor').value = currentConfig;
-        editConfigModal.show();
-    }
-
-    // Save server configuration
-    async function saveServerConfig() {
-        const config = document.getElementById('config-editor').value;
-
-        if (!confirm('Are you sure you want to update the server configuration? This will restart the WireGuard service.')) {
+        if (!confirm('Are you sure you want to update the server configuration?\n\nThis will restart the VPN service.')) {
             return;
         }
 
         try {
             const response = await fetch('/wireguard/api/config', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ config })
             });
 
             const data = await response.json();
 
             if (data.success) {
-                showToast('Configuration updated successfully', 'success');
-                editConfigModal.hide();
+                showToast('Configuration updated and service restarted successfully', 'success');
+                editConfigModalInstance.hide();
                 loadServerConfig();
-                refreshStatus();
+                loadServerStatus();
             } else {
                 showToast(data.error || 'Failed to update configuration', 'danger');
             }
@@ -414,9 +691,9 @@
         }
     }
 
-    // Restart WireGuard service
+    // Restart WireGuard
     async function restartWireGuard() {
-        if (!confirm('Are you sure you want to restart the WireGuard service? This will temporarily disconnect all VPN users.')) {
+        if (!confirm('Are you sure you want to restart the WireGuard service?')) {
             return;
         }
 
@@ -429,7 +706,7 @@
 
             if (data.success) {
                 showToast('WireGuard service restarted successfully', 'success');
-                setTimeout(refreshStatus, 2000);
+                setTimeout(() => loadServerStatus(), 2000);
             } else {
                 showToast(data.error || 'Failed to restart service', 'danger');
             }
@@ -439,16 +716,35 @@
         }
     }
 
-    // Utility function to escape HTML
-    function escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return text.replace(/[&<>"']/g, m => map[m]);
+    // Refresh status
+    function refreshStatus() {
+        loadServerStatus();
+        loadUsers();
+        showToast('Refreshing status...', 'info');
+    }
+
+    // Initialize users directory
+    async function initializeUsersDirectory() {
+        if (!confirm('This will create the users directory structure if it doesn\'t exist.\n\nContinue?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/wireguard/api/init-users-dir', {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('Users directory initialized successfully', 'success');
+            } else {
+                showToast(data.error || 'Failed to initialize directory', 'danger');
+            }
+        } catch (error) {
+            console.error('Error initializing directory:', error);
+            showToast('Error initializing directory', 'danger');
+        }
     }
 </script>
 {% endblock %}
