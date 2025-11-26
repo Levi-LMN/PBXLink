@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/Freepbx.iml" filepath="$PROJECT_DIR$/.idea/Freepbx.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/PBXLink.iml" filepath="$PROJECT_DIR$/.idea/PBXLink.iml" />
     </modules>
   </component>
 </project>

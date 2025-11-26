@@ -1,63 +1,65 @@
 """
-FreePBX Management Dashboard - Main Application
-Multi-module dashboard with CDR and Extensions management
+Main application file for FreePBX Dashboard
 """
 
-from flask import Flask, render_template
-import os
-from dotenv import load_dotenv
+from flask import Flask, render_template, redirect, url_for
 import logging
+import os
 
-# Load environment variables
-load_dotenv()
+# Import configuration
+from config import get_config
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Import blueprints
+from blueprints.api_core import api_core_bp
+from blueprints.extensions import extensions_bp
+from blueprints.cdr import cdr_bp
 
-def create_app():
-    """Application factory pattern"""
-    app = Flask(__name__, static_folder='static', template_folder='templates')
+def create_app(config_name=None):
+    """Application factory"""
+    app = Flask(__name__)
 
-    # Configuration
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['FREEPBX_HOST'] = os.getenv('FREEPBX_HOST', 'http://192.168.0.140')
-    app.config['FREEPBX_CLIENT_ID'] = os.getenv('FREEPBX_CLIENT_ID')
-    app.config['FREEPBX_CLIENT_SECRET'] = os.getenv('FREEPBX_CLIENT_SECRET')
+    # Load configuration
+    if config_name is None:
+        config_name = os.environ.get('FLASK_ENV', 'development')
+
+    app.config.from_object(get_config(config_name))
+
+    # Setup logging
+    logging.basicConfig(
+        level=getattr(logging, app.config['LOG_LEVEL']),
+        format=app.config['LOG_FORMAT']
+    )
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"Starting FreePBX Dashboard in {config_name} mode")
+    logger.info(f"FreePBX Host: {app.config['FREEPBX_HOST']}")
+    logger.info(f"SSH User: {app.config['FREEPBX_SSH_USER']}")
+    logger.info(f"Using SSH Password: {'Yes' if app.config['FREEPBX_SSH_PASSWORD'] else 'No'}")
 
     # Register blueprints
-    from blueprints.cdr import cdr_bp
-    from blueprints.extensions import extensions_bp
-    from blueprints.api_core import api_core_bp
-
-    app.register_blueprint(cdr_bp, url_prefix='/cdr')
-    app.register_blueprint(extensions_bp, url_prefix='/extensions')
     app.register_blueprint(api_core_bp, url_prefix='/api')
+    app.register_blueprint(extensions_bp, url_prefix='/extensions')
+    app.register_blueprint(cdr_bp, url_prefix='/cdr')
 
-    # Main routes
+    # Root route
     @app.route('/')
     def index():
         """Dashboard home page"""
         return render_template('index.html')
 
+    # Health check
     @app.route('/health')
     def health():
-        """Health check endpoint"""
-        return {'status': 'healthy', 'message': 'FreePBX Dashboard is running'}, 200
+        return {'status': 'ok', 'message': 'FreePBX Dashboard is running'}
 
     return app
 
 
+# For running directly with python app.py
 if __name__ == '__main__':
     app = create_app()
-    port = int(os.getenv('PORT', 5000))
-
-    # Check configuration
-    if not app.config['FREEPBX_CLIENT_ID'] or not app.config['FREEPBX_CLIENT_SECRET']:
-        logger.error("FreePBX API credentials not configured!")
-        logger.error("Set FREEPBX_HOST, FREEPBX_CLIENT_ID, and FREEPBX_CLIENT_SECRET in .env")
-    else:
-        logger.info(f"FreePBX Host: {app.config['FREEPBX_HOST']}")
-        logger.info("API credentials configured ✓")
-
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=app.config['DEBUG']
+    )

@@ -1,9 +1,9 @@
 """
-Extensions Management Blueprint with Status Monitoring
+Extensions Management Blueprint with Status Monitoring via SSH
 Handles CRUD operations for PBX extensions + registration status
 """
 
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, current_app
 import logging
 import subprocess
 import re
@@ -22,7 +22,7 @@ def index():
 
 def get_extension_status():
     """
-    Get extension registration status from Asterisk using pjsip show aors
+    Get extension registration status from Asterisk using pjsip show aors via SSH
     Returns dict with extension_id as key and status info
 
     Status values from Asterisk:
@@ -32,12 +32,33 @@ def get_extension_status():
     - Unknown: Contact status unknown
     """
     try:
-        # Use 'pjsip show aors' for better contact status info
-        cmd = 'asterisk -rx "pjsip show aors"'
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+        # Get FreePBX host from config
+        freepbx_host = current_app.config.get('FREEPBX_HOST', 'http://10.200.200.2:80')
+
+        # Extract hostname/IP from URL
+        freepbx_ip = freepbx_host.replace('http://', '').replace('https://', '').split(':')[0]
+
+        # SSH credentials from config
+        ssh_user = current_app.config.get('FREEPBX_SSH_USER', 'root')
+        ssh_key = current_app.config.get('FREEPBX_SSH_KEY', None)
+        ssh_password = current_app.config.get('FREEPBX_SSH_PASSWORD', None)
+
+        # Build SSH command
+        if ssh_key:
+            # Use SSH key authentication (preferred)
+            cmd = f'ssh -i {ssh_key} -o StrictHostKeyChecking=no -o ConnectTimeout=5 {ssh_user}@{freepbx_ip} "asterisk -rx \'pjsip show aors\'"'
+        elif ssh_password:
+            # Use sshpass for password authentication
+            cmd = f'sshpass -p "{ssh_password}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 {ssh_user}@{freepbx_ip} "asterisk -rx \'pjsip show aors\'"'
+        else:
+            logger.error("No SSH authentication method configured (FREEPBX_SSH_KEY or FREEPBX_SSH_PASSWORD)")
+            return {}
+
+        logger.debug(f"Executing SSH command to {freepbx_ip}")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
 
         if result.returncode != 0:
-            logger.error(f"Failed to get extension status: {result.stderr}")
+            logger.error(f"Failed to get extension status via SSH: {result.stderr}")
             return {}
 
         status_dict = {}
@@ -52,7 +73,7 @@ def get_extension_status():
             line = line.strip()
 
             # Skip header and separator lines
-            if not line or line.startswith('===') or line.startswith('Aor:') and 'MaxContact' in line:
+            if not line or line.startswith('===') or (line.startswith('Aor:') and 'MaxContact' in line):
                 continue
 
             # Look for AOR lines (e.g., "Aor: 1000 1")
@@ -96,13 +117,20 @@ def get_extension_status():
                         status_dict[current_aor]['status'] = 'Unavailable'
                     # If Unknown or empty, leave as Offline
 
+        logger.debug(f"Retrieved status for {len(status_dict)} extensions")
         return status_dict
 
     except subprocess.TimeoutExpired:
-        logger.error("Timeout while getting extension status")
+        logger.error("Timeout while getting extension status via SSH")
+        return {}
+    except FileNotFoundError as e:
+        if 'sshpass' in str(e):
+            logger.error("sshpass not found. Please install: apt-get install sshpass (Ubuntu) or yum install sshpass (CentOS)")
+        else:
+            logger.error(f"SSH command not found: {str(e)}")
         return {}
     except Exception as e:
-        logger.error(f"Error getting extension status: {str(e)}")
+        logger.error(f"Error getting extension status via SSH: {str(e)}")
         return {}
 
 
@@ -170,7 +198,7 @@ def list_extensions():
                 'message': result.get('message', 'Failed to fetch extensions')
             }), 500
 
-        # Get registration status
+        # Get registration status via SSH
         status_dict = get_extension_status()
 
         extensions = []
@@ -262,7 +290,7 @@ def get_extension(extension_id):
         user = result.get('user', {})
         device = result.get('coreDevice', {})
 
-        # Get status
+        # Get status via SSH
         status_dict = get_extension_status()
         ext_status = status_dict.get(extension_id, {
             'registered': False,
@@ -329,7 +357,7 @@ def create_extension():
         um_enable = data.get('umEnable', True)
         um_password = data.get('umPassword', '')
         um_groups = data.get('umGroups', '1')
-        max_contacts = int(data.get('maxContacts', 1))  # Convert to int
+        max_contacts = int(data.get('maxContacts', 1))
 
         mutation = f'''
         mutation {{
@@ -406,7 +434,7 @@ def update_extension(extension_id):
         um_password = data.get('umPassword', '')
         um_groups = data.get('umGroups', '1')
         ext_password = data.get('extPassword', '')
-        max_contacts = int(data.get('maxContacts', 1))  # Convert to int
+        max_contacts = int(data.get('maxContacts', 1))
 
         mutation = f'''
         mutation {{
