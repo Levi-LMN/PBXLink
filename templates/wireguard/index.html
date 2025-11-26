@@ -177,6 +177,25 @@
         margin-bottom: 1rem;
         opacity: 0.5;
     }
+
+    .key-mode-toggle {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .key-fields {
+        display: none;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+        margin-top: 1rem;
+    }
+
+    .key-fields.active {
+        display: block;
+    }
 </style>
 {% endblock %}
 
@@ -277,7 +296,7 @@
 
 <!-- Add User Modal -->
 <div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -294,6 +313,31 @@
                 <div class="mb-3">
                     <label for="newDescription" class="form-label">Description (Optional)</label>
                     <input type="text" class="form-control" id="newDescription" placeholder="e.g., John Doe - Sales Manager">
+                </div>
+
+                <div class="key-mode-toggle">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="useExistingKeys" onchange="toggleKeyFields()">
+                        <label class="form-check-label" for="useExistingKeys">
+                            <strong>Use Existing Keys</strong>
+                            <small class="text-muted d-block">Enable this if you already have WireGuard keys for this user</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="keyFields" class="key-fields">
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> Both private and public keys are required. Leave empty to auto-generate new keys.
+                    </div>
+                    <div class="mb-3">
+                        <label for="newPrivateKey" class="form-label">Private Key</label>
+                        <textarea class="form-control font-monospace" id="newPrivateKey" rows="2" placeholder="Enter existing private key"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newPublicKey" class="form-label">Public Key</label>
+                        <textarea class="form-control font-monospace" id="newPublicKey" rows="2" placeholder="Enter existing public key"></textarea>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -418,18 +462,33 @@
         loadUsers();
     });
 
+    // Toggle key fields visibility
+    function toggleKeyFields() {
+        const checkbox = document.getElementById('useExistingKeys');
+        const keyFields = document.getElementById('keyFields');
+
+        if (checkbox.checked) {
+            keyFields.classList.add('active');
+        } else {
+            keyFields.classList.remove('active');
+            // Clear fields when toggling off
+            document.getElementById('newPrivateKey').value = '';
+            document.getElementById('newPublicKey').value = '';
+        }
+    }
+
     // Load server status
     async function loadServerStatus() {
         const statusDiv = document.getElementById('serverStatus');
         const loadingDiv = document.getElementById('statusLoading');
-        
+
         try {
             const response = await fetch('/wireguard/api/status');
             const data = await response.json();
-            
+
             loadingDiv.style.display = 'none';
             statusDiv.style.display = 'block';
-            
+
             if (data.success) {
                 statusDiv.textContent = data.status;
             } else {
@@ -449,14 +508,14 @@
     async function loadServerConfig() {
         const configDiv = document.getElementById('serverConfig');
         const loadingDiv = document.getElementById('configLoading');
-        
+
         try {
             const response = await fetch('/wireguard/api/config');
             const data = await response.json();
-            
+
             loadingDiv.style.display = 'none';
             configDiv.style.display = 'block';
-            
+
             if (data.success) {
                 configDiv.textContent = data.config;
             } else {
@@ -478,17 +537,17 @@
         const loading = document.getElementById('usersLoading');
         const tableContainer = document.getElementById('usersTableContainer');
         const noUsers = document.getElementById('noUsers');
-        
+
         loading.style.display = 'block';
         tableContainer.style.display = 'none';
         noUsers.style.display = 'none';
-        
+
         try {
             const response = await fetch('/wireguard/api/users');
             const data = await response.json();
-            
+
             loading.style.display = 'none';
-            
+
             if (data.success && data.users.length > 0) {
                 tableContainer.style.display = 'block';
                 tbody.innerHTML = data.users.map(user => `
@@ -497,8 +556,8 @@
                         <td><code class="text-primary">${user.ip}</code></td>
                         <td><small><code style="font-size: 0.75rem;">${user.public_key.substring(0, 40)}...</code></small></td>
                         <td>
-                            ${user.config_exists ? 
-                                '<span class="badge bg-success">Active</span>' : 
+                            ${user.config_exists ?
+                                '<span class="badge bg-success">Active</span>' :
                                 '<span class="badge bg-warning">No Config</span>'}
                         </td>
                         <td>
@@ -534,6 +593,10 @@
     function showAddUserModal() {
         document.getElementById('newUsername').value = '';
         document.getElementById('newDescription').value = '';
+        document.getElementById('newPrivateKey').value = '';
+        document.getElementById('newPublicKey').value = '';
+        document.getElementById('useExistingKeys').checked = false;
+        document.getElementById('keyFields').classList.remove('active');
         addUserModalInstance.show();
     }
 
@@ -541,17 +604,38 @@
     async function createUser() {
         const username = document.getElementById('newUsername').value.trim();
         const description = document.getElementById('newDescription').value.trim();
+        const useExistingKeys = document.getElementById('useExistingKeys').checked;
+        const privateKey = document.getElementById('newPrivateKey').value.trim();
+        const publicKey = document.getElementById('newPublicKey').value.trim();
 
         if (!username) {
             showToast('Username is required', 'warning');
             return;
         }
 
+        // Validate keys if using existing
+        if (useExistingKeys) {
+            if (!privateKey || !publicKey) {
+                showToast('Both private and public keys are required when using existing keys', 'warning');
+                return;
+            }
+        }
+
+        const payload = {
+            username,
+            description
+        };
+
+        if (useExistingKeys && privateKey && publicKey) {
+            payload.private_key = privateKey;
+            payload.public_key = publicKey;
+        }
+
         try {
             const response = await fetch('/wireguard/api/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, description })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
@@ -573,7 +657,7 @@
     // View user details
     async function viewUser(username) {
         currentUser = username;
-        
+
         try {
             const response = await fetch(`/wireguard/api/users/${username}/config`);
             const data = await response.json();
@@ -581,13 +665,13 @@
             if (data.success) {
                 document.getElementById('viewUsername').textContent = username;
                 document.getElementById('viewUserConfig').textContent = data.config;
-                
+
                 // Try to parse IP from config
                 const ipMatch = data.config.match(/Address\s*=\s*([^\n]+)/);
                 if (ipMatch) {
                     document.getElementById('viewUserIP').textContent = ipMatch[1].trim();
                 }
-                
+
                 viewUserModalInstance.show();
             } else {
                 showToast('Failed to load user configuration', 'danger');
@@ -618,7 +702,7 @@
 
     // Delete user
     async function deleteUser(username) {
-        if (!confirm(`Are you sure you want to delete user "${username}"?\n\nThis action cannot be undone.`)) {
+        if (!confirm(`Are you sure you want to delete user "${username}"?\n\nThis will remove:\n- User directory and keys\n- Configuration from server\n- All associated comments\n\nThis action cannot be undone.`)) {
             return;
         }
 
