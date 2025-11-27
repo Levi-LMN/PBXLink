@@ -15,7 +15,8 @@ from blueprints.api_core import api_core_bp
 from blueprints.extensions import extensions_bp
 from blueprints.cdr import cdr_bp
 from blueprints.wireguard import wireguard_bp
-from blueprints.ai_agent import ai_agent_bp  # NEW
+from blueprints.ai_agent import ai_agent_bp
+from blueprints.tg100 import tg100_bp
 
 # Import SSH manager
 from ssh_manager import init_ssh_manager, ssh_manager
@@ -51,7 +52,8 @@ def create_app(config_name=None):
     app.register_blueprint(extensions_bp, url_prefix='/extensions')
     app.register_blueprint(cdr_bp, url_prefix='/cdr')
     app.register_blueprint(wireguard_bp, url_prefix='/wireguard')
-    app.register_blueprint(ai_agent_bp, url_prefix='/ai_agent')  # NEW
+    app.register_blueprint(ai_agent_bp, url_prefix='/ai_agent')
+    app.register_blueprint(tg100_bp, url_prefix='/tg100')
 
     # Root route
     @app.route('/')
