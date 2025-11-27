@@ -5,500 +5,103 @@
 
 {% block extra_css %}
 <style>
-    .section-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-        margin-bottom: 1.5rem;
-    }
+.section-card {background: white;border-radius: 6px;padding: 1rem;box-shadow: 0 1px 3px rgba(0,0,0,0.08);margin-bottom: 1rem;}
+.section-header {display: flex;justify-content: space-between;align-items: center;margin-bottom: 1rem;padding-bottom: 0.75rem;border-bottom: 1px solid #e9ecef;}
+.section-title {font-size: 1.1rem;font-weight: 600;color: #212529;margin: 0;}
+.status-box {background: #f8f9fa;border: 1px solid #dee2e6;border-radius: 6px;padding: 1rem;}
+.status-box pre {background: #212529;color: #f8f9fa;padding: 0.75rem;border-radius: 4px;font-size: 0.8rem;margin: 0;}
+.users-table {margin: 0;font-size: 0.85rem;}
+.users-table thead th {background: #f8f9fa;font-weight: 600;border-bottom: 1px solid #dee2e6;padding: 0.5rem;}
+.action-buttons {display: flex;gap: 0.25rem;flex-wrap: wrap;}
+.modal-content {border: none;border-radius: 6px;box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.15);}
+.modal-header {background: #f8f9fa;border-bottom: 1px solid #dee2e6;padding: 1rem;}
+.modal-title {font-weight: 600;font-size: 1rem;}
+.modal-body {padding: 1rem;}
+.config-display {background: #212529;color: #f8f9fa;padding: 0.75rem;border-radius: 4px;font-size: 0.8rem;}
+.loading-spinner {text-align: center;padding: 2rem;color: #6c757d;font-size: 0.9rem;}
+.spinner-border {width: 2rem;height: 2rem;}
+.info-grid {display: grid;grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));gap: 0.75rem;margin-bottom: 1rem;}
+.info-card {background: #f8f9fa;padding: 0.75rem;border-radius: 4px;border-left: 3px solid #0d6efd;font-size: 0.85rem;}
+.empty-state {text-align: center;padding: 2rem;color: #6c757d;font-size: 0.9rem;}
+.btn-group-sm > .btn {padding: 0.2rem 0.4rem;font-size: 0.8rem;}
 
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid #e9ecef;
-    }
+.status-overview {display: grid;grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));gap: 0.75rem;margin-bottom: 1rem;}
+.status-card {background: white;border: 1px solid #e9ecef;border-radius: 6px;padding: 0.75rem;text-align: center;}
+.status-card .value {font-size: 1.2rem;font-weight: 600;margin-bottom: 0.25rem;}
+.status-card .label {font-size: 0.75rem;color: #6c757d;text-transform: uppercase;font-weight: 600;}
 
-    .section-title {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #212529;
-        margin: 0;
-    }
+.peer-card {background: white;border: 1px solid #e9ecef;border-radius: 6px;padding: 0.75rem;margin-bottom: 0.75rem;cursor: pointer;transition: all 0.2s ease;font-size: 0.8rem;}
+.peer-card:hover {box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+.peer-header {display: flex;justify-content: space-between;align-items: center;margin-bottom: 0.5rem;}
+.peer-title {font-weight: 600;margin: 0;font-size: 0.9rem;}
+.status-badge {padding: 0.2rem 0.5rem;border-radius: 50px;font-size: 0.7rem;font-weight: 600;text-transform: uppercase;}
+.status-online {background: #d1fae5;color: #065f46;}
+.status-offline {background: #fee2e2;color: #991b1b;}
+.status-stale {background: #fef3c7;color: #92400e;}
 
-    .status-box {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 1.5rem;
-    }
+.peer-details-minimal {display: grid;grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));gap: 0.5rem;}
+.peer-detail-minimal label {font-size: 0.65rem;color: #6c757d;font-weight: 600;margin-bottom: 0.1rem;}
+.peer-detail-minimal .value {font-size: 0.75rem;font-weight: 500;}
 
-    .status-box pre {
-        background: #212529;
-        color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 6px;
-        overflow-x: auto;
-        font-size: 0.875rem;
-        line-height: 1.6;
-        margin: 0;
-    }
+.transfer-stats-minimal {display: flex;gap: 0.4rem;margin-top: 0.4rem;}
+.transfer-stat-minimal {padding: 0.3rem;background: #f8f9fa;border-radius: 3px;min-width: 50px;}
+.transfer-stat-minimal .direction {font-size: 0.6rem;color: #6c757d;}
+.transfer-stat-minimal .amount {font-size: 0.7rem;font-weight: 600;}
 
-    .users-table {
-        margin: 0;
-    }
+.interface-info {background: #f8f9fa;border-radius: 6px;padding: 1rem;margin-bottom: 1rem;font-size: 0.85rem;}
+.interface-details {display: grid;grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));gap: 0.75rem;}
 
-    .users-table thead th {
-        background: #f8f9fa;
-        color: #495057;
-        font-weight: 600;
-        border-bottom: 2px solid #dee2e6;
-    }
+.peer-details-full {display: grid;grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));gap: 0.75rem;margin-bottom: 1rem;font-size: 0.85rem;}
+.peer-detail-full label {font-size: 0.7rem;color: #6c757d;font-weight: 600;margin-bottom: 0.3rem;}
+.peer-detail-full .value {font-size: 0.8rem;padding: 0.4rem;background: #f8f9fa;border-radius: 3px;}
 
-    .users-table tbody tr:hover {
-        background: #f8f9fa;
-    }
+.transfer-stats-full {display: flex;gap: 0.75rem;margin-top: 0.75rem;}
+.transfer-stat-full {padding: 0.75rem;background: #f8f9fa;border-radius: 4px;min-width: 80px;}
+.transfer-stat-full .direction {font-size: 0.7rem;color: #6c757d;margin-bottom: 0.3rem;}
+.transfer-stat-full .amount {font-size: 0.9rem;font-weight: 600;}
 
-    .action-buttons {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-
-    .modal-content {
-        border: none;
-        border-radius: 8px;
-        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
-    }
-
-    .modal-header {
-        background: #f8f9fa;
-        border-bottom: 1px solid #dee2e6;
-        padding: 1.25rem 1.5rem;
-    }
-
-    .modal-title {
-        font-weight: 600;
-        color: #212529;
-    }
-
-    .modal-body {
-        padding: 1.5rem;
-    }
-
-    .modal-footer {
-        padding: 1rem 1.5rem;
-        border-top: 1px solid #dee2e6;
-    }
-
-    .config-display {
-        background: #212529;
-        color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 6px;
-        font-family: 'Courier New', monospace;
-        font-size: 0.875rem;
-        line-height: 1.6;
-        white-space: pre-wrap;
-        word-break: break-all;
-        max-height: 400px;
-        overflow-y: auto;
-        margin: 0;
-    }
-
-    .qr-code-container {
-        text-align: center;
-        padding: 1.5rem;
-    }
-
-    .qr-code-container img {
-        max-width: 100%;
-        border: 2px solid #dee2e6;
-        border-radius: 8px;
-    }
-
-    .loading-spinner {
-        text-align: center;
-        padding: 3rem;
-        color: #6c757d;
-    }
-
-    .spinner-border {
-        width: 3rem;
-        height: 3rem;
-    }
-
-    .info-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .info-card {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 6px;
-        border-left: 4px solid #0d6efd;
-    }
-
-    .info-card label {
-        font-size: 0.75rem;
-        color: #6c757d;
-        font-weight: 600;
-        text-transform: uppercase;
-        display: block;
-        margin-bottom: 0.5rem;
-    }
-
-    .info-card .value {
-        font-size: 1rem;
-        color: #212529;
-        font-weight: 500;
-        word-break: break-all;
-    }
-
-    .btn-group-sm > .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-
-    .empty-state {
-        text-align: center;
-        padding: 3rem;
-        color: #6c757d;
-    }
-
-    .empty-state i {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-        opacity: 0.5;
-    }
-
-    .key-mode-toggle {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 0.75rem;
-        margin-bottom: 1rem;
-    }
-
-    .key-fields {
-        display: none;
-        padding-top: 1rem;
-        border-top: 1px solid #dee2e6;
-        margin-top: 1rem;
-    }
-
-    .key-fields.active {
-        display: block;
-    }
-
-    /* Enhanced Status Styles */
-    .status-overview {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .status-card {
-        background: white;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 1.25rem;
-        text-align: center;
-    }
-
-    .status-card .value {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    .status-card .label {
-        font-size: 0.875rem;
-        color: #6c757d;
-        text-transform: uppercase;
-        font-weight: 600;
-    }
-
-    .peer-card {
-        background: white;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .peer-card:hover {
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
-    }
-
-    .peer-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.75rem;
-    }
-
-    .peer-title {
-        font-weight: 600;
-        color: #212529;
-        margin: 0;
-        font-size: 1rem;
-    }
-
-    .status-badge {
-        padding: 0.375rem 0.75rem;
-        border-radius: 50px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-
-    .status-online {
-        background: #d1fae5;
-        color: #065f46;
-        border: 1px solid #a7f3d0;
-    }
-
-    .status-offline {
-        background: #fee2e2;
-        color: #991b1b;
-        border: 1px solid #fecaca;
-    }
-
-    .status-stale {
-        background: #fef3c7;
-        color: #92400e;
-        border: 1px solid #fde68a;
-    }
-
-    .peer-details-minimal {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 0.75rem;
-        font-size: 0.875rem;
-    }
-
-    .peer-detail-minimal {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .peer-detail-minimal label {
-        font-size: 0.7rem;
-        color: #6c757d;
-        font-weight: 600;
-        text-transform: uppercase;
-        margin-bottom: 0.25rem;
-    }
-
-    .peer-detail-minimal .value {
-        font-size: 0.8rem;
-        color: #212529;
-        font-weight: 500;
-        word-break: break-all;
-    }
-
-    .transfer-stats-minimal {
-        display: flex;
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-    }
-
-    .transfer-stat-minimal {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 0.375rem;
-        background: #f8f9fa;
-        border-radius: 4px;
-        min-width: 60px;
-    }
-
-    .transfer-stat-minimal .direction {
-        font-size: 0.65rem;
-        color: #6c757d;
-        text-transform: uppercase;
-        font-weight: 600;
-    }
-
-    .transfer-stat-minimal .amount {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #212529;
-    }
-
-    .interface-info {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .interface-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-
-    .interface-title {
-        font-weight: 600;
-        color: #212529;
-        margin: 0;
-    }
-
-    .interface-details {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-    }
-
-    /* Peer Detail Modal Styles */
-    .peer-details-full {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .peer-detail-full {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .peer-detail-full label {
-        font-size: 0.75rem;
-        color: #6c757d;
-        font-weight: 600;
-        text-transform: uppercase;
-        margin-bottom: 0.5rem;
-    }
-
-    .peer-detail-full .value {
-        font-size: 0.9rem;
-        color: #212529;
-        font-weight: 500;
-        word-break: break-all;
-        padding: 0.5rem;
-        background: #f8f9fa;
-        border-radius: 4px;
-        border: 1px solid #e9ecef;
-    }
-
-    .transfer-stats-full {
-        display: flex;
-        gap: 1rem;
-        margin-top: 1rem;
-    }
-
-    .transfer-stat-full {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 1rem;
-        background: #f8f9fa;
-        border-radius: 8px;
-        min-width: 100px;
-        border: 1px solid #e9ecef;
-    }
-
-    .transfer-stat-full .direction {
-        font-size: 0.75rem;
-        color: #6c757d;
-        text-transform: uppercase;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    .transfer-stat-full .amount {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #212529;
-    }
-
-    .peer-actions {
-        display: flex;
-        gap: 0.5rem;
-        margin-top: 1rem;
-        flex-wrap: wrap;
-    }
+.peer-actions {display: flex;gap: 0.4rem;margin-top: 0.75rem;flex-wrap: wrap;}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Server Status Section -->
+    <!-- Server Status -->
     <div class="section-card">
         <div class="section-header">
-            <h2 class="section-title">
-                <i class="fas fa-server text-primary"></i> Server Status
-            </h2>
+            <h2 class="section-title"><i class="fas fa-server text-primary"></i> Server Status</h2>
             <div>
-                <button class="btn btn-sm btn-outline-secondary me-2" onclick="refreshStatus()">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-                <button class="btn btn-sm btn-primary me-2" onclick="restartWireGuard()">
-                    <i class="fas fa-redo"></i> Restart Service
-                </button>
-                <button class="btn btn-sm btn-success" onclick="initializeUsersDirectory()">
-                    <i class="fas fa-folder-plus"></i> Initialize Users Directory
-                </button>
+                <button class="btn btn-sm btn-outline-secondary me-1" onclick="refreshStatus()"><i class="fas fa-sync-alt"></i></button>
+                <button class="btn btn-sm btn-primary me-1" onclick="restartWireGuard()"><i class="fas fa-redo"></i></button>
+                <button class="btn btn-sm btn-success" onclick="initializeUsersDirectory()"><i class="fas fa-folder-plus"></i></button>
             </div>
         </div>
 
-        <!-- Enhanced Status Display -->
         <div id="enhancedStatus" style="display: none;">
-            <div class="status-overview" id="statusOverview">
-                <!-- Dynamic content will be inserted here -->
-            </div>
-
-            <div class="interface-info" id="interfaceInfo">
-                <!-- Interface details will be inserted here -->
-            </div>
-
-            <h5 class="mb-3">Connected Peers</h5>
-            <div id="peersList">
-                <!-- Peer cards will be inserted here -->
-            </div>
+            <div class="status-overview" id="statusOverview"></div>
+            <div class="interface-info" id="interfaceInfo"></div>
+            <h6 class="mb-2">Connected Peers</h6>
+            <div id="peersList"></div>
         </div>
 
-        <!-- Fallback Raw Status -->
         <div class="status-box">
             <div id="statusLoading" class="loading-spinner">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
+                <div class="spinner-border text-primary" role="status"></div>
                 <p class="mt-2">Loading status...</p>
             </div>
             <pre id="serverStatus" style="display: none;"></pre>
         </div>
     </div>
 
-    <!-- VPN Users Section -->
+    <!-- VPN Users -->
     <div class="section-card">
         <div class="section-header">
-            <h2 class="section-title">
-                <i class="fas fa-users text-primary"></i> VPN Users
-            </h2>
-            <button class="btn btn-success" onclick="showAddUserModal()">
-                <i class="fas fa-user-plus"></i> Add New User
-            </button>
+            <h2 class="section-title"><i class="fas fa-users text-primary"></i> VPN Users</h2>
+            <button class="btn btn-success btn-sm" onclick="showAddUserModal()"><i class="fas fa-user-plus"></i> Add User</button>
         </div>
 
         <div id="usersLoading" class="loading-spinner">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
+            <div class="spinner-border text-primary" role="status"></div>
             <p class="mt-2">Loading users...</p>
         </div>
 
@@ -506,925 +109,378 @@
             <div class="table-responsive">
                 <table class="table table-hover users-table">
                     <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>IP Address</th>
-                            <th>Public Key</th>
-                            <th>Status</th>
-                            <th style="width: 300px;">Actions</th>
-                        </tr>
+                        <tr><th>Username</th><th>IP</th><th>Public Key</th><th>Status</th><th style="width: 200px;">Actions</th></tr>
                     </thead>
-                    <tbody id="usersTableBody">
-                    </tbody>
+                    <tbody id="usersTableBody"></tbody>
                 </table>
             </div>
         </div>
 
         <div id="noUsers" class="empty-state" style="display: none;">
             <i class="fas fa-user-slash"></i>
-            <p class="mb-0">No users found. Click "Add New User" to create one.</p>
+            <p class="mb-0">No users found.</p>
         </div>
     </div>
 
-    <!-- Server Configuration Section -->
+    <!-- Server Config -->
     <div class="section-card">
         <div class="section-header">
-            <h2 class="section-title">
-                <i class="fas fa-cog text-primary"></i> Server Configuration
-            </h2>
-            <button class="btn btn-sm btn-primary" onclick="showEditConfigModal()">
-                <i class="fas fa-edit"></i> Edit Config
-            </button>
+            <h2 class="section-title"><i class="fas fa-cog text-primary"></i> Server Configuration</h2>
+            <button class="btn btn-sm btn-primary" onclick="showEditConfigModal()"><i class="fas fa-edit"></i> Edit</button>
         </div>
         <div class="status-box">
             <div id="configLoading" class="loading-spinner">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading configuration...</p>
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2">Loading config...</p>
             </div>
             <pre id="serverConfig" style="display: none;"></pre>
         </div>
     </div>
 </div>
 
-<!-- Add User Modal -->
+<!-- Modals -->
 <div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-user-plus text-success"></i> Add New VPN User
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="newUsername" class="form-label">Username <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="newUsername" placeholder="e.g., john_doe" required>
-                    <div class="form-text">Only letters, numbers, underscores, and hyphens allowed</div>
-                </div>
-                <div class="mb-3">
-                    <label for="newDescription" class="form-label">Description (Optional)</label>
-                    <input type="text" class="form-control" id="newDescription" placeholder="e.g., John Doe - Sales Manager">
-                </div>
-
-                <div class="key-mode-toggle">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="useExistingKeys" onchange="toggleKeyFields()">
-                        <label class="form-check-label" for="useExistingKeys">
-                            <strong>Use Existing Keys</strong>
-                            <small class="text-muted d-block">Enable this if you already have WireGuard keys for this user</small>
-                        </label>
-                    </div>
-                </div>
-
-                <div id="keyFields" class="key-fields">
-                    <div class="alert alert-info" role="alert">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Note:</strong> Both private and public keys are required. Leave empty to auto-generate new keys.
-                    </div>
-                    <div class="mb-3">
-                        <label for="newPrivateKey" class="form-label">Private Key</label>
-                        <textarea class="form-control font-monospace" id="newPrivateKey" rows="2" placeholder="Enter existing private key"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="newPublicKey" class="form-label">Public Key</label>
-                        <textarea class="form-control font-monospace" id="newPublicKey" rows="2" placeholder="Enter existing public key"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="createUser()">
-                    <i class="fas fa-check"></i> Create User
-                </button>
-            </div>
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-user-plus text-success"></i> Add User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-2"><label class="form-label">Username *</label><input type="text" class="form-control form-control-sm" id="newUsername" required></div>
+            <div class="mb-2"><label class="form-label">Description</label><input type="text" class="form-control form-control-sm" id="newDescription"></div>
+            <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" id="useExistingKeys" onchange="toggleKeyFields()"><label class="form-check-label">Use Existing Keys</label></div>
+            <div id="keyFields" class="key-fields"><div class="mb-2"><label class="form-label">Private Key</label><textarea class="form-control form-control-sm" id="newPrivateKey" rows="2"></textarea></div><div class="mb-2"><label class="form-label">Public Key</label><textarea class="form-control form-control-sm" id="newPublicKey" rows="2"></textarea></div></div>
         </div>
-    </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-success btn-sm" onclick="createUser()">Create</button></div>
+    </div></div>
 </div>
 
-<!-- View User Modal -->
 <div class="modal fade" id="viewUserModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-user text-primary"></i> User Configuration
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="info-grid">
-                    <div class="info-card">
-                        <label>Username</label>
-                        <div class="value" id="viewUsername">-</div>
-                    </div>
-                    <div class="info-card">
-                        <label>IP Address</label>
-                        <div class="value" id="viewUserIP">-</div>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Client Configuration</label>
-                    <div class="config-display" id="viewUserConfig">Loading...</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="downloadConfigFromModal()">
-                    <i class="fas fa-download"></i> Download
-                </button>
-            </div>
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-user text-primary"></i> User Config</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="info-grid"><div class="info-card"><label>Username</label><div id="viewUsername">-</div></div><div class="info-card"><label>IP Address</label><div id="viewUserIP">-</div></div></div>
+            <div class="config-display" id="viewUserConfig">Loading...</div>
         </div>
-    </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button><button type="button" class="btn btn-primary btn-sm" onclick="downloadConfigFromModal()">Download</button></div>
+    </div></div>
 </div>
 
-<!-- QR Code Modal -->
 <div class="modal fade" id="qrModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-qrcode text-primary"></i> QR Code
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="qr-code-container">
-                    <img id="qrImage" src="" alt="QR Code" class="img-fluid" />
-                    <p class="text-muted mt-3 mb-0">
-                        <i class="fas fa-mobile-alt"></i> Scan this QR code with the WireGuard mobile app
-                    </p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-qrcode text-primary"></i> QR Code</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body text-center"><img id="qrImage" src="" class="img-fluid" /><p class="text-muted mt-2 mb-0 small">Scan with WireGuard app</p></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
+    </div></div>
 </div>
 
-<!-- Edit Server Config Modal -->
 <div class="modal fade" id="editConfigModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-edit text-primary"></i> Edit Server Configuration
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-warning" role="alert">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <strong>Warning:</strong> Be careful when editing the server configuration. Invalid configurations may break your VPN.
-                </div>
-                <div class="mb-3">
-                    <label for="configEditor" class="form-label">Configuration File</label>
-                    <textarea class="form-control font-monospace" id="configEditor" rows="20" style="font-size: 0.875rem;"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveConfig()">
-                    <i class="fas fa-save"></i> Save & Restart
-                </button>
-            </div>
-        </div>
-    </div>
+    <div class="modal-dialog modal-xl"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-edit text-primary"></i> Edit Config</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body"><textarea class="form-control font-monospace" id="configEditor" rows="15" style="font-size: 0.8rem;"></textarea></div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary btn-sm" onclick="saveConfig()">Save</button></div>
+    </div></div>
 </div>
 
-<!-- Peer Details Modal -->
 <div class="modal fade" id="peerDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-network-wired text-primary"></i> Peer Details
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="peer-details-full" id="peerDetailsFull">
-                    <!-- Full peer details will be inserted here -->
-                </div>
-                <div class="transfer-stats-full" id="peerTransferStatsFull">
-                    <!-- Full transfer stats will be inserted here -->
-                </div>
-                <div class="peer-actions" id="peerActions">
-                    <!-- Peer actions will be inserted here -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
+    <div class="modal-dialog modal-lg"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="fas fa-network-wired text-primary"></i> Peer Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="peer-details-full" id="peerDetailsFull"></div>
+            <div class="transfer-stats-full" id="peerTransferStatsFull"></div>
+            <div class="peer-actions" id="peerActions"></div>
         </div>
-    </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button></div>
+    </div></div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let currentUser = null;
-    let currentPeer = null;
-    let addUserModalInstance = null;
-    let viewUserModalInstance = null;
-    let qrModalInstance = null;
-    let editConfigModalInstance = null;
-    let peerDetailModalInstance = null;
+let currentUser = null, currentPeer = null;
+let addUserModal, viewUserModal, qrModal, editConfigModal, peerDetailModal;
 
-    // Initialize modals on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        addUserModalInstance = new bootstrap.Modal(document.getElementById('addUserModal'));
-        viewUserModalInstance = new bootstrap.Modal(document.getElementById('viewUserModal'));
-        qrModalInstance = new bootstrap.Modal(document.getElementById('qrModal'));
-        editConfigModalInstance = new bootstrap.Modal(document.getElementById('editConfigModal'));
-        peerDetailModalInstance = new bootstrap.Modal(document.getElementById('peerDetailModal'));
+document.addEventListener('DOMContentLoaded', function() {
+    addUserModal = new bootstrap.Modal(document.getElementById('addUserModal'));
+    viewUserModal = new bootstrap.Modal(document.getElementById('viewUserModal'));
+    qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
+    editConfigModal = new bootstrap.Modal(document.getElementById('editConfigModal'));
+    peerDetailModal = new bootstrap.Modal(document.getElementById('peerDetailModal'));
+    loadEnhancedStatus(); loadServerConfig(); loadUsers();
+});
 
-        loadEnhancedStatus();
-        loadServerConfig();
-        loadUsers();
-    });
-
-    // Toggle key fields visibility
-    function toggleKeyFields() {
-        const checkbox = document.getElementById('useExistingKeys');
-        const keyFields = document.getElementById('keyFields');
-
-        if (checkbox.checked) {
-            keyFields.classList.add('active');
-        } else {
-            keyFields.classList.remove('active');
-            // Clear fields when toggling off
-            document.getElementById('newPrivateKey').value = '';
-            document.getElementById('newPublicKey').value = '';
-        }
-    }
-
-    // Load enhanced server status
-    async function loadEnhancedStatus() {
-        const enhancedStatusDiv = document.getElementById('enhancedStatus');
-        const rawStatusDiv = document.getElementById('serverStatus');
-        const loadingDiv = document.getElementById('statusLoading');
-
-        try {
-            const response = await fetch('/wireguard/api/status-ui');
-            const data = await response.json();
-
-            loadingDiv.style.display = 'none';
-
-            if (data.success && data.status) {
-                enhancedStatusDiv.style.display = 'block';
-                displayEnhancedStatus(data.status);
-            } else {
-                // Fallback to raw status
-                await loadServerStatus();
-            }
-        } catch (error) {
-            console.error('Error loading enhanced status:', error);
-            loadingDiv.style.display = 'none';
-            // Fallback to raw status
-            await loadServerStatus();
-        }
-    }
-
-    // Display enhanced status
-    function displayEnhancedStatus(status) {
-        const overviewDiv = document.getElementById('statusOverview');
-        const interfaceDiv = document.getElementById('interfaceInfo');
-        const peersDiv = document.getElementById('peersList');
-
-        // Update overview
-        const totalPeers = status.peers.length;
-        const onlinePeers = status.peers.filter(peer => peer.status === 'online').length;
-        const offlinePeers = status.peers.filter(peer => peer.status === 'offline').length;
-
-        overviewDiv.innerHTML = `
-            <div class="status-card">
-                <div class="value">${totalPeers}</div>
-                <div class="label">Total Peers</div>
-            </div>
-            <div class="status-card">
-                <div class="value text-success">${onlinePeers}</div>
-                <div class="label">Online</div>
-            </div>
-            <div class="status-card">
-                <div class="value text-warning">${totalPeers - onlinePeers - offlinePeers}</div>
-                <div class="label">Stale</div>
-            </div>
-            <div class="status-card">
-                <div class="value text-danger">${offlinePeers}</div>
-                <div class="label">Offline</div>
-            </div>
-        `;
-
-        // Update interface info
-        interfaceDiv.innerHTML = `
-            <div class="interface-header">
-                <h5 class="interface-title">Interface: ${status.interface.name || 'wg0'}</h5>
-            </div>
-            <div class="interface-details">
-                <div class="peer-detail">
-                    <label>Public Key</label>
-                    <div class="value"><code>${status.interface.public_key || 'N/A'}</code></div>
-                </div>
-                <div class="peer-detail">
-                    <label>Listening Port</label>
-                    <div class="value">${status.interface.port || 'N/A'}</div>
-                </div>
-            </div>
-        `;
-
-        // Update peers list with minimal details
-        if (status.peers.length > 0) {
-            peersDiv.innerHTML = status.peers.map((peer, index) => `
-                <div class="peer-card" onclick="showPeerDetails(${index})" title="Click to view full details">
-                    <div class="peer-header">
-                        <h6 class="peer-title">${peer.client_ip || 'Unknown IP'}</h6>
-                        <span class="status-badge status-${peer.status || 'offline'}">
-                            ${peer.status || 'offline'}
-                        </span>
-                    </div>
-                    <div class="peer-details-minimal">
-                        <div class="peer-detail-minimal">
-                            <label>Public Key</label>
-                            <div class="value"><code title="${peer.public_key_full}">${peer.public_key_short || 'N/A'}</code></div>
-                        </div>
-                        <div class="peer-detail-minimal">
-                            <label>Endpoint</label>
-                            <div class="value">${peer.endpoint ? peer.endpoint.split(':')[0] : 'Not connected'}</div>
-                        </div>
-                        <div class="peer-detail-minimal">
-                            <label>Last Handshake</label>
-                            <div class="value">${peer.latest_handshake ? formatTimeAgo(peer.latest_handshake) : 'Never'}</div>
-                        </div>
-                    </div>
-                    ${peer.transfer_received ? `
-                    <div class="transfer-stats-minimal">
-                        <div class="transfer-stat-minimal">
-                            <span class="direction">↓ Received</span>
-                            <span class="amount">${formatBytes(peer.transfer_received_bytes || 0)}</span>
-                        </div>
-                        <div class="transfer-stat-minimal">
-                            <span class="direction">↑ Sent</span>
-                            <span class="amount">${formatBytes(peer.transfer_sent_bytes || 0)}</span>
-                        </div>
-                    </div>
-                    ` : ''}
-                </div>
-            `).join('');
-        } else {
-            peersDiv.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-plug"></i>
-                    <p class="mb-0">No peers connected</p>
-                </div>
-            `;
-        }
-    }
-
-    // Show peer details in modal
-    function showPeerDetails(peerIndex) {
-        // Store current peer data
-        currentPeer = peerIndex;
-
-        // In a real implementation, you would fetch the full peer data
-        // For now, we'll simulate by getting data from the current display
-        const enhancedStatusDiv = document.getElementById('enhancedStatus');
-        if (enhancedStatusDiv.style.display !== 'none') {
-            // We have enhanced status data, show full details
-            fetch('/wireguard/api/status-ui')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.status && data.status.peers[peerIndex]) {
-                        const peer = data.status.peers[peerIndex];
-                        displayPeerDetails(peer);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading peer details:', error);
-                    showToast('Error loading peer details', 'danger');
-                });
-        }
-    }
-
-    // Display full peer details in modal
-    function displayPeerDetails(peer) {
-        const detailsDiv = document.getElementById('peerDetailsFull');
-        const transferStatsDiv = document.getElementById('peerTransferStatsFull');
-        const actionsDiv = document.getElementById('peerActions');
-
-        // Display detailed information
-        detailsDiv.innerHTML = `
-            <div class="peer-detail-full">
-                <label>Client IP</label>
-                <div class="value">${peer.client_ip || 'N/A'}</div>
-            </div>
-            <div class="peer-detail-full">
-                <label>Public Key</label>
-                <div class="value"><code>${peer.public_key_full || peer.public_key || 'N/A'}</code></div>
-            </div>
-            <div class="peer-detail-full">
-                <label>Endpoint</label>
-                <div class="value">${peer.endpoint || 'Not connected'}</div>
-            </div>
-            <div class="peer-detail-full">
-                <label>Allowed IPs</label>
-                <div class="value"><code>${peer.allowed_ips || 'N/A'}</code></div>
-            </div>
-            <div class="peer-detail-full">
-                <label>Last Handshake</label>
-                <div class="value">${peer.latest_handshake || 'Never'}</div>
-            </div>
-            <div class="peer-detail-full">
-                <label>Status</label>
-                <div class="value">
-                    <span class="status-badge status-${peer.status || 'offline'}">
-                        ${peer.status || 'offline'}
-                    </span>
-                </div>
-            </div>
-        `;
-
-        // Display transfer statistics if available
-        if (peer.transfer_received || peer.transfer_sent) {
-            transferStatsDiv.innerHTML = `
-                <div class="transfer-stat-full">
-                    <span class="direction">Received</span>
-                    <span class="amount">${peer.transfer_received || '0 B'}</span>
-                    ${peer.transfer_received_bytes ? `<small class="text-muted">${formatBytes(peer.transfer_received_bytes)}</small>` : ''}
-                </div>
-                <div class="transfer-stat-full">
-                    <span class="direction">Sent</span>
-                    <span class="amount">${peer.transfer_sent || '0 B'}</span>
-                    ${peer.transfer_sent_bytes ? `<small class="text-muted">${formatBytes(peer.transfer_sent_bytes)}</small>` : ''}
-                </div>
-                <div class="transfer-stat-full">
-                    <span class="direction">Total</span>
-                    <span class="amount">${peer.transfer_total || '0 B'}</span>
-                    ${peer.transfer_received_bytes && peer.transfer_sent_bytes ?
-                        `<small class="text-muted">${formatBytes(peer.transfer_received_bytes + peer.transfer_sent_bytes)}</small>` : ''}
-                </div>
-            `;
-        } else {
-            transferStatsDiv.innerHTML = '<p class="text-muted">No transfer data available</p>';
-        }
-
-        // Add action buttons
-        actionsDiv.innerHTML = `
-            <button class="btn btn-outline-primary btn-sm" onclick="refreshPeerStatus('${peer.public_key_full || peer.public_key}')">
-                <i class="fas fa-sync-alt"></i> Refresh Status
-            </button>
-            <button class="btn btn-outline-info btn-sm" onclick="viewPeerConfig('${peer.public_key_full || peer.public_key}')">
-                <i class="fas fa-eye"></i> View Config
-            </button>
-            ${peer.endpoint ? `
-            <button class="btn btn-outline-warning btn-sm" onclick="disconnectPeer('${peer.public_key_full || peer.public_key}')">
-                <i class="fas fa-unlink"></i> Disconnect
-            </button>
-            ` : ''}
-        `;
-
-        // Show the modal
-        peerDetailModalInstance.show();
-    }
-
-    // Utility function to format bytes
-    function formatBytes(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    // Utility function to format time ago
-    function formatTimeAgo(timestamp) {
-        if (!timestamp) return 'Never';
-
-        // Simple time ago formatter - you might want to use a library for more robust handling
-        const now = new Date();
-        const time = new Date(timestamp);
-        const diffMs = now - time;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins} min ago`;
-        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    }
-
-    // Load server status (raw - fallback)
-    async function loadServerStatus() {
-        const statusDiv = document.getElementById('serverStatus');
-        const loadingDiv = document.getElementById('statusLoading');
-
-        try {
-            const response = await fetch('/wireguard/api/status');
-            const data = await response.json();
-
-            loadingDiv.style.display = 'none';
-            statusDiv.style.display = 'block';
-
-            if (data.success) {
-                statusDiv.textContent = data.status;
-            } else {
-                statusDiv.textContent = 'Failed to load status';
-                showToast('Failed to load server status', 'warning');
-            }
-        } catch (error) {
-            console.error('Error loading status:', error);
-            loadingDiv.style.display = 'none';
-            statusDiv.style.display = 'block';
-            statusDiv.textContent = 'Error loading status';
-            showToast('Error loading server status', 'danger');
-        }
-    }
-
-    // Load server config
-    async function loadServerConfig() {
-        const configDiv = document.getElementById('serverConfig');
-        const loadingDiv = document.getElementById('configLoading');
-
-        try {
-            const response = await fetch('/wireguard/api/config');
-            const data = await response.json();
-
-            loadingDiv.style.display = 'none';
-            configDiv.style.display = 'block';
-
-            if (data.success) {
-                configDiv.textContent = data.config;
-            } else {
-                configDiv.textContent = 'Failed to load configuration';
-                showToast('Failed to load server configuration', 'warning');
-            }
-        } catch (error) {
-            console.error('Error loading config:', error);
-            loadingDiv.style.display = 'none';
-            configDiv.style.display = 'block';
-            configDiv.textContent = 'Error loading configuration';
-            showToast('Error loading server configuration', 'danger');
-        }
-    }
-
-    // Load users
-    async function loadUsers() {
-        const tbody = document.getElementById('usersTableBody');
-        const loading = document.getElementById('usersLoading');
-        const tableContainer = document.getElementById('usersTableContainer');
-        const noUsers = document.getElementById('noUsers');
-
-        loading.style.display = 'block';
-        tableContainer.style.display = 'none';
-        noUsers.style.display = 'none';
-
-        try {
-            const response = await fetch('/wireguard/api/users');
-            const data = await response.json();
-
-            loading.style.display = 'none';
-
-            if (data.success && data.users.length > 0) {
-                tableContainer.style.display = 'block';
-                tbody.innerHTML = data.users.map(user => `
-                    <tr>
-                        <td><strong>${user.username}</strong></td>
-                        <td><code class="text-primary">${user.ip}</code></td>
-                        <td><small><code style="font-size: 0.75rem;">${user.public_key.substring(0, 40)}...</code></small></td>
-                        <td>
-                            ${user.config_exists ?
-                                '<span class="badge bg-success">Active</span>' :
-                                '<span class="badge bg-warning">No Config</span>'}
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm action-buttons" role="group">
-                                <button class="btn btn-outline-primary" onclick="viewUser('${user.username}')" title="View Configuration">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="showQRCode('${user.username}')" title="Show QR Code">
-                                    <i class="fas fa-qrcode"></i>
-                                </button>
-                                <button class="btn btn-outline-info" onclick="downloadUserConfig('${user.username}')" title="Download Config">
-                                    <i class="fas fa-download"></i>
-                                </button>
-                                <button class="btn btn-outline-danger" onclick="deleteUser('${user.username}')" title="Delete User">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `).join('');
-            } else {
-                noUsers.style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Error loading users:', error);
-            loading.style.display = 'none';
-            noUsers.style.display = 'block';
-            showToast('Error loading users', 'danger');
-        }
-    }
-
-    // Show add user modal
-    function showAddUserModal() {
-        document.getElementById('newUsername').value = '';
-        document.getElementById('newDescription').value = '';
+function toggleKeyFields() {
+    const keyFields = document.getElementById('keyFields');
+    keyFields.style.display = document.getElementById('useExistingKeys').checked ? 'block' : 'none';
+    if(!document.getElementById('useExistingKeys').checked) {
         document.getElementById('newPrivateKey').value = '';
         document.getElementById('newPublicKey').value = '';
-        document.getElementById('useExistingKeys').checked = false;
-        document.getElementById('keyFields').classList.remove('active');
-        addUserModalInstance.show();
     }
+}
 
-    // Create user
-    async function createUser() {
-        const username = document.getElementById('newUsername').value.trim();
-        const description = document.getElementById('newDescription').value.trim();
-        const useExistingKeys = document.getElementById('useExistingKeys').checked;
-        const privateKey = document.getElementById('newPrivateKey').value.trim();
-        const publicKey = document.getElementById('newPublicKey').value.trim();
-
-        if (!username) {
-            showToast('Username is required', 'warning');
-            return;
-        }
-
-        // Validate keys if using existing
-        if (useExistingKeys) {
-            if (!privateKey || !publicKey) {
-                showToast('Both private and public keys are required when using existing keys', 'warning');
-                return;
-            }
-        }
-
-        const payload = {
-            username,
-            description
-        };
-
-        if (useExistingKeys && privateKey && publicKey) {
-            payload.private_key = privateKey;
-            payload.public_key = publicKey;
-        }
-
-        try {
-            const response = await fetch('/wireguard/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast(`User ${username} created successfully!`, 'success');
-                addUserModalInstance.hide();
-                loadUsers();
-                loadServerConfig();
-                loadEnhancedStatus();
-            } else {
-                showToast(data.error || 'Failed to create user', 'danger');
-            }
-        } catch (error) {
-            console.error('Error creating user:', error);
-            showToast('Error creating user', 'danger');
-        }
+async function loadEnhancedStatus() {
+    try {
+        const response = await fetch('/wireguard/api/status-ui');
+        const data = await response.json();
+        document.getElementById('statusLoading').style.display = 'none';
+        if (data.success && data.status) {
+            document.getElementById('enhancedStatus').style.display = 'block';
+            displayEnhancedStatus(data.status);
+        } else await loadServerStatus();
+    } catch (error) {
+        document.getElementById('statusLoading').style.display = 'none';
+        await loadServerStatus();
     }
+}
 
-    // View user details
-    async function viewUser(username) {
-        currentUser = username;
+function displayEnhancedStatus(status) {
+    const totalPeers = status.peers.length;
+    const onlinePeers = status.peers.filter(peer => peer.status === 'online').length;
+    const offlinePeers = status.peers.filter(peer => peer.status === 'offline').length;
 
-        try {
-            const response = await fetch(`/wireguard/api/users/${username}/config`);
-            const data = await response.json();
+    document.getElementById('statusOverview').innerHTML = `
+        <div class="status-card"><div class="value">${totalPeers}</div><div class="label">Total</div></div>
+        <div class="status-card"><div class="value text-success">${onlinePeers}</div><div class="label">Online</div></div>
+        <div class="status-card"><div class="value text-warning">${totalPeers - onlinePeers - offlinePeers}</div><div class="label">Stale</div></div>
+        <div class="status-card"><div class="value text-danger">${offlinePeers}</div><div class="label">Offline</div></div>
+    `;
 
-            if (data.success) {
-                document.getElementById('viewUsername').textContent = username;
-                document.getElementById('viewUserConfig').textContent = data.config;
+    document.getElementById('interfaceInfo').innerHTML = `
+        <div class="interface-header"><h6 class="interface-title">Interface: ${status.interface.name || 'wg0'}</h6></div>
+        <div class="interface-details">
+            <div class="peer-detail"><label>Public Key</label><div><code>${status.interface.public_key || 'N/A'}</code></div></div>
+            <div class="peer-detail"><label>Port</label><div>${status.interface.port || 'N/A'}</div></div>
+        </div>
+    `;
 
-                // Try to parse IP from config
-                const ipMatch = data.config.match(/Address\s*=\s*([^\n]+)/);
-                if (ipMatch) {
-                    document.getElementById('viewUserIP').textContent = ipMatch[1].trim();
-                }
-
-                viewUserModalInstance.show();
-            } else {
-                showToast('Failed to load user configuration', 'danger');
-            }
-        } catch (error) {
-            console.error('Error loading user:', error);
-            showToast('Error loading user configuration', 'danger');
-        }
-    }
-
-    // Download user config from modal
-    function downloadConfigFromModal() {
-        if (currentUser) {
-            downloadUserConfig(currentUser);
-        }
-    }
-
-    // Download user config
-    function downloadUserConfig(username) {
-        window.location.href = `/wireguard/api/users/${username}/download`;
-    }
-
-    // Show QR code
-    function showQRCode(username) {
-        document.getElementById('qrImage').src = `/wireguard/api/users/${username}/qr?t=${new Date().getTime()}`;
-        qrModalInstance.show();
-    }
-
-    // Delete user
-    async function deleteUser(username) {
-        if (!confirm(`Are you sure you want to delete user "${username}"?\n\nThis will remove:\n- User directory and keys\n- Configuration from server\n- All associated comments\n\nThis action cannot be undone.`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/wireguard/api/users/${username}`, {
-                method: 'DELETE'
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast(`User ${username} deleted successfully`, 'success');
-                loadUsers();
-                loadServerConfig();
-                loadEnhancedStatus();
-            } else {
-                showToast(data.error || 'Failed to delete user', 'danger');
-            }
-        } catch (error) {
-            console.error('Error deleting user:', error);
-            showToast('Error deleting user', 'danger');
-        }
-    }
-
-    // Show edit config modal
-    async function showEditConfigModal() {
-        try {
-            const response = await fetch('/wireguard/api/config');
-            const data = await response.json();
-
-            if (data.success) {
-                document.getElementById('configEditor').value = data.config;
-                editConfigModalInstance.show();
-            } else {
-                showToast('Failed to load configuration', 'danger');
-            }
-        } catch (error) {
-            console.error('Error loading config:', error);
-            showToast('Error loading configuration', 'danger');
-        }
-    }
-
-    // Save config
-    async function saveConfig() {
-        const config = document.getElementById('configEditor').value;
-
-        if (!confirm('Are you sure you want to update the server configuration?\n\nThis will restart the VPN service.')) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/wireguard/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ config })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast('Configuration updated and service restarted successfully', 'success');
-                editConfigModalInstance.hide();
-                loadServerConfig();
-                loadEnhancedStatus();
-            } else {
-                showToast(data.error || 'Failed to update configuration', 'danger');
-            }
-        } catch (error) {
-            console.error('Error saving config:', error);
-            showToast('Error saving configuration', 'danger');
-        }
-    }
-
-    // Restart WireGuard
-    async function restartWireGuard() {
-        if (!confirm('Are you sure you want to restart the WireGuard service?')) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/wireguard/api/restart', {
-                method: 'POST'
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast('WireGuard service restarted successfully', 'success');
-                setTimeout(() => loadEnhancedStatus(), 2000);
-            } else {
-                showToast(data.error || 'Failed to restart service', 'danger');
-            }
-        } catch (error) {
-            console.error('Error restarting service:', error);
-            showToast('Error restarting service', 'danger');
-        }
-    }
-
-    // Refresh status
-    function refreshStatus() {
-        loadEnhancedStatus();
-        loadUsers();
-        showToast('Refreshing status...', 'info');
-    }
-
-    // Initialize users directory
-    async function initializeUsersDirectory() {
-        if (!confirm('This will create the users directory structure if it doesn\'t exist.\n\nContinue?')) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/wireguard/api/init-users-dir', {
-                method: 'POST'
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast('Users directory initialized successfully', 'success');
-            } else {
-                showToast(data.error || 'Failed to initialize directory', 'danger');
-            }
-        } catch (error) {
-            console.error('Error initializing directory:', error);
-            showToast('Error initializing directory', 'danger');
-        }
-    }
-
-    // Peer management functions
-    function refreshPeerStatus(publicKey) {
-        showToast(`Refreshing status for peer...`, 'info');
-        loadEnhancedStatus();
-    }
-
-    function viewPeerConfig(publicKey) {
-        showToast(`Viewing config for peer with key: ${publicKey.substring(0, 20)}...`, 'info');
-        // Implementation would depend on your backend API
-    }
-
-    function disconnectPeer(publicKey) {
-        if (confirm('Are you sure you want to disconnect this peer?')) {
-            showToast(`Disconnecting peer...`, 'warning');
-            // Implementation would depend on your backend API
-        }
-    }
-
-    // Toast notification function
-    function showToast(message, type = 'info') {
-        // Create toast container if it doesn't exist
-        let toastContainer = document.getElementById('toastContainer');
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.id = 'toastContainer';
-            toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-            toastContainer.style.zIndex = '9999';
-            document.body.appendChild(toastContainer);
-        }
-
-        const toastId = 'toast-' + Date.now();
-        const toastHtml = `
-            <div id="${toastId}" class="toast align-items-center text-bg-${type} border-0" role="alert">
-                <div class="d-flex">
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    if (status.peers.length > 0) {
+        document.getElementById('peersList').innerHTML = status.peers.map((peer, index) => `
+            <div class="peer-card" onclick="showPeerDetails(${index})" title="Click for details">
+                <div class="peer-header">
+                    <h6 class="peer-title">${peer.client_ip || 'Unknown'}</h6>
+                    <span class="status-badge status-${peer.status || 'offline'}">${peer.status || 'offline'}</span>
                 </div>
+                <div class="peer-details-minimal">
+                    <div class="peer-detail-minimal"><label>Public Key</label><div><code>${(peer.public_key_short || '').substring(0,20)}...</code></div></div>
+                    <div class="peer-detail-minimal"><label>Endpoint</label><div>${peer.endpoint ? peer.endpoint.split(':')[0] : 'N/A'}</div></div>
+                    <div class="peer-detail-minimal"><label>Last Handshake</label><div>${peer.latest_handshake ? formatTimeAgo(peer.latest_handshake) : 'Never'}</div></div>
+                </div>
+                ${peer.transfer_received ? `
+                <div class="transfer-stats-minimal">
+                    <div class="transfer-stat-minimal"><span class="direction">↓ Recv</span><span class="amount">${formatBytes(peer.transfer_received_bytes || 0)}</span></div>
+                    <div class="transfer-stat-minimal"><span class="direction">↑ Sent</span><span class="amount">${formatBytes(peer.transfer_sent_bytes || 0)}</span></div>
+                </div>` : ''}
             </div>
-        `;
-
-        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-
-        const toastElement = document.getElementById(toastId);
-        const toast = new bootstrap.Toast(toastElement);
-        toast.show();
-
-        // Remove toast from DOM after it's hidden
-        toastElement.addEventListener('hidden.bs.toast', () => {
-            toastElement.remove();
-        });
+        `).join('');
+    } else {
+        document.getElementById('peersList').innerHTML = '<div class="empty-state"><i class="fas fa-plug"></i><p class="mb-0">No peers connected</p></div>';
     }
+}
+
+function showPeerDetails(peerIndex) {
+    currentPeer = peerIndex;
+    fetch('/wireguard/api/status-ui').then(r => r.json()).then(data => {
+        if (data.success && data.status && data.status.peers[peerIndex]) {
+            const peer = data.status.peers[peerIndex];
+            document.getElementById('peerDetailsFull').innerHTML = `
+                <div class="peer-detail-full"><label>Client IP</label><div class="value">${peer.client_ip || 'N/A'}</div></div>
+                <div class="peer-detail-full"><label>Public Key</label><div class="value"><code>${peer.public_key_full || peer.public_key || 'N/A'}</code></div></div>
+                <div class="peer-detail-full"><label>Endpoint</label><div class="value">${peer.endpoint || 'N/A'}</div></div>
+                <div class="peer-detail-full"><label>Allowed IPs</label><div class="value"><code>${peer.allowed_ips || 'N/A'}</code></div></div>
+                <div class="peer-detail-full"><label>Last Handshake</label><div class="value">${peer.latest_handshake || 'Never'}</div></div>
+                <div class="peer-detail-full"><label>Status</label><div class="value"><span class="status-badge status-${peer.status || 'offline'}">${peer.status || 'offline'}</span></div></div>
+            `;
+
+            document.getElementById('peerTransferStatsFull').innerHTML = peer.transfer_received ? `
+                <div class="transfer-stat-full"><span class="direction">Received</span><span class="amount">${peer.transfer_received}</span></div>
+                <div class="transfer-stat-full"><span class="direction">Sent</span><span class="amount">${peer.transfer_sent}</span></div>
+                <div class="transfer-stat-full"><span class="direction">Total</span><span class="amount">${peer.transfer_total}</span></div>
+            ` : '<p class="text-muted small">No transfer data</p>';
+
+            document.getElementById('peerActions').innerHTML = `
+                <button class="btn btn-outline-primary btn-sm" onclick="refreshPeerStatus()"><i class="fas fa-sync-alt"></i> Refresh</button>
+                <button class="btn btn-outline-info btn-sm" onclick="viewPeerConfig()"><i class="fas fa-eye"></i> Config</button>
+            `;
+            peerDetailModal.show();
+        }
+    }).catch(() => showToast('Error loading peer details', 'danger'));
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatTimeAgo(timestamp) {
+    if (!timestamp) return 'Never';
+    const diffMs = new Date() - new Date(timestamp);
+    const diffMins = Math.floor(diffMs / 60000), diffHours = Math.floor(diffMs / 3600000), diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return 'Just now'; if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`; return `${diffDays}d ago`;
+}
+
+async function loadServerStatus() {
+    try {
+        const response = await fetch('/wireguard/api/status');
+        const data = await response.json();
+        document.getElementById('statusLoading').style.display = 'none';
+        document.getElementById('serverStatus').style.display = 'block';
+        document.getElementById('serverStatus').textContent = data.success ? data.status : 'Failed to load status';
+    } catch (error) {
+        document.getElementById('statusLoading').style.display = 'none';
+        document.getElementById('serverStatus').style.display = 'block';
+        document.getElementById('serverStatus').textContent = 'Error loading status';
+    }
+}
+
+async function loadServerConfig() {
+    try {
+        const response = await fetch('/wireguard/api/config');
+        const data = await response.json();
+        document.getElementById('configLoading').style.display = 'none';
+        document.getElementById('serverConfig').style.display = 'block';
+        document.getElementById('serverConfig').textContent = data.success ? data.config : 'Failed to load config';
+    } catch (error) {
+        document.getElementById('configLoading').style.display = 'none';
+        document.getElementById('serverConfig').style.display = 'block';
+        document.getElementById('serverConfig').textContent = 'Error loading config';
+    }
+}
+
+async function loadUsers() {
+    try {
+        const response = await fetch('/wireguard/api/users');
+        const data = await response.json();
+        document.getElementById('usersLoading').style.display = 'none';
+        if (data.success && data.users.length > 0) {
+            document.getElementById('usersTableContainer').style.display = 'block';
+            document.getElementById('usersTableBody').innerHTML = data.users.map(user => `
+                <tr>
+                    <td><strong>${user.username}</strong></td>
+                    <td><code>${user.ip}</code></td>
+                    <td><small><code>${user.public_key.substring(0, 30)}...</code></small></td>
+                    <td>${user.config_exists ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-warning">No Config</span>'}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm action-buttons">
+                            <button class="btn btn-outline-primary" onclick="viewUser('${user.username}')"><i class="fas fa-eye"></i></button>
+                            <button class="btn btn-outline-secondary" onclick="showQRCode('${user.username}')"><i class="fas fa-qrcode"></i></button>
+                            <button class="btn btn-outline-info" onclick="downloadUserConfig('${user.username}')"><i class="fas fa-download"></i></button>
+                            <button class="btn btn-outline-danger" onclick="deleteUser('${user.username}')"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } else document.getElementById('noUsers').style.display = 'block';
+    } catch (error) {
+        document.getElementById('usersLoading').style.display = 'none';
+        document.getElementById('noUsers').style.display = 'block';
+    }
+}
+
+function showAddUserModal() {
+    document.getElementById('newUsername').value = ''; document.getElementById('newDescription').value = '';
+    document.getElementById('newPrivateKey').value = ''; document.getElementById('newPublicKey').value = '';
+    document.getElementById('useExistingKeys').checked = false; document.getElementById('keyFields').style.display = 'none';
+    addUserModal.show();
+}
+
+async function createUser() {
+    const username = document.getElementById('newUsername').value.trim();
+    if (!username) return showToast('Username required', 'warning');
+
+    const payload = {username, description: document.getElementById('newDescription').value.trim()};
+    if (document.getElementById('useExistingKeys').checked) {
+        payload.private_key = document.getElementById('newPrivateKey').value.trim();
+        payload.public_key = document.getElementById('newPublicKey').value.trim();
+    }
+
+    try {
+        const response = await fetch('/wireguard/api/users', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+        const data = await response.json();
+        if (data.success) { showToast(`User ${username} created!`, 'success'); addUserModal.hide(); loadUsers(); loadServerConfig(); loadEnhancedStatus(); }
+        else showToast(data.error || 'Failed', 'danger');
+    } catch (error) { showToast('Error creating user', 'danger'); }
+}
+
+async function viewUser(username) {
+    currentUser = username;
+    try {
+        const response = await fetch(`/wireguard/api/users/${username}/config`);
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('viewUsername').textContent = username;
+            document.getElementById('viewUserConfig').textContent = data.config;
+            const ipMatch = data.config.match(/Address\s*=\s*([^\n]+)/);
+            document.getElementById('viewUserIP').textContent = ipMatch ? ipMatch[1].trim() : '-';
+            viewUserModal.show();
+        } else showToast('Failed to load config', 'danger');
+    } catch (error) { showToast('Error loading user', 'danger'); }
+}
+
+function downloadConfigFromModal() { if (currentUser) downloadUserConfig(currentUser); }
+function downloadUserConfig(username) { window.location.href = `/wireguard/api/users/${username}/download`; }
+function showQRCode(username) { document.getElementById('qrImage').src = `/wireguard/api/users/${username}/qr?t=${Date.now()}`; qrModal.show(); }
+
+async function deleteUser(username) {
+    if (!confirm(`Delete user "${username}"?`)) return;
+    try {
+        const response = await fetch(`/wireguard/api/users/${username}`, {method: 'DELETE'});
+        const data = await response.json();
+        if (data.success) { showToast(`User ${username} deleted`, 'success'); loadUsers(); loadServerConfig(); loadEnhancedStatus(); }
+        else showToast(data.error || 'Failed', 'danger');
+    } catch (error) { showToast('Error deleting user', 'danger'); }
+}
+
+async function showEditConfigModal() {
+    try {
+        const response = await fetch('/wireguard/api/config');
+        const data = await response.json();
+        if (data.success) { document.getElementById('configEditor').value = data.config; editConfigModal.show(); }
+        else showToast('Failed to load config', 'danger');
+    } catch (error) { showToast('Error loading config', 'danger'); }
+}
+
+async function saveConfig() {
+    const config = document.getElementById('configEditor').value;
+    if (!confirm('Update config and restart service?')) return;
+    try {
+        const response = await fetch('/wireguard/api/config', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({config})});
+        const data = await response.json();
+        if (data.success) { showToast('Config updated', 'success'); editConfigModal.hide(); loadServerConfig(); loadEnhancedStatus(); }
+        else showToast(data.error || 'Failed', 'danger');
+    } catch (error) { showToast('Error saving config', 'danger'); }
+}
+
+async function restartWireGuard() {
+    if (!confirm('Restart WireGuard?')) return;
+    try {
+        const response = await fetch('/wireguard/api/restart', {method: 'POST'});
+        const data = await response.json();
+        showToast(data.success ? 'Service restarted' : data.error || 'Failed', data.success ? 'success' : 'danger');
+        if (data.success) setTimeout(() => loadEnhancedStatus(), 2000);
+    } catch (error) { showToast('Error restarting', 'danger'); }
+}
+
+function refreshStatus() { loadEnhancedStatus(); loadUsers(); showToast('Refreshing...', 'info'); }
+
+async function initializeUsersDirectory() {
+    if (!confirm('Initialize users directory?')) return;
+    try {
+        const response = await fetch('/wireguard/api/init-users-dir', {method: 'POST'});
+        const data = await response.json();
+        showToast(data.success ? 'Directory initialized' : data.error || 'Failed', data.success ? 'success' : 'danger');
+    } catch (error) { showToast('Error initializing', 'danger'); }
+}
+
+function refreshPeerStatus() { showToast('Refreshing peer...', 'info'); loadEnhancedStatus(); }
+function viewPeerConfig() { showToast('Viewing peer config...', 'info'); }
+
+function showToast(message, type = 'info') {
+    let container = document.getElementById('toastContainer');
+    if (!container) { container = document.createElement('div'); container.id = 'toastContainer'; container.className = 'toast-container position-fixed top-0 end-0 p-3'; document.body.appendChild(container); }
+    const toastId = 'toast-' + Date.now();
+    container.innerHTML += `<div id="${toastId}" class="toast align-items-center text-bg-${type} border-0"><div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`;
+    const toast = new bootstrap.Toast(document.getElementById(toastId)); toast.show();
+    document.getElementById(toastId).addEventListener('hidden.bs.toast', function() { this.remove(); });
+}
 </script>
 {% endblock %}
