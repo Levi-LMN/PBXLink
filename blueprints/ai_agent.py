@@ -3,7 +3,7 @@ AI Agent service management blueprint
 Handles AI Agent service monitoring, status, and logs
 """
 
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request
 import subprocess
 import logging
 import re
