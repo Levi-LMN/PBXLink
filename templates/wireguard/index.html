@@ -230,21 +230,29 @@
         background: white;
         border: 1px solid #e9ecef;
         border-radius: 8px;
-        padding: 1.25rem;
+        padding: 1rem;
         margin-bottom: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .peer-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
     }
 
     .peer-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
     }
 
     .peer-title {
         font-weight: 600;
         color: #212529;
         margin: 0;
+        font-size: 1rem;
     }
 
     .status-badge {
@@ -273,57 +281,58 @@
         border: 1px solid #fde68a;
     }
 
-    .peer-details {
+    .peer-details-minimal {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
+        font-size: 0.875rem;
     }
 
-    .peer-detail {
+    .peer-detail-minimal {
         display: flex;
         flex-direction: column;
     }
 
-    .peer-detail label {
-        font-size: 0.75rem;
+    .peer-detail-minimal label {
+        font-size: 0.7rem;
         color: #6c757d;
         font-weight: 600;
         text-transform: uppercase;
         margin-bottom: 0.25rem;
     }
 
-    .peer-detail .value {
-        font-size: 0.875rem;
+    .peer-detail-minimal .value {
+        font-size: 0.8rem;
         color: #212529;
         font-weight: 500;
         word-break: break-all;
     }
 
-    .transfer-stats {
+    .transfer-stats-minimal {
         display: flex;
-        gap: 1rem;
+        gap: 0.5rem;
         margin-top: 0.5rem;
     }
 
-    .transfer-stat {
+    .transfer-stat-minimal {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 0.5rem;
+        padding: 0.375rem;
         background: #f8f9fa;
-        border-radius: 6px;
-        min-width: 80px;
+        border-radius: 4px;
+        min-width: 60px;
     }
 
-    .transfer-stat .direction {
-        font-size: 0.75rem;
+    .transfer-stat-minimal .direction {
+        font-size: 0.65rem;
         color: #6c757d;
         text-transform: uppercase;
         font-weight: 600;
     }
 
-    .transfer-stat .amount {
-        font-size: 0.875rem;
+    .transfer-stat-minimal .amount {
+        font-size: 0.75rem;
         font-weight: 600;
         color: #212529;
     }
@@ -352,6 +361,76 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 1rem;
+    }
+
+    /* Peer Detail Modal Styles */
+    .peer-details-full {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .peer-detail-full {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .peer-detail-full label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+    }
+
+    .peer-detail-full .value {
+        font-size: 0.9rem;
+        color: #212529;
+        font-weight: 500;
+        word-break: break-all;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border: 1px solid #e9ecef;
+    }
+
+    .transfer-stats-full {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .transfer-stat-full {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        min-width: 100px;
+        border: 1px solid #e9ecef;
+    }
+
+    .transfer-stat-full .direction {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .transfer-stat-full .amount {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .peer-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
     }
 </style>
 {% endblock %}
@@ -615,15 +694,45 @@
         </div>
     </div>
 </div>
+
+<!-- Peer Details Modal -->
+<div class="modal fade" id="peerDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-network-wired text-primary"></i> Peer Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="peer-details-full" id="peerDetailsFull">
+                    <!-- Full peer details will be inserted here -->
+                </div>
+                <div class="transfer-stats-full" id="peerTransferStatsFull">
+                    <!-- Full transfer stats will be inserted here -->
+                </div>
+                <div class="peer-actions" id="peerActions">
+                    <!-- Peer actions will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     let currentUser = null;
+    let currentPeer = null;
     let addUserModalInstance = null;
     let viewUserModalInstance = null;
     let qrModalInstance = null;
     let editConfigModalInstance = null;
+    let peerDetailModalInstance = null;
 
     // Initialize modals on page load
     document.addEventListener('DOMContentLoaded', function() {
@@ -631,6 +740,7 @@
         viewUserModalInstance = new bootstrap.Modal(document.getElementById('viewUserModal'));
         qrModalInstance = new bootstrap.Modal(document.getElementById('qrModal'));
         editConfigModalInstance = new bootstrap.Modal(document.getElementById('editConfigModal'));
+        peerDetailModalInstance = new bootstrap.Modal(document.getElementById('peerDetailModal'));
 
         loadEnhancedStatus();
         loadServerConfig();
@@ -726,47 +836,39 @@
             </div>
         `;
 
-        // Update peers list
+        // Update peers list with minimal details
         if (status.peers.length > 0) {
-            peersDiv.innerHTML = status.peers.map(peer => `
-                <div class="peer-card">
+            peersDiv.innerHTML = status.peers.map((peer, index) => `
+                <div class="peer-card" onclick="showPeerDetails(${index})" title="Click to view full details">
                     <div class="peer-header">
-                        <h6 class="peer-title">Peer: ${peer.client_ip || 'Unknown IP'}</h6>
+                        <h6 class="peer-title">${peer.client_ip || 'Unknown IP'}</h6>
                         <span class="status-badge status-${peer.status || 'offline'}">
                             ${peer.status || 'offline'}
                         </span>
                     </div>
-                    <div class="peer-details">
-                        <div class="peer-detail">
+                    <div class="peer-details-minimal">
+                        <div class="peer-detail-minimal">
                             <label>Public Key</label>
-                            <div class="value"><code title="${peer.public_key_full}">${peer.public_key_short}</code></div>
+                            <div class="value"><code title="${peer.public_key_full}">${peer.public_key_short || 'N/A'}</code></div>
                         </div>
-                        <div class="peer-detail">
+                        <div class="peer-detail-minimal">
                             <label>Endpoint</label>
-                            <div class="value">${peer.endpoint || 'Not connected'}</div>
+                            <div class="value">${peer.endpoint ? peer.endpoint.split(':')[0] : 'Not connected'}</div>
                         </div>
-                        <div class="peer-detail">
-                            <label>Allowed IPs</label>
-                            <div class="value"><code>${peer.allowed_ips || 'N/A'}</code></div>
-                        </div>
-                        <div class="peer-detail">
+                        <div class="peer-detail-minimal">
                             <label>Last Handshake</label>
-                            <div class="value">${peer.latest_handshake || 'Never'}</div>
+                            <div class="value">${peer.latest_handshake ? formatTimeAgo(peer.latest_handshake) : 'Never'}</div>
                         </div>
                     </div>
                     ${peer.transfer_received ? `
-                    <div class="transfer-stats">
-                        <div class="transfer-stat">
-                            <span class="direction">Received</span>
-                            <span class="amount">${peer.transfer_received}</span>
+                    <div class="transfer-stats-minimal">
+                        <div class="transfer-stat-minimal">
+                            <span class="direction">↓ Received</span>
+                            <span class="amount">${formatBytes(peer.transfer_received_bytes || 0)}</span>
                         </div>
-                        <div class="transfer-stat">
-                            <span class="direction">Sent</span>
-                            <span class="amount">${peer.transfer_sent}</span>
-                        </div>
-                        <div class="transfer-stat">
-                            <span class="direction">Total</span>
-                            <span class="amount">${peer.transfer_total}</span>
+                        <div class="transfer-stat-minimal">
+                            <span class="direction">↑ Sent</span>
+                            <span class="amount">${formatBytes(peer.transfer_sent_bytes || 0)}</span>
                         </div>
                     </div>
                     ` : ''}
@@ -780,6 +882,139 @@
                 </div>
             `;
         }
+    }
+
+    // Show peer details in modal
+    function showPeerDetails(peerIndex) {
+        // Store current peer data
+        currentPeer = peerIndex;
+
+        // In a real implementation, you would fetch the full peer data
+        // For now, we'll simulate by getting data from the current display
+        const enhancedStatusDiv = document.getElementById('enhancedStatus');
+        if (enhancedStatusDiv.style.display !== 'none') {
+            // We have enhanced status data, show full details
+            fetch('/wireguard/api/status-ui')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.status && data.status.peers[peerIndex]) {
+                        const peer = data.status.peers[peerIndex];
+                        displayPeerDetails(peer);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading peer details:', error);
+                    showToast('Error loading peer details', 'danger');
+                });
+        }
+    }
+
+    // Display full peer details in modal
+    function displayPeerDetails(peer) {
+        const detailsDiv = document.getElementById('peerDetailsFull');
+        const transferStatsDiv = document.getElementById('peerTransferStatsFull');
+        const actionsDiv = document.getElementById('peerActions');
+
+        // Display detailed information
+        detailsDiv.innerHTML = `
+            <div class="peer-detail-full">
+                <label>Client IP</label>
+                <div class="value">${peer.client_ip || 'N/A'}</div>
+            </div>
+            <div class="peer-detail-full">
+                <label>Public Key</label>
+                <div class="value"><code>${peer.public_key_full || peer.public_key || 'N/A'}</code></div>
+            </div>
+            <div class="peer-detail-full">
+                <label>Endpoint</label>
+                <div class="value">${peer.endpoint || 'Not connected'}</div>
+            </div>
+            <div class="peer-detail-full">
+                <label>Allowed IPs</label>
+                <div class="value"><code>${peer.allowed_ips || 'N/A'}</code></div>
+            </div>
+            <div class="peer-detail-full">
+                <label>Last Handshake</label>
+                <div class="value">${peer.latest_handshake || 'Never'}</div>
+            </div>
+            <div class="peer-detail-full">
+                <label>Status</label>
+                <div class="value">
+                    <span class="status-badge status-${peer.status || 'offline'}">
+                        ${peer.status || 'offline'}
+                    </span>
+                </div>
+            </div>
+        `;
+
+        // Display transfer statistics if available
+        if (peer.transfer_received || peer.transfer_sent) {
+            transferStatsDiv.innerHTML = `
+                <div class="transfer-stat-full">
+                    <span class="direction">Received</span>
+                    <span class="amount">${peer.transfer_received || '0 B'}</span>
+                    ${peer.transfer_received_bytes ? `<small class="text-muted">${formatBytes(peer.transfer_received_bytes)}</small>` : ''}
+                </div>
+                <div class="transfer-stat-full">
+                    <span class="direction">Sent</span>
+                    <span class="amount">${peer.transfer_sent || '0 B'}</span>
+                    ${peer.transfer_sent_bytes ? `<small class="text-muted">${formatBytes(peer.transfer_sent_bytes)}</small>` : ''}
+                </div>
+                <div class="transfer-stat-full">
+                    <span class="direction">Total</span>
+                    <span class="amount">${peer.transfer_total || '0 B'}</span>
+                    ${peer.transfer_received_bytes && peer.transfer_sent_bytes ?
+                        `<small class="text-muted">${formatBytes(peer.transfer_received_bytes + peer.transfer_sent_bytes)}</small>` : ''}
+                </div>
+            `;
+        } else {
+            transferStatsDiv.innerHTML = '<p class="text-muted">No transfer data available</p>';
+        }
+
+        // Add action buttons
+        actionsDiv.innerHTML = `
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshPeerStatus('${peer.public_key_full || peer.public_key}')">
+                <i class="fas fa-sync-alt"></i> Refresh Status
+            </button>
+            <button class="btn btn-outline-info btn-sm" onclick="viewPeerConfig('${peer.public_key_full || peer.public_key}')">
+                <i class="fas fa-eye"></i> View Config
+            </button>
+            ${peer.endpoint ? `
+            <button class="btn btn-outline-warning btn-sm" onclick="disconnectPeer('${peer.public_key_full || peer.public_key}')">
+                <i class="fas fa-unlink"></i> Disconnect
+            </button>
+            ` : ''}
+        `;
+
+        // Show the modal
+        peerDetailModalInstance.show();
+    }
+
+    // Utility function to format bytes
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Utility function to format time ago
+    function formatTimeAgo(timestamp) {
+        if (!timestamp) return 'Never';
+
+        // Simple time ago formatter - you might want to use a library for more robust handling
+        const now = new Date();
+        const time = new Date(timestamp);
+        const diffMs = now - time;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} min ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
     }
 
     // Load server status (raw - fallback)
@@ -1135,6 +1370,24 @@
         } catch (error) {
             console.error('Error initializing directory:', error);
             showToast('Error initializing directory', 'danger');
+        }
+    }
+
+    // Peer management functions
+    function refreshPeerStatus(publicKey) {
+        showToast(`Refreshing status for peer...`, 'info');
+        loadEnhancedStatus();
+    }
+
+    function viewPeerConfig(publicKey) {
+        showToast(`Viewing config for peer with key: ${publicKey.substring(0, 20)}...`, 'info');
+        // Implementation would depend on your backend API
+    }
+
+    function disconnectPeer(publicKey) {
+        if (confirm('Are you sure you want to disconnect this peer?')) {
+            showToast(`Disconnecting peer...`, 'warning');
+            // Implementation would depend on your backend API
         }
     }
 
