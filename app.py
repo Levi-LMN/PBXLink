@@ -1,6 +1,6 @@
 """
 Main application file for FreePBX Dashboard
-Includes centralized SSH management and WireGuard VPN management
+Includes centralized SSH management, WireGuard VPN management, and AI Agent monitoring
 """
 
 from flask import Flask, render_template, redirect, url_for
@@ -15,6 +15,7 @@ from blueprints.api_core import api_core_bp
 from blueprints.extensions import extensions_bp
 from blueprints.cdr import cdr_bp
 from blueprints.wireguard import wireguard_bp
+from blueprints.ai_agent import ai_agent_bp  # NEW
 
 # Import SSH manager
 from ssh_manager import init_ssh_manager, ssh_manager
@@ -50,6 +51,7 @@ def create_app(config_name=None):
     app.register_blueprint(extensions_bp, url_prefix='/extensions')
     app.register_blueprint(cdr_bp, url_prefix='/cdr')
     app.register_blueprint(wireguard_bp, url_prefix='/wireguard')
+    app.register_blueprint(ai_agent_bp, url_prefix='/ai_agent')  # NEW
 
     # Root route
     @app.route('/')
