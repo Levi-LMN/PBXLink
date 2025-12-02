@@ -4,166 +4,421 @@
 {% block page_title %}Dashboard Overview{% endblock %}
 
 {% block content %}
+<style>
+    /* Subtle card styling */
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+        transition: box-shadow 0.2s ease;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        color: #64748b;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Service status */
+    .service-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .service-status.online {
+        background: rgba(25,135,84,0.1);
+        color: #198754;
+    }
+
+    .service-status.offline {
+        background: rgba(220,53,69,0.1);
+        color: #dc3545;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+
+    .status-dot.online {
+        background: #198754;
+    }
+
+    .status-dot.offline {
+        background: #dc3545;
+    }
+
+    /* Activity items */
+    .activity-item {
+        padding: 1rem;
+        border-left: 2px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 6px;
+        margin-bottom: 0.75rem;
+    }
+
+    .activity-item:hover {
+        border-left-color: #0d6efd;
+        background: #f1f5f9;
+    }
+
+    /* Quick action buttons */
+    .quick-action-btn {
+        background: #0d6efd;
+        border: none;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        color: white;
+        font-weight: 500;
+        transition: background 0.2s ease;
+    }
+
+    .quick-action-btn:hover {
+        background: #0a58ca;
+        color: white;
+    }
+
+    /* Feature cards */
+    .feature-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+        height: 100%;
+    }
+
+    .feature-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Progress bars */
+    .progress {
+        height: 6px;
+        border-radius: 4px;
+        background: #f1f5f9;
+    }
+
+    .progress-bar {
+        border-radius: 4px;
+    }
+
+    /* Service status grid */
+    .service-item {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+</style>
+
 <div class="row g-4">
     <!-- Welcome Card -->
     <div class="col-12">
         <div class="card">
             <div class="card-body">
-                <h4><i class="fas fa-tachometer-alt text-primary"></i> Welcome to FreePBX Management Dashboard</h4>
-                <p class="text-muted mb-0">Manage your PBX system with ease. View call analytics, manage extensions, and monitor system health.</p>
+                <h5 class="mb-2">
+                    <i class="fas fa-tachometer-alt text-primary me-2"></i>
+                    Welcome to FreePBX Management
+                    {% if session.user %}
+                    , {{ session.user.name.split()[0] }}
+                    {% endif %}
+                </h5>
+                <p class="text-muted mb-0">
+                    Complete PBX system management with real-time monitoring and analytics.
+                    {% if session.user %}
+                    <span class="badge bg-primary ms-2">{{ session.user.role|capitalize }} Access</span>
+                    {% endif %}
+                </p>
             </div>
         </div>
     </div>
-    
-    <!-- Quick Stats -->
+
+    <!-- Statistics Cards -->
     <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(13,110,253,0.1); color: #0d6efd;">
+            <div class="stat-icon" style="background: #eff6ff; color: #0d6efd;">
                 <i class="fas fa-phone"></i>
             </div>
             <h3 class="stat-value" id="total-calls">-</h3>
-            <p class="stat-label">Total Calls (7d)</p>
+            <p class="stat-label mb-0">Total Calls (7d)</p>
         </div>
     </div>
-    
+
     <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(25,135,84,0.1); color: #198754;">
-                <i class="fas fa-check-circle"></i>
+            <div class="stat-icon" style="background: #f0fdf4; color: #198754;">
+                <i class="fas fa-users"></i>
             </div>
-            <h3 class="stat-value" id="answered-calls">-</h3>
-            <p class="stat-label">Answered Calls</p>
+            <h3 class="stat-value" id="total-extensions">-</h3>
+            <p class="stat-label mb-0">Extensions</p>
         </div>
     </div>
-    
+
     <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(220,53,69,0.1); color: #dc3545;">
-                <i class="fas fa-phone-slash"></i>
+            <div class="stat-icon" style="background: #fffbeb; color: #ffc107;">
+                <i class="fas fa-shield-alt"></i>
             </div>
-            <h3 class="stat-value" id="missed-calls">-</h3>
-            <p class="stat-label">Missed Calls</p>
+            <h3 class="stat-value" id="vpn-users">-</h3>
+            <p class="stat-label mb-0">VPN Users</p>
         </div>
     </div>
-    
+
     <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(255,193,7,0.1); color: #ffc107;">
+            <div class="stat-icon" style="background: #f0f9ff; color: #0dcaf0;">
                 <i class="fas fa-clock"></i>
             </div>
             <h3 class="stat-value" id="avg-duration">-</h3>
-            <p class="stat-label">Avg Duration</p>
+            <p class="stat-label mb-0">Avg Call Time</p>
         </div>
     </div>
-    
+
+    <!-- System Services -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-server text-primary me-2"></i>
+                System Services
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="service-item">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="small text-muted">FreePBX API</div>
+                                <i class="fas fa-plug text-muted"></i>
+                            </div>
+                            <div class="service-status" id="api-status-indicator">
+                                <span class="status-dot"></span>
+                                <span>Checking...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="service-item">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="small text-muted">SSH Connection</div>
+                                <i class="fas fa-terminal text-muted"></i>
+                            </div>
+                            <div class="service-status" id="ssh-status-indicator">
+                                <span class="status-dot"></span>
+                                <span>Checking...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="service-item">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="small text-muted">AI Agent</div>
+                                <i class="fas fa-robot text-muted"></i>
+                            </div>
+                            <div class="service-status" id="ai-agent-status">
+                                <span class="status-dot"></span>
+                                <span>Checking...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="service-item">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="small text-muted">TG100 Gateway</div>
+                                <i class="fas fa-network-wired text-muted"></i>
+                            </div>
+                            <div class="service-status" id="tg100-status">
+                                <span class="status-dot"></span>
+                                <span>Checking...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Quick Actions -->
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <i class="fas fa-bolt"></i> Quick Actions
+                <i class="fas fa-bolt text-primary me-2"></i>
+                Quick Actions
             </div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-md-4">
-                        <a href="/cdr/" class="btn btn-lg btn-outline-primary w-100">
+                    <div class="col-md-3">
+                        <a href="/cdr/" class="btn quick-action-btn w-100">
                             <i class="fas fa-chart-line me-2"></i>
-                            View Call Records
+                            Call Records
                         </a>
                     </div>
-                    <div class="col-md-4">
-                        <a href="/extensions/" class="btn btn-lg btn-outline-success w-100">
+                    <div class="col-md-3">
+                        <a href="/extensions/" class="btn quick-action-btn w-100">
                             <i class="fas fa-phone me-2"></i>
                             Manage Extensions
                         </a>
                     </div>
-                    <div class="col-md-4">
-                        <button class="btn btn-lg btn-outline-info w-100" onclick="testConnection()">
-                            <i class="fas fa-wifi me-2"></i>
-                            Test API Connection
-                        </button>
+                    <div class="col-md-3">
+                        <a href="/wireguard/" class="btn quick-action-btn w-100">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            VPN Management
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="/ai_agent/" class="btn quick-action-btn w-100">
+                            <i class="fas fa-robot me-2"></i>
+                            AI Agent
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Recent Activity & System Info -->
-    <div class="col-lg-6">
+
+    <!-- Recent Activity & Extension Status -->
+    <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
-                <i class="fas fa-history"></i> Recent Activity
+                <i class="fas fa-history text-primary me-2"></i>
+                Recent Call Activity
             </div>
             <div class="card-body">
-                <div class="d-flex align-items-center justify-content-center" style="min-height: 200px;">
-                    <div class="text-center text-muted">
-                        <i class="fas fa-info-circle fa-3x mb-3"></i>
-                        <p>Navigate to <strong>Call Records</strong> to view recent calls</p>
+                <div id="recent-activity">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted mb-0">Loading recent activity...</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <div class="col-lg-6">
+
+    <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <i class="fas fa-server"></i> System Information
+                <i class="fas fa-info-circle text-primary me-2"></i>
+                Extension Status
             </div>
             <div class="card-body">
-                <table class="table table-sm">
-                    <tbody>
-                        <tr>
-                            <td><i class="fas fa-network-wired text-primary"></i> Server</td>
-                            <td class="text-end" id="server-host">-</td>
-                        </tr>
-                        <tr>
-                            <td><i class="fas fa-plug text-success"></i> API Status</td>
-                            <td class="text-end" id="api-status">
-                                <span class="badge bg-secondary">Unknown</span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><i class="fas fa-calendar text-info"></i> Dashboard Version</td>
-                            <td class="text-end">v1.0.0</td>
-                        </tr>
-                        <tr>
-                            <td><i class="fas fa-code-branch text-warning"></i> API Version</td>
-                            <td class="text-end">GraphQL</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small">Online</span>
+                        <span class="badge bg-success" id="online-extensions">0</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" id="online-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small">Offline</span>
+                        <span class="badge bg-danger" id="offline-extensions">0</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-danger" id="offline-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <a href="/extensions/" class="btn btn-outline-primary w-100">
+                        <i class="fas fa-cog me-2"></i>
+                        Manage Extensions
+                    </a>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Features Overview -->
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <i class="fas fa-star"></i> Features
+                <i class="fas fa-star text-primary me-2"></i>
+                Platform Features
             </div>
             <div class="card-body">
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <h6><i class="fas fa-chart-bar text-primary"></i> Call Analytics</h6>
-                        <p class="text-muted small">
-                            View detailed call records, statistics, and hourly/daily distributions. 
-                            Analyze call patterns and identify top callers.
-                        </p>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: #eff6ff; color: #0d6efd;">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                            <h6 class="fw-bold mb-2">Call Analytics</h6>
+                            <p class="text-muted small mb-0">
+                                Detailed call records and statistics with advanced filtering.
+                            </p>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <h6><i class="fas fa-users text-success"></i> Extension Management</h6>
-                        <p class="text-muted small">
-                            Create, update, and delete extensions. Bulk operations supported. 
-                            Configure voicemail and user settings.
-                        </p>
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: #f0fdf4; color: #198754;">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <h6 class="fw-bold mb-2">Extension Management</h6>
+                            <p class="text-muted small mb-0">
+                                Create and manage extensions with real-time monitoring.
+                            </p>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <h6><i class="fas fa-rocket text-info"></i> Real-time Updates</h6>
-                        <p class="text-muted small">
-                            Live data updates with smart caching. 
-                            Efficient GraphQL queries for optimal performance.
-                        </p>
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: #fffbeb; color: #ffc107;">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <h6 class="fw-bold mb-2">VPN Management</h6>
+                            <p class="text-muted small mb-0">
+                                WireGuard VPN with QR codes and peer management.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon" style="background: #f0f9ff; color: #0dcaf0;">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h6 class="fw-bold mb-2">AI Agent</h6>
+                            <p class="text-muted small mb-0">
+                                Intelligent call handling with automated responses.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -174,49 +429,196 @@
 
 {% block extra_js %}
 <script>
-    // Load quick stats
+    function updateServiceStatus(elementId, isOnline, label = null) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        const statusClass = isOnline ? 'online' : 'offline';
+        const statusText = label || (isOnline ? 'Online' : 'Offline');
+
+        element.className = `service-status ${statusClass}`;
+        element.innerHTML = `
+            <span class="status-dot ${statusClass}"></span>
+            <span>${statusText}</span>
+        `;
+    }
+
     async function loadStats() {
         try {
             const response = await fetch('/cdr/api/stats?days=7');
+            if (!response.ok) throw new Error('Failed to load stats');
             const data = await response.json();
-            
             document.getElementById('total-calls').textContent = data.total_calls || 0;
-            document.getElementById('answered-calls').textContent = data.answered_calls || 0;
-            document.getElementById('missed-calls').textContent = data.missed_calls || 0;
             document.getElementById('avg-duration').textContent = data.avg_duration_formatted || '0s';
         } catch (error) {
             console.error('Error loading stats:', error);
+            document.getElementById('total-calls').textContent = '-';
+            document.getElementById('avg-duration').textContent = '-';
         }
     }
-    
-    // Test API connection
+
+    async function loadExtensionStats() {
+        try {
+            const response = await fetch('/extensions/api/status');
+            if (!response.ok) throw new Error('Failed to load extension stats');
+            const data = await response.json();
+
+            const total = data.online_count + data.offline_count;
+            const onlinePercent = total > 0 ? (data.online_count / total) * 100 : 0;
+            const offlinePercent = total > 0 ? (data.offline_count / total) * 100 : 0;
+
+            document.getElementById('total-extensions').textContent = total;
+            document.getElementById('online-extensions').textContent = data.online_count;
+            document.getElementById('offline-extensions').textContent = data.offline_count;
+            document.getElementById('online-progress').style.width = onlinePercent + '%';
+            document.getElementById('offline-progress').style.width = offlinePercent + '%';
+        } catch (error) {
+            console.error('Error loading extension stats:', error);
+            document.getElementById('total-extensions').textContent = '-';
+        }
+    }
+
+    async function loadVPNStats() {
+        try {
+            const response = await fetch('/wireguard/api/users');
+            if (!response.ok) throw new Error('Failed to load VPN stats');
+            const data = await response.json();
+            document.getElementById('vpn-users').textContent = data.users?.length || 0;
+        } catch (error) {
+            console.error('Error loading VPN stats:', error);
+            document.getElementById('vpn-users').textContent = '-';
+        }
+    }
+
+    async function loadRecentActivity() {
+        try {
+            const response = await fetch('/cdr/api/calls?per_page=5');
+            if (!response.ok) throw new Error('Failed to load recent activity');
+            const data = await response.json();
+            const container = document.getElementById('recent-activity');
+
+            if (data.calls && data.calls.length > 0) {
+                let html = '';
+                data.calls.forEach(call => {
+                    const statusColor = call.disposition === 'ANSWERED' ? 'success' :
+                                       call.disposition === 'NO ANSWER' ? 'warning' : 'danger';
+                    const statusIcon = call.disposition === 'ANSWERED' ? 'check-circle' :
+                                      call.disposition === 'NO ANSWER' ? 'clock' : 'times-circle';
+
+                    html += `
+                        <div class="activity-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-phone me-2 text-primary"></i>
+                                        ${call.source} → ${call.destination}
+                                    </h6>
+                                    <small class="text-muted">
+                                        <i class="far fa-clock me-1"></i>
+                                        ${new Date(call.calldate).toLocaleString()}
+                                    </small>
+                                </div>
+                                <div class="text-end ms-3">
+                                    <span class="badge bg-${statusColor}">
+                                        <i class="fas fa-${statusIcon} me-1"></i>
+                                        ${call.disposition}
+                                    </span>
+                                    <br>
+                                    <small class="text-muted">${call.duration_formatted}</small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-info-circle fa-2x text-muted mb-3 opacity-50"></i>
+                        <p class="text-muted mb-0">No recent call activity</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading recent activity:', error);
+            document.getElementById('recent-activity').innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-exclamation-triangle fa-2x text-warning mb-3"></i>
+                    <p class="text-muted mb-0">Unable to load recent activity</p>
+                </div>
+            `;
+        }
+    }
+
     async function testConnection() {
+        updateServiceStatus('api-status-indicator', false, 'Testing...');
         try {
             const response = await fetch('/api/test');
             const data = await response.json();
-            
-            if (data.status === 'success') {
-                document.getElementById('api-status').innerHTML = 
-                    '<span class="badge bg-success"><i class="fas fa-check"></i> Connected</span>';
-                showToast('API connection successful!', 'success');
-            } else {
-                throw new Error(data.message);
-            }
+            updateServiceStatus('api-status-indicator', data.status === 'success');
         } catch (error) {
-            document.getElementById('api-status').innerHTML = 
-                '<span class="badge bg-danger"><i class="fas fa-times"></i> Disconnected</span>';
-            showToast('API connection failed: ' + error.message, 'danger');
+            updateServiceStatus('api-status-indicator', false);
+            console.error('API connection failed:', error);
         }
     }
-    
-    // Initialize
+
+    async function testSSH() {
+        updateServiceStatus('ssh-status-indicator', false, 'Testing...');
+        try {
+            const response = await fetch('/api/ssh-test');
+            const data = await response.json();
+            updateServiceStatus('ssh-status-indicator', data.status === 'success');
+        } catch (error) {
+            updateServiceStatus('ssh-status-indicator', false);
+            console.error('SSH connection failed:', error);
+        }
+    }
+
+    async function testAIAgent() {
+        updateServiceStatus('ai-agent-status', false, 'Checking...');
+        try {
+            const response = await fetch('/ai_agent/api/status');
+            const data = await response.json();
+            if (data.success && data.status.active) {
+                updateServiceStatus('ai-agent-status', true, data.status.status);
+            } else {
+                updateServiceStatus('ai-agent-status', false, data.status.status || 'Offline');
+            }
+        } catch (error) {
+            updateServiceStatus('ai-agent-status', false);
+            console.error('AI Agent check failed:', error);
+        }
+    }
+
+    async function testTG100() {
+        updateServiceStatus('tg100-status', false, 'Pinging...');
+        try {
+            const response = await fetch('/tg100/api/quick-ping');
+            const data = await response.json();
+            updateServiceStatus('tg100-status', data.success && data.ping.online);
+        } catch (error) {
+            updateServiceStatus('tg100-status', false);
+            console.error('TG100 ping failed:', error);
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         loadStats();
+        loadExtensionStats();
+        loadVPNStats();
+        loadRecentActivity();
         testConnection();
-        
-        // Show server host
-        document.getElementById('server-host').textContent = 
-            window.location.protocol + '//' + window.location.host;
+        testSSH();
+        testAIAgent();
+        testTG100();
+
+        setInterval(() => {
+            loadStats();
+            loadExtensionStats();
+            loadRecentActivity();
+            testAIAgent();
+            testTG100();
+        }, 30000);
     });
 </script>
 {% endblock %}

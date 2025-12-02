@@ -9,3 +9,4 @@ paramiko
 qrcode[pil]
 pillow
 python-dotenv
+msal

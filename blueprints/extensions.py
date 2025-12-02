@@ -322,6 +322,11 @@ def list_extensions():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+"""
+Update to extensions.py - get_extension endpoint
+Add this to return password information
+"""
+
 @extensions_bp.route('/api/get/<extension_id>')
 def get_extension(extension_id):
     """Get single extension details with status (CACHED)"""
@@ -392,8 +397,11 @@ def get_extension(extension_id):
             'description': device.get('description'),
             'dial': device.get('dial'),
             'device_type': device.get('devicetype'),
-            'email': user.get('email', ''),
+            'email': '',  # Email not available in GraphQL schema
             'max_contacts': 1,
+            # PASSWORD - Add these fields
+            'password': user.get('password', ''),
+            'extPassword': user.get('extPassword', ''),
             # Status
             'registered': ext_status['registered'],
             'status': ext_status['status'],
@@ -408,7 +416,6 @@ def get_extension(extension_id):
     except Exception as e:
         logger.error(f"Error fetching extension {extension_id}: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
 
 @extensions_bp.route('/api/refresh-status', methods=['POST'])
 def refresh_status():

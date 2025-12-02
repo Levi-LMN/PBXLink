@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - PBX Link</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ec 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Subtle background elements */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: rgba(102, 126, 234, 0.03);
+            border-radius: 50%;
+            top: -300px;
+            right: -300px;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: rgba(118, 75, 162, 0.03);
+            border-radius: 50%;
+            bottom: -200px;
+            left: -200px;
+            animation: float 15s infinite ease-in-out reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            50% { transform: translateY(30px) translateX(30px); }
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 600px; /* Wider container */
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex; /* Use flexbox for side-by-side layout */
+        }
+
+        .login-left {
+            flex: 1;
+            padding: 3rem 2.5rem;
+            background: linear-gradient(180deg, rgba(102, 126, 234, 0.03) 0%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .login-right {
+            flex: 1;
+            padding: 3rem 2.5rem;
+            border-left: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .logo-container {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 18px rgba(102, 126, 234, 0.15);
+        }
+
+        .logo-container i {
+            font-size: 2rem;
+            color: white;
+        }
+
+        .login-header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0 0 0.5rem 0;
+            text-align: center;
+        }
+
+        .login-header p {
+            color: #64748b;
+            font-size: 0.95rem;
+            margin: 0;
+            text-align: center;
+        }
+
+        .alert {
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            border: none;
+            font-size: 0.875rem;
+            padding: 1rem 1.25rem;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .alert-danger {
+            background: #fef2f2;
+            color: #991b1b;
+            border-left: 4px solid #dc3545;
+        }
+
+        .btn-microsoft {
+            background: #2f2f2f;
+            color: white;
+            padding: 0.95rem 2rem;
+            border-radius: 8px;
+            border: none;
+            width: 100%;
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-microsoft::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-microsoft:hover::before {
+            left: 100%;
+        }
+
+        .btn-microsoft:hover {
+            background: #1a1a1a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+            color: white;
+        }
+
+        .btn-microsoft:active {
+            transform: translateY(0);
+        }
+
+        .btn-microsoft i {
+            margin-right: 0.75rem;
+            font-size: 1.25rem;
+        }
+
+        .btn-microsoft .spinner {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.75rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-microsoft.loading .spinner {
+            display: inline-block;
+        }
+
+        .btn-microsoft.loading i {
+            display: none;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 2rem 0 1.5rem;
+            color: #94a3b8;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .divider span {
+            padding: 0 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .security-badge i {
+            color: #10b981;
+            font-size: 1.25rem;
+        }
+
+        .security-badge .text {
+            text-align: left;
+        }
+
+        .security-badge .title {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .security-badge .subtitle {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin: 0;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: #475569;
+        }
+
+        .feature-item i {
+            color: #667eea;
+            font-size: 0.95rem;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        .footer-text {
+            color: rgba(0, 0, 0, 0.6);
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .footer-text i {
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .login-card {
+                flex-direction: column;
+            }
+
+            .login-right {
+                border-left: none;
+                border-top: 1px solid rgba(0, 0, 0, 0.05);
+            }
+
+            .login-container {
+                max-width: 440px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .login-left, .login-right {
+                padding: 2.5rem 1.5rem;
+            }
+
+            .logo-container {
+                width: 60px;
+                height: 60px;
+            }
+
+            .logo-container i {
+                font-size: 1.75rem;
+            }
+
+            .login-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+        }
+
+        /* Smooth entrance animation */
+        .login-card {
+            animation: fadeInUp 0.6s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <!-- Left Section -->
+            <div class="login-left">
+                <div class="login-header">
+                    <div class="logo-container">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <h1>PBX Link</h1>
+                    <p>Management Dashboard by Sibasi</p>
+                </div>
+
+                <!-- Features -->
+                <div class="features">
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Secure Authentication</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Role Management</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Session Control</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Activity Logs</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Section -->
+            <div class="login-right">
+                <!-- Error Message -->
+                {% if error %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <span>{{ error }}</span>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+
+                <!-- Login Button -->
+                <a href="{{ url_for('auth.login') }}" class="btn-microsoft" id="loginBtn">
+                    <div class="spinner"></div>
+                    <i class="fab fa-microsoft"></i>
+                    <span>Sign in with Microsoft</span>
+                </a>
+
+                <!-- Divider -->
+                <div class="divider">
+                    <span>Secure Access</span>
+                </div>
+
+                <!-- Security Badge -->
+                <div class="security-badge">
+                    <i class="fas fa-shield-halved"></i>
+                    <div class="text">
+                        <p class="title">Protected by Azure AD</p>
+                        <p class="subtitle">Enterprise-grade security</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">
+                <i class="fas fa-lock"></i>
+                <span>Your data is encrypted and secure</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Add loading state to login button
+        document.getElementById('loginBtn').addEventListener('click', function(e) {
+            this.classList.add('loading');
+        });
+
+        // Auto-dismiss alerts
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                const alerts = document.querySelectorAll('.alert');
+                alerts.forEach(alert => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                });
+            }, 6000);
+        });
+    </script>
+</body>
+</html>

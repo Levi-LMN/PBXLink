@@ -14,8 +14,48 @@
         background: white;
         padding: 1.5rem;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        border: 1px solid var(--border);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        transition: all 0.2s ease;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin: 0.5rem 0;
+        color: var(--text-primary);
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin: 0;
+        font-weight: 500;
     }
 
     .disposition-badge {
@@ -38,7 +78,7 @@
     }
 
     .pagination-info {
-        color: #6c757d;
+        color: var(--text-secondary);
         font-size: 0.875rem;
     }
 </style>
@@ -118,7 +158,20 @@
     </div>
 
     <!-- Charts -->
-    <div class="col-lg-6">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-pie"></i> Call Disposition
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="disposition-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-chart-bar"></i> Hourly Distribution
@@ -131,7 +184,7 @@
         </div>
     </div>
 
-    <div class="col-lg-6">
+    <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-chart-line"></i> Daily Trends
@@ -245,7 +298,7 @@
 {% block extra_js %}
 <script>
 let currentPage = 1;
-let hourlyChart, dailyChart;
+let hourlyChart, dailyChart, dispositionChart;
 
 // Load statistics
 async function loadStats() {
@@ -258,8 +311,74 @@ async function loadStats() {
         document.getElementById('answered-calls').textContent = data.answered_calls || 0;
         document.getElementById('missed-calls').textContent = data.missed_calls || 0;
         document.getElementById('avg-duration').textContent = data.avg_duration_formatted || '0s';
+
+        // Load disposition chart with stats data
+        loadDispositionChart(data);
     } catch (error) {
-        handleError(error);
+        console.error('Error loading stats:', error);
+        showToast('Failed to load statistics', 'danger');
+    }
+}
+
+// Load disposition pie chart
+function loadDispositionChart(stats) {
+    try {
+        const ctx = document.getElementById('disposition-chart').getContext('2d');
+
+        if (dispositionChart) {
+            dispositionChart.destroy();
+        }
+
+        const answered = stats.answered_calls || 0;
+        const missed = stats.missed_calls || 0;
+
+        dispositionChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Answered', 'Missed'],
+                datasets: [{
+                    data: [answered, missed],
+                    backgroundColor: [
+                        'rgba(25, 135, 84, 0.8)',
+                        'rgba(220, 53, 69, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgb(25, 135, 84)',
+                        'rgb(220, 53, 69)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12,
+                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error loading disposition chart:', error);
     }
 }
 
@@ -302,7 +421,8 @@ async function loadCalls(page = 1) {
         updatePagination(data.pagination);
         currentPage = page;
     } catch (error) {
-        handleError(error);
+        console.error('Error loading calls:', error);
+        showToast('Failed to load call records', 'danger');
     }
 }
 
@@ -369,7 +489,8 @@ async function loadHourlyStats() {
                     data: result.data.map(d => d.calls),
                     backgroundColor: 'rgba(13, 110, 253, 0.5)',
                     borderColor: 'rgb(13, 110, 253)',
-                    borderWidth: 1
+                    borderWidth: 1,
+                    borderRadius: 4
                 }]
             },
             options: {
@@ -378,20 +499,47 @@ async function loadHourlyStats() {
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 13
+                        },
+                        bodyFont: {
+                            size: 12
+                        }
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            precision: 0
+                            precision: 0,
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            display: false
                         }
                     }
                 }
             }
         });
     } catch (error) {
-        handleError(error);
+        console.error('Error loading hourly stats:', error);
+        showToast('Failed to load hourly statistics', 'danger');
     }
 }
 
@@ -418,21 +566,30 @@ async function loadDailyStats() {
                         data: result.data.map(d => d.total),
                         borderColor: 'rgb(13, 110, 253)',
                         backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                        tension: 0.3
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     },
                     {
                         label: 'Answered',
                         data: result.data.map(d => d.answered),
                         borderColor: 'rgb(25, 135, 84)',
                         backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                        tension: 0.3
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     },
                     {
                         label: 'Missed',
                         data: result.data.map(d => d.missed),
                         borderColor: 'rgb(220, 53, 69)',
                         backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                        tension: 0.3
+                        tension: 0.3,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     }
                 ]
             },
@@ -441,21 +598,56 @@ async function loadDailyStats() {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'bottom'
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 13
+                        },
+                        bodyFont: {
+                            size: 12
+                        }
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            precision: 0
+                            precision: 0,
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            display: false
                         }
                     }
                 }
             }
         });
     } catch (error) {
-        handleError(error);
+        console.error('Error loading daily stats:', error);
+        showToast('Failed to load daily statistics', 'danger');
     }
 }
 
@@ -486,7 +678,8 @@ async function loadTopCallers() {
             tbody.insertAdjacentHTML('beforeend', row);
         });
     } catch (error) {
-        handleError(error);
+        console.error('Error loading top callers:', error);
+        showToast('Failed to load top callers', 'danger');
     }
 }
 
@@ -517,7 +710,8 @@ async function loadTopDestinations() {
             tbody.insertAdjacentHTML('beforeend', row);
         });
     } catch (error) {
-        handleError(error);
+        console.error('Error loading top destinations:', error);
+        showToast('Failed to load top destinations', 'danger');
     }
 }
 

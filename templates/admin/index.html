@@ -1,0 +1,707 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - FreePBX Management{% endblock %}
+{% block page_title %}Admin Panel{% endblock %}
+
+{% block content %}
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        border: 1px solid #e2e8f0;
+        transition: box-shadow 0.2s ease;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        color: #64748b;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .role-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .role-badge.admin {
+        background: rgba(220,53,69,0.1);
+        color: #dc3545;
+    }
+
+    .role-badge.operator {
+        background: rgba(13,110,253,0.1);
+        color: #0d6efd;
+    }
+
+    .role-badge.viewer {
+        background: rgba(108,117,125,0.1);
+        color: #6c757d;
+    }
+
+    .action-log-item {
+        padding: 1rem;
+        border-left: 2px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+    }
+
+    .action-log-item:hover {
+        border-left-color: #0d6efd;
+        background: #f1f5f9;
+    }
+
+    .tab-content {
+        padding: 1.5rem 0;
+    }
+
+    .nav-tabs .nav-link {
+        color: #64748b;
+        border: none;
+        border-bottom: 2px solid transparent;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .nav-tabs .nav-link:hover {
+        color: #0d6efd;
+        border-bottom-color: #e2e8f0;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom-color: #0d6efd;
+        background: transparent;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .status-badge {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+
+    .status-badge.active {
+        background: #198754;
+    }
+
+    .status-badge.inactive {
+        background: #dc3545;
+    }
+</style>
+
+<div class="row g-4">
+    <!-- Welcome Card -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="mb-2">
+                    <i class="fas fa-users-cog text-primary me-2"></i>
+                    Admin Panel
+                </h5>
+                <p class="text-muted mb-0">
+                    Manage users, roles, and monitor system activity.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #eff6ff; color: #0d6efd;">
+                <i class="fas fa-users"></i>
+            </div>
+            <h3 class="stat-value" id="total-users">-</h3>
+            <p class="stat-label mb-0">Total Users</p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #f0fdf4; color: #198754;">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <h3 class="stat-value" id="active-users">-</h3>
+            <p class="stat-label mb-0">Active Users</p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #fffbeb; color: #ffc107;">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <h3 class="stat-value" id="total-actions">-</h3>
+            <p class="stat-label mb-0">Actions (7d)</p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #f0f9ff; color: #0dcaf0;">
+                <i class="fas fa-phone-volume"></i>
+            </div>
+            <h3 class="stat-value" id="ai-calls">-</h3>
+            <p class="stat-label mb-0">AI Agent Calls (7d)</p>
+        </div>
+    </div>
+
+    <!-- Tabbed Content -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <ul class="nav nav-tabs card-header-tabs" id="adminTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button">
+                            <i class="fas fa-users me-2"></i>Users
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit" type="button">
+                            <i class="fas fa-history me-2"></i>Audit Logs
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ai-calls-tab" data-bs-toggle="tab" data-bs-target="#ai-calls-content" type="button">
+                            <i class="fas fa-robot me-2"></i>AI Agent Calls
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="adminTabContent">
+                    <!-- Users Tab -->
+                    <div class="tab-pane fade show active" id="users" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-users me-2 text-primary"></i>
+                                User Management
+                            </h5>
+                            <button class="btn btn-primary" onclick="showAddUserModal()">
+                                <i class="fas fa-plus-circle me-2"></i>Add User
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Audit Logs Tab -->
+                    <div class="tab-pane fade" id="audit" role="tabpanel">
+                        <div class="mb-3">
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <select class="form-select" id="audit-resource-filter">
+                                        <option value="">All Resources</option>
+                                        <option value="user">User</option>
+                                        <option value="extension">Extension</option>
+                                        <option value="vpn">VPN</option>
+                                        <option value="ai_agent">AI Agent</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="number" class="form-control" id="audit-limit" placeholder="Limit" value="100">
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-primary" onclick="loadAuditLogs()">
+                                        <i class="fas fa-filter me-2"></i>Apply Filter
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="audit-logs-container">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Agent Calls Tab -->
+                    <div class="tab-pane fade" id="ai-calls-content" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Call ID</th>
+                                        <th>Caller</th>
+                                        <th>Intent</th>
+                                        <th>Sentiment</th>
+                                        <th>Duration</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ai-calls-table-body">
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus me-2 text-primary"></i>
+                    Add New User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="add-user-name" required placeholder="John Doe">
+                        <div class="invalid-feedback">Please enter a name</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" id="add-user-email" required placeholder="john.doe@example.com">
+                        <div class="invalid-feedback">Please enter a valid email</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role <span class="text-danger">*</span></label>
+                        <select class="form-select" id="add-user-role" required>
+                            <option value="">Select a role...</option>
+                            <option value="VIEWER">Viewer - Can view only</option>
+                            <option value="OPERATOR">Operator - Can view and edit</option>
+                            <option value="ADMIN">Admin - Full access</option>
+                        </select>
+                        <div class="invalid-feedback">Please select a role</div>
+                        <small class="form-text text-muted">User will be able to log in with their Azure AD account using the email provided above.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createUser()">
+                    <i class="fas fa-check me-2"></i>Create User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-edit me-2 text-primary"></i>
+                    Edit User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-user-id">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-control" id="edit-user-name" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="edit-user-email" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Role</label>
+                    <select class="form-select" id="edit-user-role">
+                        <option value="admin">Admin</option>
+                        <option value="operator">Operator</option>
+                        <option value="viewer">Viewer</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="edit-user-status">
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUserChanges()">
+                    <i class="fas fa-save me-2"></i>Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentUsers = [];
+
+    function showAddUserModal() {
+        // Reset form
+        document.getElementById('addUserForm').reset();
+        document.getElementById('addUserForm').classList.remove('was-validated');
+
+        const modal = new bootstrap.Modal(document.getElementById('addUserModal'));
+        modal.show();
+    }
+
+    async function createUser() {
+        const form = document.getElementById('addUserForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const name = document.getElementById('add-user-name').value.trim();
+        const email = document.getElementById('add-user-email').value.trim();
+        const role = document.getElementById('add-user-role').value;
+
+        if (!name || !email || !role) {
+            showToast('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/admin/api/users', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: name,
+                    email: email,
+                    role: role
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('User created successfully. They can now log in with Azure AD.', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+                loadUsers();
+                loadStats(); // Refresh stats
+            } else {
+                showToast(data.error || 'Failed to create user', 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating user:', error);
+            showToast('Failed to create user. Please try again.', 'danger');
+        }
+    }
+
+    async function loadStats() {
+        try {
+            const [usersRes, auditRes, aiCallsRes] = await Promise.all([
+                fetch('/admin/api/users'),
+                fetch('/admin/api/audit-logs/stats?days=7'),
+                fetch('/admin/api/ai-agent-calls/stats?days=7')
+            ]);
+
+            if (usersRes.ok) {
+                const usersData = await usersRes.json();
+                if (usersData.success) {
+                    const activeUsers = usersData.users.filter(u => u.is_active).length;
+                    document.getElementById('total-users').textContent = usersData.users.length;
+                    document.getElementById('active-users').textContent = activeUsers;
+                }
+            }
+
+            if (auditRes.ok) {
+                const auditData = await auditRes.json();
+                if (auditData.success) {
+                    document.getElementById('total-actions').textContent = auditData.stats.total_actions || 0;
+                }
+            }
+
+            if (aiCallsRes.ok) {
+                const aiData = await aiCallsRes.json();
+                if (aiData.success) {
+                    document.getElementById('ai-calls').textContent = aiData.stats.total_calls || 0;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+
+    async function loadUsers() {
+        try {
+            const response = await fetch('/admin/api/users');
+            const data = await response.json();
+
+            if (data.success) {
+                currentUsers = data.users;
+                const tbody = document.getElementById('users-table-body');
+
+                if (data.users.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">No users found</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = data.users.map(user => `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="user-avatar me-3">${user.name[0].toUpperCase()}</div>
+                                <div>
+                                    <div class="fw-bold">${user.name}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${user.email}</td>
+                        <td>
+                            <span class="role-badge ${user.role}">${user.role}</span>
+                        </td>
+                        <td>
+                            <span class="status-badge ${user.is_active ? 'active' : 'inactive'}"></span>
+                            ${user.is_active ? 'Active' : 'Inactive'}
+                        </td>
+                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editUser(${user.id})">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        } catch (error) {
+            console.error('Error loading users:', error);
+            showToast('Failed to load users', 'danger');
+        }
+    }
+
+    function editUser(userId) {
+        const user = currentUsers.find(u => u.id === userId);
+        if (!user) return;
+
+        document.getElementById('edit-user-id').value = user.id;
+        document.getElementById('edit-user-name').value = user.name;
+        document.getElementById('edit-user-email').value = user.email;
+        document.getElementById('edit-user-role').value = user.role;
+        document.getElementById('edit-user-status').value = user.is_active.toString();
+
+        const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+        modal.show();
+    }
+
+    async function saveUserChanges() {
+        const userId = document.getElementById('edit-user-id').value;
+        const newRole = document.getElementById('edit-user-role').value;
+        const newStatus = document.getElementById('edit-user-status').value === 'true';
+
+        try {
+            const [roleRes, statusRes] = await Promise.all([
+                fetch(`/admin/api/users/${userId}/role`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({role: newRole})
+                }),
+                fetch(`/admin/api/users/${userId}/active`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({is_active: newStatus})
+                })
+            ]);
+
+            if (roleRes.ok && statusRes.ok) {
+                showToast('User updated successfully', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+                loadUsers();
+            } else {
+                throw new Error('Failed to update user');
+            }
+        } catch (error) {
+            console.error('Error updating user:', error);
+            showToast('Failed to update user', 'danger');
+        }
+    }
+
+    async function loadAuditLogs() {
+        const resourceType = document.getElementById('audit-resource-filter').value;
+        const limit = document.getElementById('audit-limit').value;
+        const container = document.getElementById('audit-logs-container');
+
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        `;
+
+        try {
+            const params = new URLSearchParams({limit});
+            if (resourceType) params.append('resource_type', resourceType);
+
+            const response = await fetch(`/admin/api/audit-logs?${params}`);
+            const data = await response.json();
+
+            if (data.success && data.logs.length > 0) {
+                container.innerHTML = data.logs.map(log => `
+                    <div class="action-log-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-${getActionIcon(log.action)} text-primary me-2"></i>
+                                    ${log.action.replace(/_/g, ' ').toUpperCase()}
+                                </h6>
+                                <small class="text-muted">
+                                    <strong>${log.user_name || 'System'}</strong> •
+                                    ${log.resource_type} #${log.resource_id} •
+                                    ${new Date(log.timestamp).toLocaleString()}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-info-circle fa-2x mb-3 opacity-50"></i>
+                        <p class="mb-0">No audit logs found</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading audit logs:', error);
+            container.innerHTML = `
+                <div class="text-center py-4 text-danger">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                    <p class="mb-0">Failed to load audit logs</p>
+                </div>
+            `;
+        }
+    }
+
+    async function loadAICalls() {
+        try {
+            const response = await fetch('/admin/api/ai-agent-calls?limit=50');
+            const data = await response.json();
+            const tbody = document.getElementById('ai-calls-table-body');
+
+            if (data.success && data.calls.length > 0) {
+                tbody.innerHTML = data.calls.map(call => `
+                    <tr>
+                        <td><code>${call.call_id}</code></td>
+                        <td>${call.caller_number || 'Unknown'}</td>
+                        <td><span class="badge bg-info">${call.intent || 'N/A'}</span></td>
+                        <td><span class="badge bg-secondary">${call.sentiment || 'N/A'}</span></td>
+                        <td>${call.call_duration}s</td>
+                        <td>${new Date(call.call_date).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">No AI agent calls found</td>
+                    </tr>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading AI calls:', error);
+        }
+    }
+
+    function getActionIcon(action) {
+        const icons = {
+            create: 'plus-circle',
+            create_user: 'user-plus',
+            update: 'edit',
+            update_role: 'user-tag',
+            delete: 'trash',
+            activate: 'check-circle',
+            activate_user: 'user-check',
+            deactivate: 'times-circle',
+            deactivate_user: 'user-times',
+            login: 'sign-in-alt',
+            logout: 'sign-out-alt'
+        };
+        return icons[action] || 'cog';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStats();
+        loadUsers();
+        loadAuditLogs();
+
+        document.getElementById('ai-calls-tab').addEventListener('shown.bs.tab', loadAICalls);
+        document.getElementById('audit-tab').addEventListener('shown.bs.tab', loadAuditLogs);
+    });
+</script>
+{% endblock %}

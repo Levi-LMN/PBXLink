@@ -216,7 +216,7 @@ class WireGuardManager:
 
         # Try to get public IP or use request host
         # You should replace this with your actual server IP
-        server_ip = "YOUR_SERVER_PUBLIC_IP"  # Replace with actual IP
+        server_ip = "172.173.154.119"  # Replace with actual IP
         port = settings.get('port', '51820')
 
         return f"{server_ip}:{port}"

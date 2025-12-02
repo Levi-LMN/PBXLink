@@ -335,7 +335,7 @@ ssh_manager = SSHManager()
 
 def init_ssh_manager(app):
     """
-    Initialize SSH manager with Flask app
+    Initialize SSH manager with Flask app to sangoma
     Adds teardown handler to close connections
 
     Usage in app.py:

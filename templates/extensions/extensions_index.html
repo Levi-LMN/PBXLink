@@ -3,48 +3,110 @@
 {% block title %}Extensions - FreePBX Dashboard{% endblock %}
 {% block page_title %}Extensions Management{% endblock %}
 
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1.25rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        transition: all 0.2s ease;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin: 0.5rem 0;
+        color: var(--text-primary);
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .action-buttons .btn-group-sm .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row mb-4">
+<div class="row g-4 mb-4">
     <!-- Stats Cards -->
-    <div class="col-md-6 col-lg-3 mb-3">
+    <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #d4edda; color: #28a745;">
+            <div class="stat-icon" style="background: rgba(25,135,84,0.1); color: #198754;">
                 <i class="fas fa-check-circle"></i>
             </div>
-            <p class="stat-value" id="online-count">-</p>
+            <h3 class="stat-value" id="online-count">-</h3>
             <p class="stat-label">Online</p>
         </div>
     </div>
-    <div class="col-md-6 col-lg-3 mb-3">
+
+    <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #f8d7da; color: #dc3545;">
+            <div class="stat-icon" style="background: rgba(220,53,69,0.1); color: #dc3545;">
                 <i class="fas fa-times-circle"></i>
             </div>
-            <p class="stat-value" id="offline-count">-</p>
+            <h3 class="stat-value" id="offline-count">-</h3>
             <p class="stat-label">Offline</p>
         </div>
     </div>
-    <div class="col-md-6 col-lg-3 mb-3">
+
+    <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #cfe2ff; color: #0d6efd;">
+            <div class="stat-icon" style="background: rgba(13,110,253,0.1); color: #0d6efd;">
                 <i class="fas fa-phone-alt"></i>
             </div>
-            <p class="stat-value" id="total-count">-</p>
+            <h3 class="stat-value" id="total-count">-</h3>
             <p class="stat-label">Total Extensions</p>
         </div>
     </div>
-    <div class="col-md-6 col-lg-3 mb-3">
+
+    <div class="col-md-6 col-lg-3">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #fff3cd; color: #ffc107;">
+            <div class="stat-icon" style="background: rgba(255,193,7,0.1); color: #ffc107;">
                 <i class="fas fa-sync-alt"></i>
             </div>
-            <p class="stat-label mb-2">Actions</p>
-            <button class="btn btn-sm btn-warning me-1" onclick="refreshStatus()" title="Refresh Status Cache">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-            <button class="btn btn-sm btn-danger" onclick="reloadAsterisk()" title="Apply Config (Reload Asterisk)">
-                <i class="fas fa-redo"></i>
-            </button>
+            <p class="stat-label mb-3">Quick Actions</p>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-warning" onclick="refreshStatus()" title="Refresh Status Cache">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="reloadAsterisk()" title="Apply Config (Reload Asterisk)">
+                    <i class="fas fa-redo"></i> Reload
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -77,9 +139,9 @@
         <span><i class="fas fa-list"></i> Extensions</span>
         <span class="badge bg-secondary" id="filtered-count">0</span>
     </div>
-    <div class="card-body">
+    <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover" id="extensions-table">
+            <table class="table table-hover mb-0" id="extensions-table">
                 <thead>
                     <tr>
                         <th>Extension</th>
@@ -93,7 +155,7 @@
                 </thead>
                 <tbody id="extensions-tbody">
                     <tr>
-                        <td colspan="7" class="text-center">
+                        <td colspan="7" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
@@ -154,8 +216,20 @@
                             <input type="text" class="form-control" name="callerId">
                         </div>
                         <div class="col-md-6 mb-3">
+                            <label class="form-label">SIP Password</label>
+                            <input type="text" class="form-control" name="extPassword" placeholder="Auto-generated if empty">
+                            <small class="text-muted">Leave empty to auto-generate</small>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Max Contacts</label>
                             <input type="number" class="form-control" name="maxContacts" value="1" min="1">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">VM Password</label>
+                            <input type="text" class="form-control" name="vmPassword">
+                            <small class="text-muted">Voicemail PIN</small>
                         </div>
                     </div>
                     <div class="row">
@@ -164,10 +238,6 @@
                                 <input class="form-check-input" type="checkbox" name="vmEnable" checked>
                                 <label class="form-check-label">Enable Voicemail</label>
                             </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">VM Password</label>
-                            <input type="text" class="form-control" name="vmPassword">
                         </div>
                     </div>
                 </form>
@@ -270,6 +340,17 @@
                             <input type="text" class="form-control" name="emergencyCid" id="edit-emergency-cid">
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">SIP Password</label>
+                            <input type="text" class="form-control" name="extPassword" id="edit-ext-password" placeholder="Leave empty to keep current">
+                            <small class="text-muted">Leave empty to keep existing password</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Caller ID</label>
+                            <input type="text" class="form-control" name="callerId" id="edit-caller-id">
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -281,18 +362,119 @@
         </div>
     </div>
 </div>
+
+<!-- View Details Modal -->
+<div class="modal fade" id="viewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Extension Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Extension Number</label>
+                        <p class="form-control-plaintext fw-bold" id="view-ext-number">-</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Display Name</label>
+                        <p class="form-control-plaintext" id="view-name">-</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Technology</label>
+                        <p class="form-control-plaintext" id="view-tech">-</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Status</label>
+                        <p class="form-control-plaintext" id="view-status">-</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <div class="alert alert-info">
+                            <strong><i class="fas fa-key"></i> SIP Credentials</strong>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Username</small>
+                                    <strong id="view-username">-</strong>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Password</small>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <code id="view-password" style="font-size: 1rem;">••••••••</code>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="togglePassword()" id="toggle-password-btn">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="copyPassword()" title="Copy to clipboard">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <small class="text-muted d-block">Server</small>
+                                    <strong id="view-server">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Caller ID</label>
+                        <p class="form-control-plaintext" id="view-caller-id">-</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Outbound CID</label>
+                        <p class="form-control-plaintext" id="view-outbound-cid">-</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Emergency CID</label>
+                        <p class="form-control-plaintext" id="view-emergency-cid">-</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Email</label>
+                        <p class="form-control-plaintext" id="view-email">-</p>
+                    </div>
+                </div>
+                <div class="row" id="view-contacts-section" style="display: none;">
+                    <div class="col-12">
+                        <label class="form-label text-muted">Registered Contacts</label>
+                        <div id="view-contacts" class="border rounded p-2 bg-light">
+                            <code style="font-size: 0.85rem; white-space: pre-wrap;"></code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="editFromView()">
+                    <i class="fas fa-edit"></i> Edit Extension
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 let allExtensions = [];
-let createModalInstance, bulkCreateModalInstance, editModalInstance;
+let createModalInstance, bulkCreateModalInstance, editModalInstance, viewModalInstance;
+let currentExtensionData = null;
+let passwordVisible = false;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     createModalInstance = new bootstrap.Modal(document.getElementById('createModal'));
     bulkCreateModalInstance = new bootstrap.Modal(document.getElementById('bulkCreateModal'));
     editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
+    viewModalInstance = new bootstrap.Modal(document.getElementById('viewModal'));
 
     loadExtensions();
     loadStatus();
@@ -318,7 +500,8 @@ async function loadExtensions() {
             throw new Error(data.message);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error loading extensions:', error);
+        showToast('Failed to load extensions', 'danger');
     }
 }
 
@@ -343,7 +526,7 @@ function renderExtensions(extensions) {
     document.getElementById('filtered-count').textContent = extensions.length;
 
     if (extensions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No extensions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No extensions found</td></tr>';
         return;
     }
 
@@ -356,17 +539,20 @@ function renderExtensions(extensions) {
                     ? '<span class="badge bg-success"><i class="fas fa-check-circle"></i> ' + ext.status + '</span>'
                     : '<span class="badge bg-secondary"><i class="fas fa-times-circle"></i> Offline</span>'
                 }
-                ${ext.contact_count > 0 ? `<small class="text-muted">(${ext.contact_count})</small>` : ''}
+                ${ext.contact_count > 0 ? `<small class="text-muted ms-1">(${ext.contact_count})</small>` : ''}
             </td>
             <td>${ext.caller_id || '-'}</td>
             <td><span class="badge bg-info">${ext.tech.toUpperCase()}</span></td>
             <td>${ext.device_type || '-'}</td>
-            <td>
+            <td class="action-buttons">
                 <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-primary btn-icon" onclick="editExtension('${ext.extension_id}')" title="Edit">
+                    <button class="btn btn-outline-info" onclick="viewExtension('${ext.extension_id}')" title="View Details & Password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="editExtension('${ext.extension_id}')" title="Edit">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-outline-danger btn-icon" onclick="confirmDelete('${ext.extension_id}')" title="Delete">
+                    <button class="btn btn-outline-danger" onclick="confirmDelete('${ext.extension_id}')" title="Delete">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -401,7 +587,8 @@ async function refreshStatus() {
             }, 1000);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error refreshing status:', error);
+        showToast('Failed to refresh status', 'danger');
     }
 }
 
@@ -426,7 +613,8 @@ async function reloadAsterisk() {
             throw new Error(data.message);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error reloading Asterisk:', error);
+        showToast('Failed to reload Asterisk', 'danger');
     }
 }
 
@@ -474,7 +662,8 @@ async function createExtension() {
             throw new Error(result.message);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error creating extension:', error);
+        showToast('Failed to create extension: ' + error.message, 'danger');
     }
 }
 
@@ -519,7 +708,8 @@ async function bulkCreateExtensions() {
             throw new Error(result.message);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error bulk creating extensions:', error);
+        showToast('Failed to bulk create extensions: ' + error.message, 'danger');
     }
 }
 
@@ -544,7 +734,8 @@ async function editExtension(extensionId) {
             throw new Error(data.message);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error loading extension:', error);
+        showToast('Failed to load extension details', 'danger');
     }
 }
 
@@ -583,7 +774,8 @@ async function updateExtension() {
             throw new Error(result.message);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error updating extension:', error);
+        showToast('Failed to update extension: ' + error.message, 'danger');
     }
 }
 
@@ -621,7 +813,96 @@ async function deleteExtension(extensionId) {
             throw new Error(result.message);
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error deleting extension:', error);
+        showToast('Failed to delete extension: ' + error.message, 'danger');
+    }
+}
+
+// View extension details with password
+async function viewExtension(extensionId) {
+    try {
+        const response = await fetch(`/extensions/api/get/${extensionId}`);
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            const ext = data.extension;
+            currentExtensionData = ext;
+            passwordVisible = false;
+
+            document.getElementById('view-ext-number').textContent = ext.extension_id;
+            document.getElementById('view-name').textContent = ext.name || '-';
+            document.getElementById('view-tech').textContent = ext.tech ? ext.tech.toUpperCase() : '-';
+            document.getElementById('view-status').innerHTML = ext.registered
+                ? '<span class="badge bg-success">Online</span>'
+                : '<span class="badge bg-secondary">Offline</span>';
+
+            // SIP Credentials
+            document.getElementById('view-username').textContent = ext.extension_id;
+            document.getElementById('view-password').textContent = '••••••••';
+            document.getElementById('view-password').setAttribute('data-password', ext.password || ext.extPassword || 'Not set');
+            document.getElementById('view-server').textContent = window.location.hostname;
+
+            // Other details
+            document.getElementById('view-caller-id').textContent = ext.caller_id || '-';
+            document.getElementById('view-outbound-cid').textContent = ext.outbound_cid || '-';
+            document.getElementById('view-emergency-cid').textContent = ext.emergency_cid || '-';
+            document.getElementById('view-email').textContent = ext.email || '-';
+
+            // Show registered contacts if available
+            if (ext.contacts && ext.contacts.length > 0) {
+                document.getElementById('view-contacts-section').style.display = 'block';
+                document.getElementById('view-contacts').querySelector('code').textContent = ext.contacts.join('\n');
+            } else {
+                document.getElementById('view-contacts-section').style.display = 'none';
+            }
+
+            viewModalInstance.show();
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        console.error('Error loading extension:', error);
+        showToast('Failed to load extension details', 'danger');
+    }
+}
+
+// Toggle password visibility
+function togglePassword() {
+    const passwordEl = document.getElementById('view-password');
+    const toggleBtn = document.getElementById('toggle-password-btn');
+    const actualPassword = passwordEl.getAttribute('data-password');
+
+    passwordVisible = !passwordVisible;
+
+    if (passwordVisible) {
+        passwordEl.textContent = actualPassword;
+        toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+    } else {
+        passwordEl.textContent = '••••••••';
+        toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+    }
+}
+
+// Copy password to clipboard
+function copyPassword() {
+    const passwordEl = document.getElementById('view-password');
+    const actualPassword = passwordEl.getAttribute('data-password');
+
+    navigator.clipboard.writeText(actualPassword).then(() => {
+        showToast('Password copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        showToast('Failed to copy password', 'danger');
+    });
+}
+
+// Edit from view modal
+function editFromView() {
+    if (currentExtensionData) {
+        viewModalInstance.hide();
+        setTimeout(() => {
+            editExtension(currentExtensionData.extension_id);
+        }, 300);
     }
 }
 </script>
