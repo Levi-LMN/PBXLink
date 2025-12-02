@@ -40,18 +40,13 @@ class Config:
     AZURE_AD_CLIENT_SECRET = os.environ.get('AZURE_AD_CLIENT_SECRET', '')
     AZURE_AD_REDIRECT_PATH = '/auth/callback'
 
-    # Azure AD endpoints (safe — no hardcoded secrets)
-    @property
-    def AZURE_AD_AUTHORITY(self):
-        return f'https://login.microsoftonline.com/{self.AZURE_AD_TENANT_ID}'
-
-    @property
-    def AZURE_AD_AUTH_ENDPOINT(self):
-        return f'{self.AZURE_AD_AUTHORITY}/oauth2/v2.0/authorize'
-
-    @property
-    def AZURE_AD_TOKEN_ENDPOINT(self):
-        return f'{self.AZURE_AD_AUTHORITY}/oauth2/v2.0/token'
+    # Azure AD endpoints - Define as regular attributes, not properties
+    def __init__(self):
+        # Build the authority and endpoints based on tenant ID
+        tenant_id = self.AZURE_AD_TENANT_ID or os.environ.get('AZURE_AD_TENANT_ID', '')
+        self.AZURE_AD_AUTHORITY = f'https://login.microsoftonline.com/{tenant_id}'
+        self.AZURE_AD_AUTH_ENDPOINT = f'{self.AZURE_AD_AUTHORITY}/oauth2/v2.0/authorize'
+        self.AZURE_AD_TOKEN_ENDPOINT = f'{self.AZURE_AD_AUTHORITY}/oauth2/v2.0/token'
 
     AZURE_AD_SCOPE = ['User.Read', 'email', 'profile', 'openid']
 
@@ -86,4 +81,7 @@ def get_config(config_name=None):
     """Get configuration object"""
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'development')
-    return config.get(config_name, DevelopmentConfig)
+
+    config_class = config.get(config_name, DevelopmentConfig)
+    # Return an instance of the config class, not the class itself
+    return config_class()
