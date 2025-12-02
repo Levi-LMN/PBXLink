@@ -7,6 +7,11 @@ from flask import Flask, render_template, redirect, url_for, session
 import logging
 import os
 
+# Load .env first so config picks up environment variables
+from dotenv import load_dotenv
+load_dotenv()  # Looks for .env in current directory
+
+
 # Import configuration
 from config import get_config
 
