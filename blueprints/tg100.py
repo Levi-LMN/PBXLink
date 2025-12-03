@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, jsonify, request
 import subprocess
 import logging
 import re
+import os
 from datetime import datetime
 import time
 
@@ -28,6 +29,15 @@ class TG100Monitor:
         self.ping_history = []  # Store recent ping results
         self.max_history = 50  # Keep last 50 pings
 
+        # Define full paths to commands
+        self.ping_cmd = '/usr/bin/ping'
+
+        # Set environment with proper PATH
+        self.env = {
+            'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+            'HOME': os.environ.get('HOME', '/root')
+        }
+
     def ping_device(self, count=4, timeout=2):
         """
         Ping the TG100 device
@@ -36,12 +46,13 @@ class TG100Monitor:
         try:
             start_time = time.time()
 
-            # Ping command - Linux style
+            # Ping command - Linux style with full path
             result = subprocess.run(
-                ['ping', '-c', str(count), '-W', str(timeout), self.device_ip],
+                [self.ping_cmd, '-c', str(count), '-W', str(timeout), self.device_ip],
                 capture_output=True,
                 text=True,
-                timeout=timeout * count + 2
+                timeout=timeout * count + 2,
+                env=self.env
             )
 
             end_time = time.time()
@@ -65,6 +76,9 @@ class TG100Monitor:
             if result.returncode == 0:
                 # Parse ping output
                 ping_data.update(self._parse_ping_output(result.stdout, count))
+                logger.debug(f"Ping successful to {self.device_ip}: avg_rtt={ping_data.get('avg_rtt')}ms")
+            else:
+                logger.warning(f"Ping failed to {self.device_ip}: {result.stderr}")
 
             # Add to history
             self._add_to_history(ping_data)
@@ -82,6 +96,17 @@ class TG100Monitor:
                 'packet_loss': 100.0,
                 'error': 'Timeout',
                 'duration': timeout * count
+            }
+            self._add_to_history(ping_data)
+            return ping_data
+
+        except FileNotFoundError as e:
+            logger.error(f"Ping command not found: {e}")
+            ping_data = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'online': False,
+                'ip': self.device_ip,
+                'error': f'Command not found: {e}'
             }
             self._add_to_history(ping_data)
             return ping_data
@@ -110,6 +135,9 @@ class TG100Monitor:
                 stats['packet_loss'] = round(
                     ((packets_sent - stats['packets_received']) / packets_sent) * 100, 2
                 )
+            else:
+                stats['packets_received'] = 0
+                stats['packet_loss'] = 100.0
 
             # Parse RTT statistics
             # Example: "rtt min/avg/max/mdev = 0.123/0.456/0.789/0.012 ms"

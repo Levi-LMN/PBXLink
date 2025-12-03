@@ -34,6 +34,21 @@ class WireGuardManager:
         self.interface = WG_INTERFACE
         self.server_config = WG_SERVER_CONFIG
 
+        # Define full paths to commands
+        self.sudo_cmd = '/usr/bin/sudo'
+        self.cat_cmd = '/usr/bin/cat'
+        self.mv_cmd = '/usr/bin/mv'
+        self.chmod_cmd = '/usr/bin/chmod'
+        self.rm_cmd = '/usr/bin/rm'
+        self.wg_cmd = '/usr/bin/wg'
+        self.systemctl_cmd = '/usr/bin/systemctl'
+
+        # Set environment with proper PATH
+        self.env = {
+            'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+            'HOME': os.environ.get('HOME', '/root')
+        }
+
     def ensure_users_directory(self):
         """Create users directory if it doesn't exist"""
         try:
@@ -49,12 +64,22 @@ class WireGuardManager:
         """Read the WireGuard server configuration"""
         try:
             result = subprocess.run(
-                ['sudo', 'cat', self.server_config],
+                [self.sudo_cmd, self.cat_cmd, self.server_config],
                 capture_output=True,
                 text=True,
-                check=True
+                timeout=5,
+                env=self.env
             )
-            return result.stdout
+
+            if result.returncode == 0:
+                return result.stdout
+            else:
+                logger.error(f"Failed to read config: {result.stderr}")
+                return None
+
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error reading server config: {e}")
             return None
@@ -69,14 +94,21 @@ class WireGuardManager:
 
             # Move to actual location with sudo
             subprocess.run(
-                ['sudo', 'mv', temp_file, self.server_config],
+                [self.sudo_cmd, self.mv_cmd, temp_file, self.server_config],
+                timeout=5,
+                env=self.env,
                 check=True
             )
             subprocess.run(
-                ['sudo', 'chmod', '600', self.server_config],
+                [self.sudo_cmd, self.chmod_cmd, '600', self.server_config],
+                timeout=5,
+                env=self.env,
                 check=True
             )
             return True
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error writing server config: {e}")
             return False
@@ -92,12 +124,22 @@ class WireGuardManager:
 
             # Fallback to /etc/wireguard
             result = subprocess.run(
-                ['sudo', 'cat', '/etc/wireguard/publickey'],
+                [self.sudo_cmd, self.cat_cmd, '/etc/wireguard/publickey'],
                 capture_output=True,
                 text=True,
-                check=True
+                timeout=5,
+                env=self.env
             )
-            return result.stdout.strip()
+
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                logger.error(f"Failed to read public key: {result.stderr}")
+                return None
+
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error reading server public key: {e}")
             return None
@@ -186,24 +228,40 @@ class WireGuardManager:
         try:
             # Generate private key
             private_result = subprocess.run(
-                ['wg', 'genkey'],
+                [self.wg_cmd, 'genkey'],
                 capture_output=True,
                 text=True,
-                check=True
+                timeout=5,
+                env=self.env
             )
+
+            if private_result.returncode != 0:
+                logger.error(f"Failed to generate private key: {private_result.stderr}")
+                return None, None
+
             private_key = private_result.stdout.strip()
 
             # Generate public key from private key
             public_result = subprocess.run(
-                ['wg', 'pubkey'],
+                [self.wg_cmd, 'pubkey'],
                 input=private_key,
                 capture_output=True,
                 text=True,
-                check=True
+                timeout=5,
+                env=self.env
             )
+
+            if public_result.returncode != 0:
+                logger.error(f"Failed to generate public key: {public_result.stderr}")
+                return None, None
+
             public_key = public_result.stdout.strip()
 
             return private_key, public_key
+
+        except FileNotFoundError as e:
+            logger.error(f"WireGuard command not found: {e}")
+            return None, None
         except Exception as e:
             logger.error(f"Error generating keypair: {e}")
             return None, None
@@ -437,13 +495,21 @@ PersistentKeepalive = 25
                 self.write_server_config(new_config)
 
             # Delete user directory
-            subprocess.run(['rm', '-rf', user_dir], check=True)
+            subprocess.run(
+                [self.rm_cmd, '-rf', user_dir],
+                timeout=5,
+                env=self.env,
+                check=True
+            )
 
             # Restart WireGuard
             self.restart_wireguard()
 
             logger.info(f"Deleted user: {username}")
             return True
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error deleting user: {e}")
             return False
@@ -465,11 +531,16 @@ PersistentKeepalive = 25
         """Restart WireGuard service"""
         try:
             subprocess.run(
-                ['sudo', 'systemctl', 'restart', f'wg-quick@{self.interface}'],
+                [self.sudo_cmd, self.systemctl_cmd, 'restart', f'wg-quick@{self.interface}'],
+                timeout=10,
+                env=self.env,
                 check=True
             )
             logger.info("WireGuard service restarted")
             return True
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error restarting WireGuard: {e}")
             return False
@@ -478,15 +549,23 @@ PersistentKeepalive = 25
         """Parse WireGuard status into structured, UI-friendly format"""
         try:
             result = subprocess.run(
-                ['sudo', 'wg', 'show', self.interface],
+                [self.sudo_cmd, self.wg_cmd, 'show', self.interface],
                 capture_output=True,
                 text=True,
-                check=True
+                timeout=5,
+                env=self.env
             )
 
-            raw_status = result.stdout
-            return self._format_status_for_ui(raw_status)
+            if result.returncode == 0:
+                raw_status = result.stdout
+                return self._format_status_for_ui(raw_status)
+            else:
+                logger.error(f"Failed to get WireGuard status: {result.stderr}")
+                return None
 
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error getting WireGuard status: {e}")
             return None
@@ -628,12 +707,22 @@ PersistentKeepalive = 25
         """Get WireGuard interface status (legacy method)"""
         try:
             result = subprocess.run(
-                ['sudo', 'wg', 'show', self.interface],
+                [self.sudo_cmd, self.wg_cmd, 'show', self.interface],
                 capture_output=True,
                 text=True,
-                check=True
+                timeout=5,
+                env=self.env
             )
-            return result.stdout
+
+            if result.returncode == 0:
+                return result.stdout
+            else:
+                logger.error(f"Failed to get status: {result.stderr}")
+                return None
+
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error getting WireGuard status: {e}")
             return None
