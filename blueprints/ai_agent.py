@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, jsonify, request
 import subprocess
 import logging
 import re
+import os
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -22,15 +23,26 @@ class AIAgentManager:
 
     def __init__(self):
         self.service_name = SERVICE_NAME
+        # Define full paths to commands
+        self.sudo_cmd = '/usr/bin/sudo'
+        self.systemctl_cmd = '/usr/bin/systemctl'
+        self.journalctl_cmd = '/usr/bin/journalctl'
+
+        # Set environment with proper PATH
+        self.env = {
+            'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+            'HOME': os.environ.get('HOME', '/root')
+        }
 
     def get_service_status(self):
         """Get detailed service status"""
         try:
             result = subprocess.run(
-                ['sudo', 'systemctl', 'status', self.service_name],
+                [self.sudo_cmd, self.systemctl_cmd, 'status', self.service_name],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                env=self.env
             )
 
             # Parse the output
@@ -52,6 +64,9 @@ class AIAgentManager:
         except subprocess.TimeoutExpired:
             logger.error("Service status check timed out")
             return {'active': False, 'status': 'timeout', 'error': 'Status check timed out'}
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return {'active': False, 'status': 'error', 'error': f'Command not found: {e}'}
         except Exception as e:
             logger.error(f"Error getting service status: {e}")
             return {'active': False, 'status': 'error', 'error': str(e)}
@@ -108,20 +123,26 @@ class AIAgentManager:
         """Get recent service logs"""
         try:
             result = subprocess.run(
-                ['sudo', 'journalctl', '-u', self.service_name, '-n', str(lines), '--no-pager'],
+                [self.sudo_cmd, self.journalctl_cmd, '-u', self.service_name,
+                 '-n', str(lines), '--no-pager'],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                env=self.env
             )
 
             if result.returncode == 0:
                 logs = result.stdout.strip().split('\n')
                 return self._parse_logs(logs)
             else:
+                logger.error(f"journalctl returned non-zero exit code: {result.returncode}")
                 return []
 
         except subprocess.TimeoutExpired:
             logger.error("Log retrieval timed out")
+            return []
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
             return []
         except Exception as e:
             logger.error(f"Error getting service logs: {e}")
@@ -178,12 +199,23 @@ class AIAgentManager:
         """Start the AI Agent service"""
         try:
             result = subprocess.run(
-                ['sudo', 'systemctl', 'start', self.service_name],
+                [self.sudo_cmd, self.systemctl_cmd, 'start', self.service_name],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                env=self.env
             )
-            return result.returncode == 0
+
+            if result.returncode == 0:
+                logger.info(f"Service {self.service_name} started successfully")
+                return True
+            else:
+                logger.error(f"Failed to start service: {result.stderr}")
+                return False
+
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error starting service: {e}")
             return False
@@ -192,12 +224,23 @@ class AIAgentManager:
         """Stop the AI Agent service"""
         try:
             result = subprocess.run(
-                ['sudo', 'systemctl', 'stop', self.service_name],
+                [self.sudo_cmd, self.systemctl_cmd, 'stop', self.service_name],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                env=self.env
             )
-            return result.returncode == 0
+
+            if result.returncode == 0:
+                logger.info(f"Service {self.service_name} stopped successfully")
+                return True
+            else:
+                logger.error(f"Failed to stop service: {result.stderr}")
+                return False
+
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error stopping service: {e}")
             return False
@@ -206,12 +249,23 @@ class AIAgentManager:
         """Restart the AI Agent service"""
         try:
             result = subprocess.run(
-                ['sudo', 'systemctl', 'restart', self.service_name],
+                [self.sudo_cmd, self.systemctl_cmd, 'restart', self.service_name],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
+                env=self.env
             )
-            return result.returncode == 0
+
+            if result.returncode == 0:
+                logger.info(f"Service {self.service_name} restarted successfully")
+                return True
+            else:
+                logger.error(f"Failed to restart service: {result.stderr}")
+                return False
+
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error restarting service: {e}")
             return False
@@ -220,10 +274,11 @@ class AIAgentManager:
         """Get detailed service properties"""
         try:
             result = subprocess.run(
-                ['sudo', 'systemctl', 'show', self.service_name],
+                [self.sudo_cmd, self.systemctl_cmd, 'show', self.service_name],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                env=self.env
             )
 
             properties = {}
@@ -233,6 +288,10 @@ class AIAgentManager:
                     properties[key] = value
 
             return properties
+
+        except FileNotFoundError as e:
+            logger.error(f"Command not found: {e}")
+            return {}
         except Exception as e:
             logger.error(f"Error getting service properties: {e}")
             return {}

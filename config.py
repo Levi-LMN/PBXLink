@@ -29,10 +29,16 @@ class Config:
     FREEPBX_CLIENT_ID = os.environ.get('FREEPBX_CLIENT_ID', '')
     FREEPBX_CLIENT_SECRET = os.environ.get('FREEPBX_CLIENT_SECRET', '')
 
-    # SSH settings
+    # SSH settings - Handle None/empty values properly
     FREEPBX_SSH_USER = os.environ.get('FREEPBX_SSH_USER', '')
     FREEPBX_SSH_PASSWORD = os.environ.get('FREEPBX_SSH_PASSWORD', '')
-    FREEPBX_SSH_KEY = os.environ.get('FREEPBX_SSH_KEY', None)
+
+    # SSH Key - Convert 'None' string or empty to actual None
+    _ssh_key = os.environ.get('FREEPBX_SSH_KEY', None)
+    if _ssh_key and _ssh_key.strip() and _ssh_key.strip().lower() != 'none':
+        FREEPBX_SSH_KEY = _ssh_key.strip()
+    else:
+        FREEPBX_SSH_KEY = None
 
     # Azure AD OAuth Settings
     AZURE_AD_TENANT_ID = os.environ.get('AZURE_AD_TENANT_ID', '')
@@ -40,7 +46,7 @@ class Config:
     AZURE_AD_CLIENT_SECRET = os.environ.get('AZURE_AD_CLIENT_SECRET', '')
     AZURE_AD_REDIRECT_PATH = '/auth/callback'
 
-    # Azure AD endpoints - Define as regular attributes, not properties
+    # Azure AD endpoints
     def __init__(self):
         # Build the authority and endpoints based on tenant ID
         tenant_id = self.AZURE_AD_TENANT_ID or os.environ.get('AZURE_AD_TENANT_ID', '')
@@ -83,5 +89,5 @@ def get_config(config_name=None):
         config_name = os.environ.get('FLASK_ENV', 'development')
 
     config_class = config.get(config_name, DevelopmentConfig)
-    # Return an instance of the config class, not the class itself
+    # Return an instance of the config class
     return config_class()

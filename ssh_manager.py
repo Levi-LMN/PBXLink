@@ -99,16 +99,26 @@ class SSHConnectionPool:
                 self.client = paramiko.SSHClient()
                 self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
+                # Check if key_path is valid (not None, not string "None", not empty)
+                use_key = False
                 if key_path:
+                    # Convert to string and check
+                    key_path_str = str(key_path).strip()
+                    if key_path_str and key_path_str.lower() != 'none':
+                        use_key = True
+                        logger.debug(f"Using SSH key: {key_path_str}")
+
+                if use_key:
                     self.client.connect(
                         host,
                         username=user,
-                        key_filename=key_path,
+                        key_filename=key_path_str,
                         timeout=timeout,
                         look_for_keys=False,
                         allow_agent=False
                     )
                 elif password:
+                    logger.debug(f"Using password authentication for {user}@{host}")
                     self.client.connect(
                         host,
                         username=user,
@@ -122,15 +132,19 @@ class SSHConnectionPool:
                     return None
 
                 self.last_used = time.time()
-                logger.info(f"✅ SSH connected to {host}")
+                logger.info(f"✅ SSH connected to {host} as {user}")
                 return self.client
 
-            except paramiko.AuthenticationException:
-                logger.error(f"❌ SSH authentication failed for {user}@{host}")
+            except paramiko.AuthenticationException as e:
+                logger.error(f"❌ SSH authentication failed for {user}@{host}: {e}")
                 self.client = None
                 return None
             except paramiko.SSHException as e:
                 logger.error(f"❌ SSH error: {e}")
+                self.client = None
+                return None
+            except FileNotFoundError as e:
+                logger.error(f"❌ SSH key file not found: {e}")
                 self.client = None
                 return None
             except Exception as e:
@@ -161,11 +175,14 @@ class SSHConnectionPool:
             return None
 
         try:
+            # Set proper PATH for all commands
+            path_prefix = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; "
+
             # Prepare command
             if use_sudo:
-                full_command = f"sudo {command}"
+                full_command = f"{path_prefix}sudo {command}"
             else:
-                full_command = f"export PATH=$PATH:/usr/sbin:/sbin; {command}"
+                full_command = f"{path_prefix}{command}"
 
             logger.debug(f"Executing: {full_command}")
 
@@ -260,7 +277,7 @@ class SSHManager:
         Example:
             output = ssh_manager.execute_asterisk_command('pjsip show aors')
         """
-        command = f"/usr/sbin/asterisk -rx '{asterisk_cmd}'"
+        command = f"asterisk -rx '{asterisk_cmd}'"
         return self.pool.execute_command(
             command=command,
             use_sudo=True,
@@ -302,7 +319,7 @@ class SSHManager:
             'uptime': 'uptime',
             'memory': 'free -h',
             'disk': 'df -h',
-            'asterisk_version': '/usr/sbin/asterisk -V'
+            'asterisk_version': 'asterisk -V'
         }
 
         results = {}
@@ -335,7 +352,7 @@ ssh_manager = SSHManager()
 
 def init_ssh_manager(app):
     """
-    Initialize SSH manager with Flask app to sangoma
+    Initialize SSH manager with Flask app
     Adds teardown handler to close connections
 
     Usage in app.py:
