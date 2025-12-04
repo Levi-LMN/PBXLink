@@ -168,6 +168,51 @@ def create_app(config_name=None):
                 'message': str(e)
             }, 500
 
+    # WireGuard status endpoint
+    @app.route('/api/wireguard-status')
+    def wireguard_status():
+        """Check WireGuard VPN status (local)"""
+        try:
+            import subprocess
+
+            # Check if WireGuard interface is active using systemctl (local command)
+            result = subprocess.run(
+                ['sudo', 'systemctl', 'is-active', 'wg-quick@wg0'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode == 0 and 'active' in result.stdout.strip():
+                return {
+                    'status': 'success',
+                    'message': 'Online',
+                    'interface': 'wg0',
+                    'state': 'active'
+                }
+            else:
+                return {
+                    'status': 'error',
+                    'message': 'Offline',
+                    'interface': 'wg0',
+                    'state': 'inactive'
+                }
+
+        except FileNotFoundError:
+            logger.error("systemctl command not found")
+            return {
+                'status': 'error',
+                'message': 'Command not found',
+                'error': 'systemctl not available'
+            }, 500
+        except Exception as e:
+            logger.error(f"WireGuard status check error: {e}")
+            return {
+                'status': 'error',
+                'message': 'Check Failed',
+                'error': str(e)
+            }, 500
+
     # Error handlers
     @app.errorhandler(401)
     def unauthorized(e):
