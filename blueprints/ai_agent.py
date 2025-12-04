@@ -1,6 +1,6 @@
 """
 AI Agent service management blueprint
-Handles AI Agent service monitoring, status, and logs
+Handles AI Agent service monitoring, status, and logs with audit logging
 """
 
 from flask import Blueprint, render_template, jsonify, request
@@ -9,6 +9,7 @@ import logging
 import re
 import os
 from datetime import datetime
+from audit_utils import log_action  # Import audit logging
 
 logger = logging.getLogger(__name__)
 
@@ -301,54 +302,259 @@ class AIAgentManager:
 ai_agent_manager = AIAgentManager()
 
 
-# Routes
+# ============================================================================
+# FLASK ROUTES WITH AUDIT LOGGING
+# ============================================================================
+
 @ai_agent_bp.route('/')
 def index():
     """AI Agent monitoring page"""
+    # Log page view
+    log_action(
+        action='view',
+        resource_type='ai_agent_page',
+        details='Accessed AI Agent monitoring page'
+    )
     return render_template('ai_agent/index.html')
 
 
 @ai_agent_bp.route('/api/status')
 def get_status():
     """Get AI Agent service status"""
-    status = ai_agent_manager.get_service_status()
-    return jsonify({'success': True, 'status': status})
+    try:
+        status = ai_agent_manager.get_service_status()
+
+        # Log status check
+        log_action(
+            action='view',
+            resource_type='ai_agent_status',
+            details={
+                'service': SERVICE_NAME,
+                'status': status.get('status', 'unknown'),
+                'active': status.get('active', False),
+                'pid': status.get('pid', 'N/A'),
+                'memory': status.get('memory', 'N/A')
+            }
+        )
+
+        return jsonify({'success': True, 'status': status})
+
+    except Exception as e:
+        logger.error(f"Error getting status: {e}")
+
+        # Log error
+        log_action(
+            action='view_error',
+            resource_type='ai_agent_status',
+            details={
+                'service': SERVICE_NAME,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @ai_agent_bp.route('/api/logs')
 def get_logs():
     """Get AI Agent service logs"""
-    lines = int(request.args.get('lines', 100))
-    logs = ai_agent_manager.get_service_logs(lines)
-    return jsonify({'success': True, 'logs': logs})
+    try:
+        lines = int(request.args.get('lines', 100))
+        logs = ai_agent_manager.get_service_logs(lines)
+
+        # Log logs retrieval
+        log_action(
+            action='view',
+            resource_type='ai_agent_logs',
+            details={
+                'service': SERVICE_NAME,
+                'lines_requested': lines,
+                'lines_returned': len(logs)
+            }
+        )
+
+        return jsonify({'success': True, 'logs': logs})
+
+    except Exception as e:
+        logger.error(f"Error getting logs: {e}")
+
+        # Log error
+        log_action(
+            action='view_error',
+            resource_type='ai_agent_logs',
+            details={
+                'service': SERVICE_NAME,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @ai_agent_bp.route('/api/start', methods=['POST'])
 def start_service():
     """Start AI Agent service"""
-    if ai_agent_manager.start_service():
-        return jsonify({'success': True, 'message': 'Service started successfully'})
-    return jsonify({'success': False, 'error': 'Failed to start service'}), 500
+    try:
+        if ai_agent_manager.start_service():
+            # Log successful start
+            log_action(
+                action='start',
+                resource_type='ai_agent_service',
+                details={
+                    'service': SERVICE_NAME,
+                    'message': 'Service started successfully'
+                }
+            )
+
+            return jsonify({'success': True, 'message': 'Service started successfully'})
+
+        # Log failed start
+        log_action(
+            action='start_failed',
+            resource_type='ai_agent_service',
+            details={
+                'service': SERVICE_NAME,
+                'error': 'Failed to start service'
+            }
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to start service'}), 500
+
+    except Exception as e:
+        logger.error(f"Error starting service: {e}")
+
+        # Log error
+        log_action(
+            action='start_error',
+            resource_type='ai_agent_service',
+            details={
+                'service': SERVICE_NAME,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @ai_agent_bp.route('/api/stop', methods=['POST'])
 def stop_service():
     """Stop AI Agent service"""
-    if ai_agent_manager.stop_service():
-        return jsonify({'success': True, 'message': 'Service stopped successfully'})
-    return jsonify({'success': False, 'error': 'Failed to stop service'}), 500
+    try:
+        if ai_agent_manager.stop_service():
+            # Log successful stop
+            log_action(
+                action='stop',
+                resource_type='ai_agent_service',
+                details={
+                    'service': SERVICE_NAME,
+                    'message': 'Service stopped successfully'
+                }
+            )
+
+            return jsonify({'success': True, 'message': 'Service stopped successfully'})
+
+        # Log failed stop
+        log_action(
+            action='stop_failed',
+            resource_type='ai_agent_service',
+            details={
+                'service': SERVICE_NAME,
+                'error': 'Failed to stop service'
+            }
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to stop service'}), 500
+
+    except Exception as e:
+        logger.error(f"Error stopping service: {e}")
+
+        # Log error
+        log_action(
+            action='stop_error',
+            resource_type='ai_agent_service',
+            details={
+                'service': SERVICE_NAME,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @ai_agent_bp.route('/api/restart', methods=['POST'])
 def restart_service():
     """Restart AI Agent service"""
-    if ai_agent_manager.restart_service():
-        return jsonify({'success': True, 'message': 'Service restarted successfully'})
-    return jsonify({'success': False, 'error': 'Failed to restart service'}), 500
+    try:
+        if ai_agent_manager.restart_service():
+            # Log successful restart
+            log_action(
+                action='restart',
+                resource_type='ai_agent_service',
+                details={
+                    'service': SERVICE_NAME,
+                    'message': 'Service restarted successfully'
+                }
+            )
+
+            return jsonify({'success': True, 'message': 'Service restarted successfully'})
+
+        # Log failed restart
+        log_action(
+            action='restart_failed',
+            resource_type='ai_agent_service',
+            details={
+                'service': SERVICE_NAME,
+                'error': 'Failed to restart service'
+            }
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to restart service'}), 500
+
+    except Exception as e:
+        logger.error(f"Error restarting service: {e}")
+
+        # Log error
+        log_action(
+            action='restart_error',
+            resource_type='ai_agent_service',
+            details={
+                'service': SERVICE_NAME,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @ai_agent_bp.route('/api/properties')
 def get_properties():
     """Get detailed service properties"""
-    properties = ai_agent_manager.get_service_properties()
-    return jsonify({'success': True, 'properties': properties})
+    try:
+        properties = ai_agent_manager.get_service_properties()
+
+        # Log properties view
+        log_action(
+            action='view',
+            resource_type='ai_agent_properties',
+            details={
+                'service': SERVICE_NAME,
+                'properties_count': len(properties)
+            }
+        )
+
+        return jsonify({'success': True, 'properties': properties})
+
+    except Exception as e:
+        logger.error(f"Error getting properties: {e}")
+
+        # Log error
+        log_action(
+            action='view_error',
+            resource_type='ai_agent_properties',
+            details={
+                'service': SERVICE_NAME,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500

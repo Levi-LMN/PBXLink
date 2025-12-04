@@ -1,9 +1,9 @@
 """
 Main application file for FreePBX Dashboard
-Includes Azure AD authentication, audit logging, and database support
+Includes Azure AD authentication, audit logging, database support, and automatic log cleanup
 """
 
-from flask import Flask, render_template, redirect, url_for, session
+from flask import Flask, render_template, redirect, url_for, session, request
 import logging
 import os
 
@@ -30,6 +30,9 @@ from blueprints.admin import admin_bp
 
 # Import SSH manager
 from ssh_manager import init_ssh_manager, ssh_manager
+
+# Import log cleanup system
+from audit_utils import init_log_cleanup
 
 
 def create_app(config_name=None):
@@ -60,6 +63,10 @@ def create_app(config_name=None):
     # Initialize SSH manager
     init_ssh_manager(app)
 
+    # Initialize automatic log cleanup system
+    init_log_cleanup(app)
+    logger.info("Automatic log cleanup initialized (runs every 24 hours)")
+
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(api_core_bp, url_prefix='/api')
@@ -70,9 +77,39 @@ def create_app(config_name=None):
     app.register_blueprint(tg100_bp, url_prefix='/tg100')
     app.register_blueprint(admin_bp, url_prefix='/admin')
 
-    # Root route - require login
+    # Global authentication check
+    @app.before_request
+    def require_authentication():
+        """Require authentication for all routes except public ones"""
+        # List of public endpoints that don't require authentication
+        public_endpoints = {
+            'auth.login_page',
+            'auth.login',
+            'auth.callback',
+            'health',
+            'static'
+        }
+
+        # Check if current endpoint is public
+        if request.endpoint in public_endpoints:
+            return None
+
+        # Check if accessing static files
+        if request.path.startswith('/static/'):
+            return None
+
+        # Require authentication for all other routes
+        if 'user' not in session:
+            # For API routes, return JSON error
+            if request.path.startswith('/api/'):
+                return {'error': 'Unauthorized', 'message': 'Please log in'}, 401
+            # For web routes, redirect to login
+            return redirect(url_for('auth.login_page'))
+
+        return None
+
+    # Root route
     @app.route('/')
-    @login_required
     def index():
         """Dashboard home page"""
         return render_template('index.html')
@@ -84,7 +121,6 @@ def create_app(config_name=None):
 
     # API test endpoint
     @app.route('/api/test')
-    @login_required
     def api_test():
         """Test API connection"""
         try:
@@ -103,14 +139,22 @@ def create_app(config_name=None):
 
     # SSH connection test endpoint
     @app.route('/api/ssh-test')
-    @login_required
     def ssh_test():
-        """Test SSH connection"""
+        """Test SSH connection and get uptime"""
         try:
             if ssh_manager.test_connection():
+                # Get system uptime
+                uptime_output = ssh_manager.execute_command('uptime -p', timeout=5)
+                uptime = uptime_output.strip() if uptime_output else 'Unknown'
+
+                # Clean up uptime format (remove "up " prefix if present)
+                if uptime.startswith('up '):
+                    uptime = uptime[3:]
+
                 return {
                     'status': 'success',
-                    'message': 'SSH connection successful'
+                    'message': 'SSH connection successful',
+                    'uptime': uptime
                 }
             else:
                 return {
@@ -128,14 +172,14 @@ def create_app(config_name=None):
     @app.errorhandler(401)
     def unauthorized(e):
         """Redirect to login page for unauthorized access"""
-        if '/api/' in str(e):
+        if request.path.startswith('/api/'):
             return {'error': 'Unauthorized', 'message': 'Please log in'}, 401
         return redirect(url_for('auth.login_page'))
 
     @app.errorhandler(403)
     def forbidden(e):
         """Handle forbidden access"""
-        if '/api/' in str(e):
+        if request.path.startswith('/api/'):
             return {'error': 'Forbidden', 'message': 'Insufficient permissions'}, 403
         # Check if error template exists, otherwise use simple message
         try:
@@ -146,7 +190,7 @@ def create_app(config_name=None):
     @app.errorhandler(404)
     def not_found(e):
         """Handle not found errors"""
-        if '/api/' in str(e):
+        if request.path.startswith('/api/'):
             return {'error': 'Not found'}, 404
         # Check if error template exists, otherwise use simple message
         try:
@@ -158,7 +202,7 @@ def create_app(config_name=None):
     def internal_error(e):
         """Handle internal server errors"""
         logger.error(f"Internal error: {str(e)}")
-        if '/api/' in str(e):
+        if request.path.startswith('/api/'):
             return {'error': 'Internal server error'}, 500
         # Check if error template exists, otherwise use simple message
         try:

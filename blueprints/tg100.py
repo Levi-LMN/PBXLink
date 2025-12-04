@@ -1,6 +1,6 @@
 """
 TG100 device monitoring blueprint
-Handles TG100 device status monitoring via ping
+Handles TG100 device status monitoring via ping with audit logging
 """
 
 from flask import Blueprint, render_template, jsonify, request
@@ -10,6 +10,7 @@ import re
 import os
 from datetime import datetime
 import time
+from audit_utils import log_action  # Import audit logging
 
 logger = logging.getLogger(__name__)
 
@@ -212,10 +213,24 @@ class TG100Monitor:
 tg100_monitor = TG100Monitor()
 
 
-# Routes
+# ============================================================================
+# FLASK ROUTES WITH AUDIT LOGGING
+# ============================================================================
+
 @tg100_bp.route('/')
 def index():
     """TG100 monitoring page"""
+    # Log page view
+    log_action(
+        action='view',
+        resource_type='tg100_page',
+        details={
+            'device_name': TG100_NAME,
+            'device_ip': TG100_IP,
+            'message': 'Accessed TG100 monitoring page'
+        }
+    )
+
     return render_template('tg100/index.html',
                            device_name=TG100_NAME,
                            device_ip=TG100_IP)
@@ -224,36 +239,206 @@ def index():
 @tg100_bp.route('/api/ping')
 def ping():
     """Ping the TG100 device"""
-    count = int(request.args.get('count', 4))
-    timeout = int(request.args.get('timeout', 2))
+    try:
+        count = int(request.args.get('count', 4))
+        timeout = int(request.args.get('timeout', 2))
 
-    result = tg100_monitor.ping_device(count=count, timeout=timeout)
-    return jsonify({'success': True, 'ping': result})
+        result = tg100_monitor.ping_device(count=count, timeout=timeout)
+
+        # Log ping attempt
+        log_action(
+            action='ping',
+            resource_type='tg100_device',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'packets_sent': count,
+                'packets_received': result.get('packets_received', 0),
+                'packet_loss': result.get('packet_loss', 100.0),
+                'avg_rtt': result.get('avg_rtt'),
+                'online': result.get('online', False),
+                'timeout': timeout
+            }
+        )
+
+        return jsonify({'success': True, 'ping': result})
+
+    except Exception as e:
+        logger.error(f"Error in ping endpoint: {e}")
+
+        # Log error
+        log_action(
+            action='ping_error',
+            resource_type='tg100_device',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @tg100_bp.route('/api/quick-ping')
 def quick_ping():
     """Quick ping for status checks"""
-    result = tg100_monitor.quick_ping()
-    return jsonify({'success': True, 'ping': result})
+    try:
+        result = tg100_monitor.quick_ping()
+
+        # Log quick ping (less verbose)
+        log_action(
+            action='quick_ping',
+            resource_type='tg100_device',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'online': result.get('online', False),
+                'avg_rtt': result.get('avg_rtt')
+            }
+        )
+
+        return jsonify({'success': True, 'ping': result})
+
+    except Exception as e:
+        logger.error(f"Error in quick ping: {e}")
+
+        # Log error
+        log_action(
+            action='quick_ping_error',
+            resource_type='tg100_device',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @tg100_bp.route('/api/history')
 def get_history():
     """Get ping history"""
-    history = tg100_monitor.get_ping_history()
-    return jsonify({'success': True, 'history': history})
+    try:
+        history = tg100_monitor.get_ping_history()
+
+        # Log history view
+        log_action(
+            action='view',
+            resource_type='tg100_history',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'history_count': len(history)
+            }
+        )
+
+        return jsonify({'success': True, 'history': history})
+
+    except Exception as e:
+        logger.error(f"Error getting history: {e}")
+
+        # Log error
+        log_action(
+            action='view_error',
+            resource_type='tg100_history',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @tg100_bp.route('/api/statistics')
 def get_statistics():
     """Get overall statistics"""
-    stats = tg100_monitor.get_statistics()
-    return jsonify({'success': True, 'statistics': stats})
+    try:
+        stats = tg100_monitor.get_statistics()
+
+        # Log statistics view
+        log_action(
+            action='view',
+            resource_type='tg100_statistics',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'total_checks': stats.get('total_checks', 0),
+                'online_count': stats.get('online_count', 0),
+                'offline_count': stats.get('offline_count', 0),
+                'uptime_percentage': stats.get('uptime_percentage', 0.0),
+                'avg_response_time': stats.get('avg_response_time')
+            }
+        )
+
+        return jsonify({'success': True, 'statistics': stats})
+
+    except Exception as e:
+        logger.error(f"Error getting statistics: {e}")
+
+        # Log error
+        log_action(
+            action='view_error',
+            resource_type='tg100_statistics',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @tg100_bp.route('/api/clear-history', methods=['POST'])
 def clear_history():
     """Clear ping history"""
-    tg100_monitor.ping_history = []
-    return jsonify({'success': True, 'message': 'History cleared'})
+    try:
+        # Get history count before clearing
+        history_count = len(tg100_monitor.ping_history)
+
+        # Clear history
+        tg100_monitor.ping_history = []
+
+        # Log history clear
+        log_action(
+            action='clear',
+            resource_type='tg100_history',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'records_cleared': history_count,
+                'message': 'Ping history cleared'
+            }
+        )
+
+        return jsonify({'success': True, 'message': 'History cleared'})
+
+    except Exception as e:
+        logger.error(f"Error clearing history: {e}")
+
+        # Log error
+        log_action(
+            action='clear_error',
+            resource_type='tg100_history',
+            resource_id=TG100_IP,
+            details={
+                'device_name': TG100_NAME,
+                'device_ip': TG100_IP,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500

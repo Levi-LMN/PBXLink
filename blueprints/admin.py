@@ -1,6 +1,6 @@
 """
 Admin Blueprint
-Manages users, roles, and audit logs
+Manages users, roles, audit logs, and log cleanup
 Only accessible by admin users
 """
 
@@ -8,7 +8,18 @@ from flask import Blueprint, render_template, jsonify, request
 import logging
 from models import db, User, UserRole, AuditLog, AIAgentCallLog
 from blueprints.auth import login_required, permission_required, get_current_user
-from audit_utils import log_action, get_audit_logs, get_ai_agent_call_logs
+from audit_utils import (
+    log_action,
+    get_audit_logs,
+    get_ai_agent_call_logs,
+    cleanup_old_audit_logs,
+    cleanup_old_ai_agent_logs,
+    cleanup_all_logs,
+    get_log_statistics,
+    AUDIT_LOG_RETENTION_DAYS,
+    AI_AGENT_LOG_RETENTION_DAYS,
+    CLEANUP_CHECK_HOURS
+)
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -16,15 +27,26 @@ logger = logging.getLogger(__name__)
 admin_bp = Blueprint('admin', __name__)
 
 
-# User Management Routes
+# ============================================================================
+# DASHBOARD
+# ============================================================================
 
 @admin_bp.route('/')
 @login_required
 @permission_required('view')
 def index():
     """Admin dashboard"""
+    log_action(
+        action='view',
+        resource_type='admin_page',
+        details='Accessed admin dashboard'
+    )
     return render_template('admin/index.html')
 
+
+# ============================================================================
+# USER MANAGEMENT ROUTES
+# ============================================================================
 
 @admin_bp.route('/api/users')
 @login_required
@@ -33,6 +55,13 @@ def list_users():
     """List all users"""
     try:
         users = User.query.all()
+
+        log_action(
+            action='view',
+            resource_type='users_list',
+            details={'total_users': len(users)}
+        )
+
         return jsonify({
             'success': True,
             'users': [user.to_dict() for user in users]
@@ -96,7 +125,7 @@ def create_user():
 
         # Log the action
         log_action(
-            'create_user',
+            'create',
             'user',
             new_user.id,
             {
@@ -127,6 +156,14 @@ def get_user(user_id):
     """Get user details"""
     try:
         user = User.query.get_or_404(user_id)
+
+        log_action(
+            action='view',
+            resource_type='user',
+            resource_id=user_id,
+            details={'email': user.email}
+        )
+
         return jsonify({
             'success': True,
             'user': user.to_dict()
@@ -175,7 +212,7 @@ def update_user(user_id):
             db.session.commit()
 
             # Log the action
-            log_action('update_user', 'user', user_id, changes)
+            log_action('update', 'user', user_id, changes)
             logger.info(f"Updated user {user_id}: {changes}")
 
             return jsonify({
@@ -270,7 +307,7 @@ def update_user_active(user_id):
 
         # Log the action
         log_action(
-            'deactivate_user' if not is_active else 'activate_user',
+            'deactivate' if not is_active else 'activate',
             'user',
             user_id,
             {'old_status': old_status, 'new_status': is_active}
@@ -313,7 +350,7 @@ def delete_user(user_id):
 
         # Log the action
         log_action(
-            'delete_user',
+            'delete',
             'user',
             user_id,
             {'email': user.email, 'name': user.name}
@@ -332,7 +369,9 @@ def delete_user(user_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# Audit Log Routes
+# ============================================================================
+# AUDIT LOG ROUTES
+# ============================================================================
 
 @admin_bp.route('/api/audit-logs')
 @login_required
@@ -350,6 +389,19 @@ def list_audit_logs():
             resource_id=resource_id,
             user_id=user_id,
             limit=limit
+        )
+
+        log_action(
+            action='view',
+            resource_type='audit_logs',
+            details={
+                'filters': {
+                    'resource_type': resource_type,
+                    'resource_id': resource_id,
+                    'user_id': user_id
+                },
+                'count': len(logs)
+            }
         )
 
         return jsonify({
@@ -395,6 +447,12 @@ def audit_log_stats():
             AuditLog.timestamp >= start_date
         ).group_by(AuditLog.action).all()
 
+        log_action(
+            action='view',
+            resource_type='audit_log_stats',
+            details={'days': days, 'total_actions': total_actions}
+        )
+
         return jsonify({
             'success': True,
             'stats': {
@@ -415,7 +473,9 @@ def audit_log_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# AI Agent Call Log Routes
+# ============================================================================
+# AI AGENT CALL LOG ROUTES
+# ============================================================================
 
 @admin_bp.route('/api/ai-agent-calls')
 @login_required
@@ -427,6 +487,15 @@ def list_ai_agent_calls():
         caller_number = request.args.get('caller_number')
 
         logs = get_ai_agent_call_logs(limit=limit, caller_number=caller_number)
+
+        log_action(
+            action='view',
+            resource_type='ai_agent_call_logs',
+            details={
+                'caller_number': caller_number,
+                'count': len(logs)
+            }
+        )
 
         return jsonify({
             'success': True,
@@ -446,6 +515,14 @@ def get_ai_agent_call(call_id):
     """Get specific AI agent call details"""
     try:
         call = AIAgentCallLog.query.filter_by(call_id=call_id).first_or_404()
+
+        log_action(
+            action='view',
+            resource_type='ai_agent_call',
+            resource_id=call_id,
+            details={'caller_number': call.caller_number}
+        )
+
         return jsonify({
             'success': True,
             'call': call.to_dict()
@@ -495,6 +572,12 @@ def ai_agent_call_stats():
             AIAgentCallLog.call_date >= start_date
         ).group_by(AIAgentCallLog.sentiment).all()
 
+        log_action(
+            action='view',
+            resource_type='ai_agent_call_stats',
+            details={'days': days, 'total_calls': total_calls}
+        )
+
         return jsonify({
             'success': True,
             'stats': {
@@ -514,3 +597,172 @@ def ai_agent_call_stats():
     except Exception as e:
         logger.error(f"Error getting AI agent call stats: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# LOG CLEANUP MANAGEMENT ROUTES
+# ============================================================================
+
+@admin_bp.route('/api/logs/statistics')
+@login_required
+@permission_required('view')
+def get_log_stats():
+    """Get log storage statistics"""
+    try:
+        stats = get_log_statistics()
+
+        # Log statistics view
+        log_action(
+            action='view',
+            resource_type='log_statistics',
+            details='Viewed log storage statistics'
+        )
+
+        return jsonify({
+            'status': 'success',
+            'statistics': stats
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting log statistics: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@admin_bp.route('/api/logs/cleanup/audit', methods=['POST'])
+@login_required
+@permission_required('delete')
+def manual_cleanup_audit():
+    """Manually trigger audit log cleanup"""
+    try:
+        data = request.get_json() or {}
+        retention_days = data.get('retention_days', AUDIT_LOG_RETENTION_DAYS)
+
+        deleted = cleanup_old_audit_logs(retention_days)
+
+        # Log cleanup action
+        log_action(
+            action='cleanup',
+            resource_type='audit_logs',
+            details={
+                'retention_days': retention_days,
+                'deleted_count': deleted,
+                'trigger': 'manual'
+            }
+        )
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Deleted {deleted} audit logs older than {retention_days} days',
+            'deleted_count': deleted
+        })
+
+    except Exception as e:
+        logger.error(f"Error in manual audit log cleanup: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@admin_bp.route('/api/logs/cleanup/ai-agent', methods=['POST'])
+@login_required
+@permission_required('delete')
+def manual_cleanup_ai_agent():
+    """Manually trigger AI agent log cleanup"""
+    try:
+        data = request.get_json() or {}
+        retention_days = data.get('retention_days', AI_AGENT_LOG_RETENTION_DAYS)
+
+        deleted = cleanup_old_ai_agent_logs(retention_days)
+
+        # Log cleanup action
+        log_action(
+            action='cleanup',
+            resource_type='ai_agent_logs',
+            details={
+                'retention_days': retention_days,
+                'deleted_count': deleted,
+                'trigger': 'manual'
+            }
+        )
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Deleted {deleted} AI agent logs older than {retention_days} days',
+            'deleted_count': deleted
+        })
+
+    except Exception as e:
+        logger.error(f"Error in manual AI agent log cleanup: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@admin_bp.route('/api/logs/cleanup/all', methods=['POST'])
+@login_required
+@permission_required('delete')
+def manual_cleanup_all():
+    """Manually trigger cleanup for all log types"""
+    try:
+        stats = cleanup_all_logs()
+
+        # Log cleanup action
+        log_action(
+            action='cleanup',
+            resource_type='all_logs',
+            details={
+                'audit_logs_deleted': stats['audit_logs_deleted'],
+                'ai_agent_logs_deleted': stats['ai_agent_logs_deleted'],
+                'total_deleted': stats['total_deleted'],
+                'trigger': 'manual'
+            }
+        )
+
+        return jsonify({
+            'status': 'success',
+            'message': f"Deleted {stats['total_deleted']} logs total",
+            'statistics': stats
+        })
+
+    except Exception as e:
+        logger.error(f"Error in manual log cleanup: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@admin_bp.route('/api/logs/retention-config')
+@login_required
+@permission_required('view')
+def get_retention_config():
+    """Get current log retention configuration"""
+    try:
+        config = {
+            'audit_log_retention_days': AUDIT_LOG_RETENTION_DAYS,
+            'ai_agent_log_retention_days': AI_AGENT_LOG_RETENTION_DAYS,
+            'cleanup_check_hours': CLEANUP_CHECK_HOURS
+        }
+
+        log_action(
+            action='view',
+            resource_type='log_retention_config',
+            details='Viewed log retention configuration'
+        )
+
+        return jsonify({
+            'status': 'success',
+            'config': config
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting retention config: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500

@@ -1,7 +1,7 @@
 """
 WireGuard management blueprint
 Handles WireGuard VPN configuration, user management, and QR code generation
-Updated with enhanced status parsing and UI-friendly output
+Updated with enhanced status parsing, UI-friendly output, and audit logging
 """
 
 from flask import Blueprint, render_template, request, jsonify, send_file, Response
@@ -13,6 +13,7 @@ import qrcode
 import io
 import re
 from datetime import datetime, timedelta
+from audit_utils import log_action  # Import audit logging
 
 logger = logging.getLogger(__name__)
 
@@ -366,7 +367,8 @@ PersistentKeepalive = 25
                 'username': username,
                 'ip': client_ip,
                 'public_key': public_key,
-                'config_file': config_file
+                'config_file': config_file,
+                'description': description
             }
         except Exception as e:
             logger.error(f"Error creating user: {e}")
@@ -732,113 +734,297 @@ PersistentKeepalive = 25
 wg_manager = WireGuardManager()
 
 
-# Routes
+# ============================================================================
+# FLASK ROUTES WITH AUDIT LOGGING
+# ============================================================================
+
 @wireguard_bp.route('/')
 def index():
     """WireGuard management page"""
+    # Log page view
+    log_action(
+        action='view',
+        resource_type='wireguard_page',
+        details='Accessed WireGuard management page'
+    )
     return render_template('wireguard/index.html')
 
 
 @wireguard_bp.route('/api/config')
 def get_config():
     """Get server configuration"""
-    config = wg_manager.read_server_config()
-    if config:
-        return jsonify({'success': True, 'config': config})
-    return jsonify({'success': False, 'error': 'Failed to read configuration'}), 500
+    try:
+        config = wg_manager.read_server_config()
+        if config:
+            # Log config view
+            log_action(
+                action='view',
+                resource_type='wireguard_config',
+                details='Viewed WireGuard server configuration'
+            )
+            return jsonify({'success': True, 'config': config})
+
+        return jsonify({'success': False, 'error': 'Failed to read configuration'}), 500
+    except Exception as e:
+        logger.error(f"Error getting config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/config', methods=['POST'])
 def update_config():
     """Update server configuration"""
-    data = request.get_json()
-    config_content = data.get('config')
+    try:
+        data = request.get_json()
+        config_content = data.get('config')
 
-    if not config_content:
-        return jsonify({'success': False, 'error': 'No configuration provided'}), 400
+        if not config_content:
+            return jsonify({'success': False, 'error': 'No configuration provided'}), 400
 
-    if wg_manager.write_server_config(config_content):
-        wg_manager.restart_wireguard()
-        return jsonify({'success': True, 'message': 'Configuration updated successfully'})
+        if wg_manager.write_server_config(config_content):
+            wg_manager.restart_wireguard()
 
-    return jsonify({'success': False, 'error': 'Failed to update configuration'}), 500
+            # Log config update
+            log_action(
+                action='update',
+                resource_type='wireguard_config',
+                details={
+                    'message': 'Updated WireGuard server configuration',
+                    'config_lines': len(config_content.split('\n'))
+                }
+            )
+
+            return jsonify({'success': True, 'message': 'Configuration updated successfully'})
+
+        # Log failed attempt
+        log_action(
+            action='update_failed',
+            resource_type='wireguard_config',
+            details='Failed to update WireGuard server configuration'
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to update configuration'}), 500
+
+    except Exception as e:
+        logger.error(f"Error updating config: {e}")
+        log_action(
+            action='update_error',
+            resource_type='wireguard_config',
+            details={'error': str(e)}
+        )
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/users')
 def list_users():
     """List all users"""
-    users = wg_manager.list_users()
-    return jsonify({'success': True, 'users': users})
+    try:
+        users = wg_manager.list_users()
+
+        # Log users list view
+        log_action(
+            action='view',
+            resource_type='wireguard_users',
+            details={
+                'total_users': len(users),
+                'query': 'list_all'
+            }
+        )
+
+        return jsonify({'success': True, 'users': users})
+
+    except Exception as e:
+        logger.error(f"Error listing users: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/users', methods=['POST'])
 def create_user():
     """Create a new user"""
-    data = request.get_json()
-    username = data.get('username')
-    description = data.get('description', '')
-    private_key = data.get('private_key', '').strip()
-    public_key = data.get('public_key', '').strip()
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        description = data.get('description', '')
+        private_key = data.get('private_key', '').strip()
+        public_key = data.get('public_key', '').strip()
 
-    if not username:
-        return jsonify({'success': False, 'error': 'Username is required'}), 400
+        if not username:
+            return jsonify({'success': False, 'error': 'Username is required'}), 400
 
-    # Validate username (alphanumeric and underscores/hyphens only)
-    if not username.replace('_', '').replace('-', '').isalnum():
-        return jsonify({'success': False, 'error': 'Invalid username format'}), 400
+        # Validate username (alphanumeric and underscores/hyphens only)
+        if not username.replace('_', '').replace('-', '').isalnum():
+            return jsonify({'success': False, 'error': 'Invalid username format'}), 400
 
-    # If keys are provided, both must be present
-    if (private_key and not public_key) or (public_key and not private_key):
-        return jsonify({'success': False, 'error': 'Both private and public keys must be provided'}), 400
+        # If keys are provided, both must be present
+        if (private_key and not public_key) or (public_key and not private_key):
+            return jsonify({'success': False, 'error': 'Both private and public keys must be provided'}), 400
 
-    result = wg_manager.create_user(username, description, private_key or None, public_key or None)
-    if result:
-        return jsonify({'success': True, 'user': result})
+        result = wg_manager.create_user(username, description, private_key or None, public_key or None)
 
-    return jsonify({'success': False, 'error': 'Failed to create user'}), 500
+        if result:
+            # Log user creation
+            log_action(
+                action='create',
+                resource_type='wireguard_user',
+                resource_id=username,
+                details={
+                    'username': username,
+                    'description': description,
+                    'ip': result.get('ip'),
+                    'public_key_preview': result.get('public_key')[:16] + '...' if result.get('public_key') else 'N/A',
+                    'keys_provided': bool(private_key and public_key)
+                }
+            )
+            return jsonify({'success': True, 'user': result})
+
+        # Log failed creation
+        log_action(
+            action='create_failed',
+            resource_type='wireguard_user',
+            resource_id=username,
+            details={
+                'username': username,
+                'description': description,
+                'error': 'Failed to create user'
+            }
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to create user'}), 500
+
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+
+        # Log exception
+        log_action(
+            action='create_error',
+            resource_type='wireguard_user',
+            resource_id=data.get('username', 'unknown'),
+            details={
+                'username': data.get('username', 'unknown'),
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/users/<username>', methods=['DELETE'])
 def delete_user(username):
     """Delete a user"""
-    if wg_manager.delete_user(username):
-        return jsonify({'success': True, 'message': f'User {username} deleted successfully'})
+    try:
+        # Get user info before deletion for logging
+        users = wg_manager.list_users()
+        user_info = next((u for u in users if u['username'] == username), None)
 
-    return jsonify({'success': False, 'error': 'Failed to delete user'}), 500
+        if wg_manager.delete_user(username):
+            # Log successful deletion
+            log_action(
+                action='delete',
+                resource_type='wireguard_user',
+                resource_id=username,
+                details={
+                    'username': username,
+                    'ip': user_info.get('ip') if user_info else 'N/A',
+                    'message': f'User {username} deleted successfully'
+                }
+            )
+
+            return jsonify({'success': True, 'message': f'User {username} deleted successfully'})
+
+        # Log failed deletion
+        log_action(
+            action='delete_failed',
+            resource_type='wireguard_user',
+            resource_id=username,
+            details={
+                'username': username,
+                'error': 'Failed to delete user'
+            }
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to delete user'}), 500
+
+    except Exception as e:
+        logger.error(f"Error deleting user {username}: {e}")
+
+        # Log exception
+        log_action(
+            action='delete_error',
+            resource_type='wireguard_user',
+            resource_id=username,
+            details={
+                'username': username,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/users/<username>/config')
 def get_user_config(username):
     """Get user's configuration file"""
-    config = wg_manager.get_user_config(username)
-    if config:
-        return jsonify({'success': True, 'config': config})
+    try:
+        config = wg_manager.get_user_config(username)
+        if config:
+            # Log config view
+            log_action(
+                action='view',
+                resource_type='wireguard_user_config',
+                resource_id=username,
+                details={
+                    'username': username,
+                    'action': 'viewed_config'
+                }
+            )
 
-    return jsonify({'success': False, 'error': 'Failed to read user configuration'}), 404
+            return jsonify({'success': True, 'config': config})
+
+        return jsonify({'success': False, 'error': 'Failed to read user configuration'}), 404
+
+    except Exception as e:
+        logger.error(f"Error getting user config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 404
 
 
 @wireguard_bp.route('/api/users/<username>/download')
 def download_user_config(username):
     """Download user's configuration file"""
-    config = wg_manager.get_user_config(username)
-    if config:
-        return Response(
-            config,
-            mimetype='text/plain',
-            headers={'Content-Disposition': f'attachment; filename={username}.conf'}
-        )
+    try:
+        config = wg_manager.get_user_config(username)
+        if config:
+            # Log config download
+            log_action(
+                action='download',
+                resource_type='wireguard_user_config',
+                resource_id=username,
+                details={
+                    'username': username,
+                    'action': 'downloaded_config',
+                    'filename': f'{username}.conf'
+                }
+            )
 
-    return jsonify({'success': False, 'error': 'Failed to read user configuration'}), 404
+            return Response(
+                config,
+                mimetype='text/plain',
+                headers={'Content-Disposition': f'attachment; filename={username}.conf'}
+            )
+
+        return jsonify({'success': False, 'error': 'Failed to read user configuration'}), 404
+
+    except Exception as e:
+        logger.error(f"Error downloading user config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 404
 
 
 @wireguard_bp.route('/api/users/<username>/qr')
 def get_user_qr(username):
     """Generate QR code for user's configuration"""
-    config = wg_manager.get_user_config(username)
-    if not config:
-        return jsonify({'success': False, 'error': 'Failed to read user configuration'}), 404
-
     try:
+        config = wg_manager.get_user_config(username)
+        if not config:
+            return jsonify({'success': False, 'error': 'Failed to read user configuration'}), 404
+
         # Generate QR code
         qr = qrcode.QRCode(
             version=1,
@@ -856,45 +1042,172 @@ def get_user_qr(username):
         img.save(img_buffer, format='PNG')
         img_buffer.seek(0)
 
+        # Log QR code generation
+        log_action(
+            action='generate',
+            resource_type='wireguard_qr_code',
+            resource_id=username,
+            details={
+                'username': username,
+                'action': 'generated_qr_code'
+            }
+        )
+
         return send_file(img_buffer, mimetype='image/png')
+
     except Exception as e:
         logger.error(f"Error generating QR code: {e}")
+
+        # Log error
+        log_action(
+            action='generate_error',
+            resource_type='wireguard_qr_code',
+            resource_id=username,
+            details={
+                'username': username,
+                'error': str(e)
+            }
+        )
+
         return jsonify({'success': False, 'error': 'Failed to generate QR code'}), 500
 
 
 @wireguard_bp.route('/api/status')
 def get_status():
     """Get WireGuard status (raw)"""
-    status = wg_manager.get_wireguard_status()
-    if status:
-        return jsonify({'success': True, 'status': status})
+    try:
+        status = wg_manager.get_wireguard_status()
+        if status:
+            # Log status view
+            log_action(
+                action='view',
+                resource_type='wireguard_status',
+                details={
+                    'format': 'raw',
+                    'status_length': len(status)
+                }
+            )
 
-    return jsonify({'success': False, 'error': 'Failed to get WireGuard status'}), 500
+            return jsonify({'success': True, 'status': status})
+
+        return jsonify({'success': False, 'error': 'Failed to get WireGuard status'}), 500
+
+    except Exception as e:
+        logger.error(f"Error getting status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/status-ui')
 def get_status_ui():
     """Get WireGuard status in UI-friendly format"""
-    status = wg_manager.parse_wireguard_status()
-    if status:
-        return jsonify({'success': True, 'status': status})
+    try:
+        status = wg_manager.parse_wireguard_status()
+        if status:
+            # Log status view
+            log_action(
+                action='view',
+                resource_type='wireguard_status',
+                details={
+                    'format': 'ui',
+                    'interface': status.get('interface', {}).get('name', 'N/A'),
+                    'peer_count': len(status.get('peers', []))
+                }
+            )
 
-    return jsonify({'success': False, 'error': 'Failed to get WireGuard status'}), 500
+            return jsonify({'success': True, 'status': status})
+
+        return jsonify({'success': False, 'error': 'Failed to get WireGuard status'}), 500
+
+    except Exception as e:
+        logger.error(f"Error getting UI status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/restart', methods=['POST'])
 def restart_wireguard():
     """Restart WireGuard service"""
-    if wg_manager.restart_wireguard():
-        return jsonify({'success': True, 'message': 'WireGuard restarted successfully'})
+    try:
+        if wg_manager.restart_wireguard():
+            # Log restart
+            log_action(
+                action='restart',
+                resource_type='wireguard_service',
+                details={
+                    'interface': WG_INTERFACE,
+                    'message': 'WireGuard service restarted successfully'
+                }
+            )
 
-    return jsonify({'success': False, 'error': 'Failed to restart WireGuard'}), 500
+            return jsonify({'success': True, 'message': 'WireGuard restarted successfully'})
+
+        # Log failed restart
+        log_action(
+            action='restart_failed',
+            resource_type='wireguard_service',
+            details={
+                'interface': WG_INTERFACE,
+                'error': 'Failed to restart WireGuard'
+            }
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to restart WireGuard'}), 500
+
+    except Exception as e:
+        logger.error(f"Error restarting WireGuard: {e}")
+
+        # Log error
+        log_action(
+            action='restart_error',
+            resource_type='wireguard_service',
+            details={
+                'interface': WG_INTERFACE,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @wireguard_bp.route('/api/init-users-dir', methods=['POST'])
 def init_users_directory():
     """Initialize users directory structure"""
-    if wg_manager.ensure_users_directory():
-        return jsonify({'success': True, 'message': 'Users directory initialized successfully'})
+    try:
+        if wg_manager.ensure_users_directory():
+            # Log initialization
+            log_action(
+                action='initialize',
+                resource_type='wireguard_users_directory',
+                details={
+                    'directory': WG_USERS_DIR,
+                    'message': 'Users directory initialized successfully'
+                }
+            )
 
-    return jsonify({'success': False, 'error': 'Failed to initialize users directory'}), 500
+            return jsonify({'success': True, 'message': 'Users directory initialized successfully'})
+
+        # Log failed initialization
+        log_action(
+            action='initialize_failed',
+            resource_type='wireguard_users_directory',
+            details={
+                'directory': WG_USERS_DIR,
+                'error': 'Failed to initialize users directory'
+            }
+        )
+
+        return jsonify({'success': False, 'error': 'Failed to initialize users directory'}), 500
+
+    except Exception as e:
+        logger.error(f"Error initializing users directory: {e}")
+
+        # Log error
+        log_action(
+            action='initialize_error',
+            resource_type='wireguard_users_directory',
+            details={
+                'directory': WG_USERS_DIR,
+                'error': str(e)
+            }
+        )
+
+        return jsonify({'success': False, 'error': str(e)}), 500

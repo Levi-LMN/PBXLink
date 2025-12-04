@@ -1,7 +1,8 @@
 """
-Extensions Management Blueprint with Status Monitoring
+Extensions Management Blueprint with Status Monitoring and Audit Logging
 Uses centralized SSH manager for Asterisk commands
 Automatically reloads Asterisk after configuration changes
+Logs all actions to audit log
 """
 
 from flask import Blueprint, render_template, jsonify, request
@@ -11,6 +12,7 @@ import time
 from functools import wraps
 from blueprints.api_core import api
 from ssh_manager import ssh_manager  # Import centralized SSH manager
+from audit_utils import log_action  # Import audit logging
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,14 @@ def reload_asterisk():
             transaction_id = reload_result.get('transaction_id', 'N/A')
             logger.info(f"✅ Asterisk reload initiated successfully (transaction: {transaction_id})")
             logger.info(f"   Message: {reload_result.get('message', '')}")
+
+            # Log reload action
+            log_action(
+                action='reload',
+                resource_type='asterisk',
+                details={'transaction_id': transaction_id, 'message': reload_result.get('message', '')}
+            )
+
             return True
         else:
             logger.error(f"❌ Asterisk reload failed: {reload_result.get('message', '')}")
@@ -210,6 +220,12 @@ def get_extension_status():
 @extensions_bp.route('/')
 def index():
     """Extensions management page"""
+    # Log page view
+    log_action(
+        action='view',
+        resource_type='extensions_page',
+        details='Accessed extensions management page'
+    )
     return render_template('extensions_index.html')
 
 
@@ -221,6 +237,17 @@ def get_status():
 
         online_count = sum(1 for s in status_dict.values() if s['registered'])
         offline_count = len(status_dict) - online_count
+
+        # Log status check
+        log_action(
+            action='view',
+            resource_type='extension_status',
+            details={
+                'online_count': online_count,
+                'offline_count': offline_count,
+                'total': len(status_dict)
+            }
+        )
 
         return jsonify({
             'status': 'success',
@@ -311,6 +338,16 @@ def list_extensions():
                 'contact_count': len(ext_status['contacts'])
             })
 
+        # Log list view
+        log_action(
+            action='view',
+            resource_type='extensions_list',
+            details={
+                'total_extensions': len(extensions),
+                'query': 'list_all'
+            }
+        )
+
         return jsonify({
             'status': 'success',
             'total': result.get('totalCount', 0),
@@ -321,11 +358,6 @@ def list_extensions():
         logger.error(f"Error fetching extensions: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-
-"""
-Update to extensions.py - get_extension endpoint
-Add this to return password information
-"""
 
 @extensions_bp.route('/api/get/<extension_id>')
 def get_extension(extension_id):
@@ -408,6 +440,17 @@ def get_extension(extension_id):
             'contacts': ext_status['contacts']
         }
 
+        # Log extension view
+        log_action(
+            action='view',
+            resource_type='extension',
+            resource_id=extension_id,
+            details={
+                'name': user.get('name'),
+                'status': ext_status['status']
+            }
+        )
+
         return jsonify({
             'status': 'success',
             'extension': extension
@@ -417,12 +460,21 @@ def get_extension(extension_id):
         logger.error(f"Error fetching extension {extension_id}: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
 @extensions_bp.route('/api/refresh-status', methods=['POST'])
 def refresh_status():
     """Force refresh extension status (clears cache)"""
     try:
         status_cache.clear()
         logger.info("🔄 Extension status cache cleared")
+
+        # Log cache refresh
+        log_action(
+            action='refresh',
+            resource_type='extension_status_cache',
+            details='Manually cleared extension status cache'
+        )
+
         return jsonify({
             'status': 'success',
             'message': 'Status cache cleared, next request will fetch fresh data'
@@ -499,6 +551,23 @@ def create_extension():
             # RELOAD ASTERISK after creating extension
             reload_success = reload_asterisk()
 
+            # Log creation
+            log_action(
+                action='create',
+                resource_type='extension',
+                resource_id=extension_id,
+                details={
+                    'name': name,
+                    'tech': tech,
+                    'email': email,
+                    'outbound_cid': outbound_cid,
+                    'emergency_cid': emergency_cid,
+                    'max_contacts': max_contacts,
+                    'reloaded': reload_success,
+                    'message': add_result.get('message', '')
+                }
+            )
+
             return jsonify({
                 'status': 'success',
                 'message': add_result.get('message', 'Extension created successfully'),
@@ -506,6 +575,17 @@ def create_extension():
                 'reloaded': reload_success
             })
         else:
+            # Log failed attempt
+            log_action(
+                action='create_failed',
+                resource_type='extension',
+                resource_id=extension_id,
+                details={
+                    'name': name,
+                    'error': add_result.get('message', 'Unknown error')
+                }
+            )
+
             return jsonify({
                 'status': 'error',
                 'message': add_result.get('message', 'Failed to create extension')
@@ -513,6 +593,15 @@ def create_extension():
 
     except Exception as e:
         logger.error(f"Error creating extension: {str(e)}")
+
+        # Log exception
+        log_action(
+            action='create_error',
+            resource_type='extension',
+            resource_id=data.get('extensionId', 'unknown'),
+            details={'error': str(e)}
+        )
+
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -584,12 +673,40 @@ def update_extension(extension_id):
             # RELOAD ASTERISK after updating extension
             reload_success = reload_asterisk()
 
+            # Log update
+            log_action(
+                action='update',
+                resource_type='extension',
+                resource_id=extension_id,
+                details={
+                    'name': name,
+                    'tech': tech,
+                    'email': email,
+                    'outbound_cid': outbound_cid,
+                    'emergency_cid': emergency_cid,
+                    'max_contacts': max_contacts,
+                    'reloaded': reload_success,
+                    'message': update_result.get('message', '')
+                }
+            )
+
             return jsonify({
                 'status': 'success',
                 'message': update_result.get('message', 'Extension updated successfully'),
                 'reloaded': reload_success
             })
         else:
+            # Log failed attempt
+            log_action(
+                action='update_failed',
+                resource_type='extension',
+                resource_id=extension_id,
+                details={
+                    'name': name,
+                    'error': update_result.get('message', 'Unknown error')
+                }
+            )
+
             return jsonify({
                 'status': 'error',
                 'message': update_result.get('message', 'Failed to update extension')
@@ -597,6 +714,15 @@ def update_extension(extension_id):
 
     except Exception as e:
         logger.error(f"Error updating extension {extension_id}: {str(e)}")
+
+        # Log exception
+        log_action(
+            action='update_error',
+            resource_type='extension',
+            resource_id=extension_id,
+            details={'error': str(e)}
+        )
+
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -626,12 +752,31 @@ def delete_extension(extension_id):
             # RELOAD ASTERISK after deleting extension
             reload_success = reload_asterisk()
 
+            # Log deletion
+            log_action(
+                action='delete',
+                resource_type='extension',
+                resource_id=extension_id,
+                details={
+                    'reloaded': reload_success,
+                    'message': delete_result.get('message', '')
+                }
+            )
+
             return jsonify({
                 'status': 'success',
                 'message': delete_result.get('message', 'Extension deleted successfully'),
                 'reloaded': reload_success
             })
         else:
+            # Log failed attempt
+            log_action(
+                action='delete_failed',
+                resource_type='extension',
+                resource_id=extension_id,
+                details={'error': delete_result.get('message', 'Unknown error')}
+            )
+
             return jsonify({
                 'status': 'error',
                 'message': delete_result.get('message', 'Failed to delete extension')
@@ -639,6 +784,15 @@ def delete_extension(extension_id):
 
     except Exception as e:
         logger.error(f"Error deleting extension {extension_id}: {str(e)}")
+
+        # Log exception
+        log_action(
+            action='delete_error',
+            resource_type='extension',
+            resource_id=extension_id,
+            details={'error': str(e)}
+        )
+
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -703,12 +857,40 @@ def bulk_create_extensions():
             # RELOAD ASTERISK after bulk creating extensions
             reload_success = reload_asterisk()
 
+            # Log bulk creation
+            log_action(
+                action='bulk_create',
+                resource_type='extension',
+                resource_id=f"{start_ext}-{int(start_ext) + int(num_extensions) - 1}",
+                details={
+                    'start_extension': start_ext,
+                    'number_of_extensions': num_extensions,
+                    'name_template': name,
+                    'tech': tech,
+                    'email': email,
+                    'reloaded': reload_success,
+                    'message': create_result.get('message', '')
+                }
+            )
+
             return jsonify({
                 'status': 'success',
                 'message': create_result.get('message', 'Extensions created successfully'),
                 'reloaded': reload_success
             })
         else:
+            # Log failed attempt
+            log_action(
+                action='bulk_create_failed',
+                resource_type='extension',
+                resource_id=f"{start_ext}-{int(start_ext) + int(num_extensions) - 1}",
+                details={
+                    'start_extension': start_ext,
+                    'number_of_extensions': num_extensions,
+                    'error': create_result.get('message', 'Unknown error')
+                }
+            )
+
             return jsonify({
                 'status': 'error',
                 'message': create_result.get('message', 'Failed to create extensions')
@@ -716,6 +898,18 @@ def bulk_create_extensions():
 
     except Exception as e:
         logger.error(f"Error bulk creating extensions: {str(e)}")
+
+        # Log exception
+        log_action(
+            action='bulk_create_error',
+            resource_type='extension',
+            details={
+                'start_extension': data.get('startExtension', 'unknown'),
+                'number_of_extensions': data.get('numberOfExtensions', 'unknown'),
+                'error': str(e)
+            }
+        )
+
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -729,6 +923,13 @@ def manual_reload():
             # Clear status cache after reload
             status_cache.clear()
 
+            # Log manual reload
+            log_action(
+                action='manual_reload',
+                resource_type='asterisk',
+                details='Manually triggered Asterisk configuration reload'
+            )
+
             return jsonify({
                 'status': 'success',
                 'message': 'Asterisk configuration reloaded successfully'
@@ -741,4 +942,12 @@ def manual_reload():
 
     except Exception as e:
         logger.error(f"Error in manual reload: {str(e)}")
+
+        # Log error
+        log_action(
+            action='manual_reload_error',
+            resource_type='asterisk',
+            details={'error': str(e)}
+        )
+
         return jsonify({'status': 'error', 'message': str(e)}), 500

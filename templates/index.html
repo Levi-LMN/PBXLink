@@ -147,6 +147,12 @@
         border-radius: 8px;
         padding: 1rem;
     }
+
+    .service-detail {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 0.5rem;
+    }
 </style>
 
 <div class="row g-4">
@@ -221,7 +227,7 @@
             </div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-md-3">
+                    <div class="col-md-6 col-lg-3">
                         <div class="service-item">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div class="small text-muted">FreePBX API</div>
@@ -233,7 +239,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6 col-lg-3">
                         <div class="service-item">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div class="small text-muted">SSH Connection</div>
@@ -243,9 +249,13 @@
                                 <span class="status-dot"></span>
                                 <span>Checking...</span>
                             </div>
+                            <div class="service-detail" id="ssh-uptime">
+                                <i class="fas fa-hourglass-half me-1"></i>
+                                <span>Uptime: -</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6 col-lg-3">
                         <div class="service-item">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div class="small text-muted">AI Agent</div>
@@ -257,13 +267,25 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6 col-lg-3">
                         <div class="service-item">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div class="small text-muted">TG100 Gateway</div>
                                 <i class="fas fa-network-wired text-muted"></i>
                             </div>
                             <div class="service-status" id="tg100-status">
+                                <span class="status-dot"></span>
+                                <span>Checking...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <div class="service-item">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="small text-muted">WireGuard VPN</div>
+                                <i class="fas fa-shield-alt text-muted"></i>
+                            </div>
+                            <div class="service-status" id="wireguard-status">
                                 <span class="status-dot"></span>
                                 <span>Checking...</span>
                             </div>
@@ -564,12 +586,30 @@
 
     async function testSSH() {
         updateServiceStatus('ssh-status-indicator', false, 'Testing...');
+        const uptimeElement = document.getElementById('ssh-uptime');
+
         try {
             const response = await fetch('/api/ssh-test');
             const data = await response.json();
             updateServiceStatus('ssh-status-indicator', data.status === 'success');
+
+            if (data.status === 'success' && data.uptime) {
+                uptimeElement.innerHTML = `
+                    <i class="fas fa-hourglass-half me-1"></i>
+                    <span>Uptime: ${data.uptime}</span>
+                `;
+            } else {
+                uptimeElement.innerHTML = `
+                    <i class="fas fa-hourglass-half me-1"></i>
+                    <span>Uptime: -</span>
+                `;
+            }
         } catch (error) {
             updateServiceStatus('ssh-status-indicator', false);
+            uptimeElement.innerHTML = `
+                <i class="fas fa-hourglass-half me-1"></i>
+                <span>Uptime: -</span>
+            `;
             console.error('SSH connection failed:', error);
         }
     }
@@ -602,6 +642,18 @@
         }
     }
 
+    async function testWireGuard() {
+        updateServiceStatus('wireguard-status', false, 'Checking...');
+        try {
+            const response = await fetch('/api/wireguard-status');
+            const data = await response.json();
+            updateServiceStatus('wireguard-status', data.status === 'success', data.message);
+        } catch (error) {
+            updateServiceStatus('wireguard-status', false);
+            console.error('WireGuard check failed:', error);
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         loadStats();
         loadExtensionStats();
@@ -611,13 +663,16 @@
         testSSH();
         testAIAgent();
         testTG100();
+        testWireGuard();
 
         setInterval(() => {
             loadStats();
             loadExtensionStats();
             loadRecentActivity();
+            testSSH();
             testAIAgent();
             testTG100();
+            testWireGuard();
         }, 30000);
     });
 </script>
