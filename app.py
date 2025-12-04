@@ -22,7 +22,7 @@ from models import db, init_db
 from blueprints.api_core import api_core_bp
 from blueprints.extensions import extensions_bp
 from blueprints.cdr import cdr_bp
-from blueprints.wireguard import wireguard_bp
+from blueprints.wireguard import wireguard_bp, wg_manager
 from blueprints.ai_agent import ai_agent_bp
 from blueprints.tg100 import tg100_bp
 from blueprints.auth import auth_bp, login_required
@@ -173,17 +173,10 @@ def create_app(config_name=None):
     def wireguard_status():
         """Check WireGuard VPN status (local)"""
         try:
-            import subprocess
+            # Use the WireGuardManager's method to check status
+            status = wg_manager.get_wireguard_status()
 
-            # Check if WireGuard interface is active using systemctl (local command)
-            result = subprocess.run(
-                ['sudo', 'systemctl', 'is-active', 'wg-quick@wg0'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-
-            if result.returncode == 0 and 'active' in result.stdout.strip():
+            if status:
                 return {
                     'status': 'success',
                     'message': 'Online',
@@ -198,13 +191,6 @@ def create_app(config_name=None):
                     'state': 'inactive'
                 }
 
-        except FileNotFoundError:
-            logger.error("systemctl command not found")
-            return {
-                'status': 'error',
-                'message': 'Command not found',
-                'error': 'systemctl not available'
-            }, 500
         except Exception as e:
             logger.error(f"WireGuard status check error: {e}")
             return {
