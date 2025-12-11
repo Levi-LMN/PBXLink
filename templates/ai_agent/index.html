@@ -36,7 +36,7 @@
                     <i class="fas fa-stop"></i> Stop
                 </button>
                 <button class="btn btn-outline-primary btn-sm" onclick="refreshStatus()">
-                    <i class="fas fa-sync-alt"></i>
+                    <i class="fas fa-sync-alt"></i> Refresh
                 </button>
             </div>
         </div>
@@ -76,7 +76,7 @@
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-plug"></i> System Connections</h5>
-        <small class="text-muted">Last update: <span id="lastUpdate"></span></small>
+        <small class="text-muted">Last update: <span id="lastUpdate">Never</span></small>
     </div>
     <div class="card-body">
         <div class="row g-3">
@@ -324,10 +324,7 @@
 
 {% block extra_js %}
 <script>
-let statusInterval = null;
 let isUpdating = false;
-let consecutiveErrors = 0;
-let lastKnownState = null;
 
 // Load configuration
 async function loadConfig() {
@@ -382,7 +379,7 @@ document.getElementById('configForm').addEventListener('submit', async (e) => {
     }
 });
 
-// Refresh status with error handling
+// Refresh status - MANUAL ONLY (NO AUTO-REFRESH)
 async function refreshStatus() {
     if (isUpdating) return;
     isUpdating = true;
@@ -391,30 +388,22 @@ async function refreshStatus() {
         const response = await fetch('/ai_agent/api/service/status');
 
         if (!response.ok) {
-            consecutiveErrors++;
             console.warn(`Status check failed: ${response.status}`);
-
-            if (consecutiveErrors >= 3 && consecutiveErrors % 3 === 0) {
-                console.warn('Multiple connection failures detected');
-            }
+            alert('Failed to fetch status. Please try again.');
             return;
         }
 
         const data = await response.json();
 
         if (data.success) {
-            consecutiveErrors = 0;
-            lastKnownState = data.status;
             updateStatusDisplay(data.status);
             updateLastUpdateTime();
+        } else {
+            alert('Failed to get status: ' + (data.error || 'Unknown error'));
         }
     } catch (error) {
-        consecutiveErrors++;
         console.error('Failed to refresh status:', error);
-
-        if (lastKnownState && consecutiveErrors < 10) {
-            console.log('Using last known state');
-        }
+        alert('Error connecting to service. Please check your connection.');
     } finally {
         setTimeout(() => { isUpdating = false; }, 500);
     }
@@ -517,9 +506,9 @@ async function startService() {
         const data = await response.json();
 
         if (data.success) {
-            document.getElementById('stopBtn').disabled = false;
-            alert('Service started successfully');
-            startStatusPolling();
+            alert('Service started successfully! Click Refresh to update status.');
+            // Automatically refresh once after starting
+            setTimeout(refreshStatus, 2000);
         } else {
             alert('Failed to start: ' + data.message);
             btn.disabled = false;
@@ -542,9 +531,9 @@ async function stopService() {
         const data = await response.json();
 
         if (data.success) {
-            document.getElementById('startBtn').disabled = false;
-            alert('Service stopped successfully');
-            stopStatusPolling();
+            alert('Service stopped successfully! Click Refresh to update status.');
+            // Automatically refresh once after stopping
+            setTimeout(refreshStatus, 1000);
         } else {
             alert('Failed to stop: ' + data.message);
             btn.disabled = false;
@@ -644,27 +633,10 @@ function showAddDepartmentModal() {
     alert('Add department modal - coming soon');
 }
 
-function startStatusPolling() {
-    if (statusInterval) return;
-    statusInterval = setInterval(refreshStatus, 5000);
-    refreshStatus();
-}
-
-function stopStatusPolling() {
-    if (statusInterval) {
-        clearInterval(statusInterval);
-        statusInterval = null;
-    }
-}
-
+// Load initial data on page load - NO AUTO-REFRESH
 document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
-    refreshStatus();
-    startStatusPolling();
-});
-
-window.addEventListener('beforeunload', () => {
-    stopStatusPolling();
+    refreshStatus(); // Initial load only
 });
 </script>
 {% endblock %}
