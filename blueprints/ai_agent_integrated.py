@@ -1,6 +1,6 @@
 """
-Integrated AI Agent Blueprint - FIXED SESSION MANAGEMENT
-Fixed SQLAlchemy detached instance error by passing config dict instead of ORM object
+Integrated AI Agent Blueprint - FIXED FLICKERING ISSUE
+Fixed status flickering by using proper threading locks and status states
 """
 
 from flask import Blueprint, render_template, jsonify, request, session, current_app
@@ -105,7 +105,7 @@ class AIAgentConfigContainer:
 
 
 # ============================================================================
-# AI AGENT SERVICE MANAGER - FIXED SESSION MANAGEMENT
+# AI AGENT SERVICE MANAGER - FIXED FLICKERING WITH PROPER LOCKS
 # ============================================================================
 
 class AIAgentService:
@@ -116,11 +116,16 @@ class AIAgentService:
         self.thread = None
         self.loop = None
         self.active_calls = {}
-        self.startup_complete = False
         self.app = None
-        self.config_container = None  # Store config container instead of ORM object
+        self.config_container = None
 
-        # System stats
+        # FIXED: Add thread lock for status updates
+        self._status_lock = threading.Lock()
+
+        # FIXED: Add explicit status states
+        self._service_state = "stopped"  # stopped, starting, running, stopping
+
+        # System stats - protected by lock
         self.stats = {
             'azure_openai_connected': False,
             'azure_speech_connected': False,
@@ -137,110 +142,124 @@ class AIAgentService:
 
     def start(self, config):
         """Start AI agent service with given config"""
-        if self.running:
-            return False, "Service already running"
+        with self._status_lock:
+            if self.running or self._service_state in ["starting", "running"]:
+                return False, "Service already running or starting"
 
-        try:
-            from flask import current_app
-            self.app = current_app._get_current_object()
-
-            # Get credentials from environment
-            azure_endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
-            azure_api_key = os.environ.get('AZURE_OPENAI_API_KEY')
-            azure_deployment = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini')
-            azure_speech_key = os.environ.get('AZURE_SPEECH_KEY')
-            azure_speech_region = os.environ.get('AZURE_SPEECH_REGION', 'eastus')
-
-            # Validate credentials
-            if not all([azure_endpoint, azure_api_key, azure_speech_key]):
-                error = "Missing Azure credentials in environment"
-                self.stats['last_error'] = error
-                logger.error(f"❌ {error}")
-                return False, error
-
-            # Check for required modules
             try:
-                import openai
-                import aioari
-                import azure.cognitiveservices.speech
-            except ImportError as e:
-                error = f"Missing required Python module: {str(e)}"
-                self.stats['last_error'] = error
-                logger.error(f"❌ {error}")
-                logger.error("Install with: pip install openai aioari azure-cognitiveservices-speech msal pydub gtts")
-                return False, error
+                from flask import current_app
+                self.app = current_app._get_current_object()
 
-            # FIXED: Create thread-safe config container from ORM object
-            self.config_container = AIAgentConfigContainer.from_db_config(config)
-            self.stats['config_loaded'] = True
-            self.startup_complete = False
+                # Get credentials from environment
+                azure_endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
+                azure_api_key = os.environ.get('AZURE_OPENAI_API_KEY')
+                azure_deployment = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini')
+                azure_speech_key = os.environ.get('AZURE_SPEECH_KEY')
+                azure_speech_region = os.environ.get('AZURE_SPEECH_REGION', 'eastus')
 
-            # Start service in background thread
-            self.thread = threading.Thread(target=self._run_service, daemon=True)
-            self.thread.start()
-            self.running = True
-            self.stats['start_time'] = datetime.utcnow()
+                # Validate credentials
+                if not all([azure_endpoint, azure_api_key, azure_speech_key]):
+                    error = "Missing Azure credentials in environment"
+                    self.stats['last_error'] = error
+                    logger.error(f"❌ {error}")
+                    return False, error
 
-            logger.info("🚀 AI AGENT SERVICE STARTING...")
-            return True, "Service started successfully"
+                # Check for required modules
+                try:
+                    import openai
+                    import aioari
+                    import azure.cognitiveservices.speech
+                except ImportError as e:
+                    error = f"Missing required Python module: {str(e)}"
+                    self.stats['last_error'] = error
+                    logger.error(f"❌ {error}")
+                    logger.error(
+                        "Install with: pip install openai aioari azure-cognitiveservices-speech msal pydub gtts")
+                    return False, error
 
-        except Exception as e:
-            logger.error(f"❌ FAILED TO START: {e}")
-            logger.error(traceback.format_exc())
-            self.stats['last_error'] = str(e)
-            self.running = False
-            return False, str(e)
+                # FIXED: Create thread-safe config container from ORM object
+                self.config_container = AIAgentConfigContainer.from_db_config(config)
+                self.stats['config_loaded'] = True
+
+                # FIXED: Set state to starting BEFORE launching thread
+                self._service_state = "starting"
+
+                # Start service in background thread
+                self.thread = threading.Thread(target=self._run_service, daemon=True)
+                self.thread.start()
+
+                # FIXED: Set running flag AFTER thread starts
+                self.running = True
+                self.stats['start_time'] = datetime.utcnow()
+
+                logger.info("🚀 AI AGENT SERVICE STARTING...")
+                return True, "Service started successfully"
+
+            except Exception as e:
+                logger.error(f"❌ FAILED TO START: {e}")
+                logger.error(traceback.format_exc())
+                self.stats['last_error'] = str(e)
+                self.running = False
+                self._service_state = "stopped"
+                return False, str(e)
 
     def stop(self):
         """Stop AI agent service"""
-        if not self.running:
-            return False, "Service not running"
+        with self._status_lock:
+            if not self.running or self._service_state == "stopped":
+                return False, "Service not running"
 
-        try:
-            logger.info("🛑 STOPPING AI AGENT SERVICE...")
-            self.running = False
-            self.startup_complete = False
+            try:
+                logger.info("🛑 STOPPING AI AGENT SERVICE...")
 
-            # Stop all active calls
-            if self.loop and not self.loop.is_closed():
-                for call_id in list(self.active_calls.keys()):
-                    try:
-                        asyncio.run_coroutine_threadsafe(
-                            self._hangup_call(call_id),
-                            self.loop
-                        )
-                    except:
-                        pass
+                # FIXED: Set state to stopping
+                self._service_state = "stopping"
+                self.running = False
 
-            # Wait for thread to finish
-            if self.thread and self.thread.is_alive():
-                self.thread.join(timeout=5)
+                # Stop all active calls
+                if self.loop and not self.loop.is_closed():
+                    for call_id in list(self.active_calls.keys()):
+                        try:
+                            asyncio.run_coroutine_threadsafe(
+                                self._hangup_call(call_id),
+                                self.loop
+                            )
+                        except:
+                            pass
 
-            # Reset stats
-            self.stats = {
-                'azure_openai_connected': False,
-                'azure_speech_connected': False,
-                'ari_connected': False,
-                'ssh_connected': False,
-                'dataverse_connected': False,
-                'cache_loaded': False,
-                'cache_phrases_count': 0,
-                'last_error': None,
-                'start_time': None,
-                'total_calls_handled': self.stats.get('total_calls_handled', 0),
-                'config_loaded': False
-            }
+                # Wait for thread to finish
+                if self.thread and self.thread.is_alive():
+                    self.thread.join(timeout=5)
 
-            self.config_container = None
+                # Reset stats
+                self.stats = {
+                    'azure_openai_connected': False,
+                    'azure_speech_connected': False,
+                    'ari_connected': False,
+                    'ssh_connected': False,
+                    'dataverse_connected': False,
+                    'cache_loaded': False,
+                    'cache_phrases_count': 0,
+                    'last_error': None,
+                    'start_time': None,
+                    'total_calls_handled': self.stats.get('total_calls_handled', 0),
+                    'config_loaded': False
+                }
 
-            logger.info("✅ SERVICE STOPPED")
-            return True, "Service stopped successfully"
+                self.config_container = None
 
-        except Exception as e:
-            logger.error(f"❌ FAILED TO STOP: {e}")
-            logger.error(traceback.format_exc())
-            self.stats['last_error'] = str(e)
-            return False, str(e)
+                # FIXED: Set state to stopped at the very end
+                self._service_state = "stopped"
+
+                logger.info("✅ SERVICE STOPPED")
+                return True, "Service stopped successfully"
+
+            except Exception as e:
+                logger.error(f"❌ FAILED TO STOP: {e}")
+                logger.error(traceback.format_exc())
+                self.stats['last_error'] = str(e)
+                self._service_state = "stopped"
+                return False, str(e)
 
     def _run_service(self):
         """Run the async service loop"""
@@ -251,15 +270,18 @@ class AIAgentService:
         except Exception as e:
             logger.error(f"❌ SERVICE ERROR: {e}")
             logger.error(traceback.format_exc())
-            self.stats['last_error'] = str(e)
-            self.running = False
-            self.startup_complete = False
+            with self._status_lock:
+                self.stats['last_error'] = str(e)
+                self.running = False
+                self._service_state = "stopped"
         finally:
             try:
                 self.loop.close()
             except:
                 pass
-            self.running = False
+            with self._status_lock:
+                self.running = False
+                self._service_state = "stopped"
 
     async def _service_main(self):
         """Main service loop - connects to ARI and handles calls"""
@@ -276,8 +298,10 @@ class AIAgentService:
 
         if not ari_pass:
             logger.error("❌ ARI_PASSWORD not configured in environment")
-            self.stats['last_error'] = "ARI_PASSWORD not configured"
-            self.running = False
+            with self._status_lock:
+                self.stats['last_error'] = "ARI_PASSWORD not configured"
+                self.running = False
+                self._service_state = "stopped"
             return
 
         logger.info("=" * 80)
@@ -301,12 +325,15 @@ class AIAgentService:
                     messages=[{"role": "user", "content": "Hi"}],
                     max_tokens=5
                 )
-                self.stats['azure_openai_connected'] = True
+                with self._status_lock:
+                    self.stats['azure_openai_connected'] = True
                 logger.info("   ✅ Azure OpenAI: CONNECTED")
             except Exception as e:
                 logger.error(f"   ❌ Azure OpenAI: FAILED - {e}")
-                self.stats['last_error'] = f"Azure OpenAI failed: {str(e)}"
-                self.running = False
+                with self._status_lock:
+                    self.stats['last_error'] = f"Azure OpenAI failed: {str(e)}"
+                    self.running = False
+                    self._service_state = "stopped"
                 return
 
             # Initialize Azure Speech
@@ -316,7 +343,8 @@ class AIAgentService:
                 region=self.config_container.azure_speech_region
             )
             speech_config.speech_recognition_language = "en-US"
-            self.stats['azure_speech_connected'] = True
+            with self._status_lock:
+                self.stats['azure_speech_connected'] = True
             logger.info("   ✅ Azure Speech: CONFIGURED")
 
             # Initialize SSH
@@ -325,7 +353,8 @@ class AIAgentService:
                 with self.app.app_context():
                     from ssh_manager import ssh_manager
                     if ssh_manager.test_connection():
-                        self.stats['ssh_connected'] = True
+                        with self._status_lock:
+                            self.stats['ssh_connected'] = True
                         logger.info("   ✅ SSH: CONNECTED")
                     else:
                         logger.warning("   ⚠️  SSH: FAILED (non-critical)")
@@ -339,7 +368,8 @@ class AIAgentService:
                 try:
                     token = await get_dataverse_token()
                     if token:
-                        self.stats['dataverse_connected'] = True
+                        with self._status_lock:
+                            self.stats['dataverse_connected'] = True
                         logger.info("   ✅ Dataverse: CONNECTED")
                     else:
                         logger.warning("   ⚠️  Dataverse: AUTH FAILED (optional)")
@@ -349,7 +379,7 @@ class AIAgentService:
                 logger.info("   ℹ️  Dataverse: NOT CONFIGURED (optional)")
 
             # Pre-cache TTS phrases
-            logger.info("🔊 Pre-caching common TTS phrases...")
+            logger.info("📊 Pre-caching common TTS phrases...")
             cache = SoundCache()
 
             common_phrases = [
@@ -372,14 +402,16 @@ class AIAgentService:
                 except Exception as e:
                     logger.warning(f"   ⚠️  Cache warning: {e}")
 
-            self.stats['cache_loaded'] = True
-            self.stats['cache_phrases_count'] = cached_count
+            with self._status_lock:
+                self.stats['cache_loaded'] = True
+                self.stats['cache_phrases_count'] = cached_count
             logger.info(f"   ✅ Cached {cached_count}/{len(common_phrases)} phrases")
 
             # Connect to ARI
             logger.info("📞 Connecting to Asterisk ARI...")
             ari_client = await aioari.connect(ari_url, ari_user, ari_pass)
-            self.stats['ari_connected'] = True
+            with self._status_lock:
+                self.stats['ari_connected'] = True
             logger.info("   ✅ ARI: CONNECTED")
 
             # Register event handler
@@ -394,12 +426,16 @@ class AIAgentService:
                 logger.info("=" * 80)
 
                 if channel_id:
-                    self.stats['total_calls_handled'] += 1
+                    with self._status_lock:
+                        self.stats['total_calls_handled'] += 1
                     await self._handle_call(channel_id, event, ari_client)
 
             ari_client.on_event('StasisStart', on_stasis_start)
 
-            self.startup_complete = True
+            # FIXED: Mark service as fully running AFTER all initialization
+            with self._status_lock:
+                self._service_state = "running"
+
             logger.info("=" * 80)
             logger.info("🎙️  AI AGENT READY - WAITING FOR CALLS...")
             logger.info("=" * 80)
@@ -412,34 +448,39 @@ class AIAgentService:
             logger.error(f"❌ ARI CONNECTION ERROR: {e}")
             logger.error(traceback.format_exc())
             logger.error("=" * 80)
-            self.stats['last_error'] = str(e)
-            self.stats['ari_connected'] = False
-            self.running = False
+            with self._status_lock:
+                self.stats['last_error'] = str(e)
+                self.stats['ari_connected'] = False
+                self.running = False
+                self._service_state = "stopped"
         finally:
             if 'ari_client' in locals():
                 try:
                     await ari_client.close()
                 except:
                     pass
-            self.running = False
+            with self._status_lock:
+                self.running = False
+                self._service_state = "stopped"
             logger.info("🛑 ARI Connection closed")
 
     async def _handle_call(self, channel_id, event, ari_client):
-        """Handle incoming call - FIXED: WITH PROPER SESSION MANAGEMENT"""
+        """Handle incoming call - WITH PROPER SESSION MANAGEMENT"""
         try:
             channel = await ari_client.channels.get(channelId=channel_id)
             caller_number = event.get('channel', {}).get('caller', {}).get('number', 'Unknown')
 
             # Store active call
-            self.active_calls[channel_id] = {
-                'start_time': datetime.utcnow(),
-                'caller_number': caller_number,
-                'channel': channel
-            }
+            with self._status_lock:
+                self.active_calls[channel_id] = {
+                    'start_time': datetime.utcnow(),
+                    'caller_number': caller_number,
+                    'channel': channel
+                }
 
             logger.info(f"🎯 Processing call from {caller_number}...")
 
-            # FIXED: Use config container directly (no DB access in background thread)
+            # Use config container directly (no DB access in background thread)
             with self.app.app_context():
                 from blueprints.ai_agent_handler import handle_call
                 await handle_call(channel, ari_client, self.config_container, caller_number)
@@ -449,14 +490,18 @@ class AIAgentService:
         except Exception as e:
             logger.error(f"❌ CALL HANDLING ERROR: {e}")
             logger.error(traceback.format_exc())
-            self.stats['last_error'] = f"Call handling: {str(e)}"
+            with self._status_lock:
+                self.stats['last_error'] = f"Call handling: {str(e)}"
         finally:
             # Remove from active calls
-            self.active_calls.pop(channel_id, None)
+            with self._status_lock:
+                self.active_calls.pop(channel_id, None)
 
     async def _hangup_call(self, channel_id):
         """Hangup a specific call"""
-        call_info = self.active_calls.get(channel_id)
+        with self._status_lock:
+            call_info = self.active_calls.get(channel_id)
+
         if call_info and 'channel' in call_info:
             try:
                 await call_info['channel'].hangup()
@@ -464,38 +509,46 @@ class AIAgentService:
                 pass
 
     def get_status(self):
-        """Get comprehensive service status"""
-        uptime = None
-        if self.stats['start_time'] and self.running:
-            uptime = (datetime.utcnow() - self.stats['start_time']).seconds
+        """Get comprehensive service status - THREAD SAFE"""
+        with self._status_lock:
+            # FIXED: Base running status on service state
+            is_running = self._service_state == "running"
 
-        return {
-            'running': self.running and self.startup_complete,
-            'active_calls': len(self.active_calls),
-            'calls': [
+            uptime = None
+            if self.stats['start_time'] and is_running:
+                uptime = (datetime.utcnow() - self.stats['start_time']).seconds
+
+            # Create snapshot of active calls
+            active_calls_snapshot = [
                 {
                     'channel_id': cid,
                     'caller_number': info['caller_number'],
                     'duration': (datetime.utcnow() - info['start_time']).seconds
                 }
                 for cid, info in self.active_calls.items()
-            ],
-            'uptime_seconds': uptime,
-            'total_calls_handled': self.stats.get('total_calls_handled', 0),
-            'connections': {
-                'azure_openai': self.stats.get('azure_openai_connected', False),
-                'azure_speech': self.stats.get('azure_speech_connected', False),
-                'ari': self.stats.get('ari_connected', False),
-                'ssh': self.stats.get('ssh_connected', False),
-                'dataverse': self.stats.get('dataverse_connected', False)
-            },
-            'cache': {
-                'loaded': self.stats.get('cache_loaded', False),
-                'phrases_count': self.stats.get('cache_phrases_count', 0)
-            },
-            'config_loaded': self.stats.get('config_loaded', False),
-            'last_error': self.stats.get('last_error')
-        }
+            ]
+
+            return {
+                'running': is_running,
+                'service_state': self._service_state,  # For debugging
+                'active_calls': len(active_calls_snapshot),
+                'calls': active_calls_snapshot,
+                'uptime_seconds': uptime,
+                'total_calls_handled': self.stats.get('total_calls_handled', 0),
+                'connections': {
+                    'azure_openai': self.stats.get('azure_openai_connected', False),
+                    'azure_speech': self.stats.get('azure_speech_connected', False),
+                    'ari': self.stats.get('ari_connected', False),
+                    'ssh': self.stats.get('ssh_connected', False),
+                    'dataverse': self.stats.get('dataverse_connected', False)
+                },
+                'cache': {
+                    'loaded': self.stats.get('cache_loaded', False),
+                    'phrases_count': self.stats.get('cache_phrases_count', 0)
+                },
+                'config_loaded': self.stats.get('config_loaded', False),
+                'last_error': self.stats.get('last_error')
+            }
 
 
 # Global service instance
@@ -578,6 +631,8 @@ def update_config():
             config.max_turns = data['max_turns']
         if 'recording_duration' in data:
             config.recording_duration = data['recording_duration']
+        if 'silence_duration' in data:
+            config.silence_duration = data['silence_duration']
         if 'store_recordings' in data:
             config.store_recordings = data['store_recordings']
         if 'store_transcripts' in data:
@@ -671,6 +726,33 @@ def create_department():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@ai_agent_integrated_bp.route('/api/departments/<int:dept_id>', methods=['DELETE'])
+def delete_department(dept_id):
+    """Delete a department"""
+    try:
+        department = AIAgentDepartment.query.get_or_404(dept_id)
+
+        log_action(
+            action='delete',
+            resource_type='ai_agent_department',
+            resource_id=str(dept_id),
+            details={'name': department.name}
+        )
+
+        db.session.delete(department)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Department deleted successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting department: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @ai_agent_integrated_bp.route('/api/service/status', methods=['GET'])
 def service_status():
     """Get AI agent service status with detailed stats"""
@@ -727,6 +809,7 @@ def start_service():
         logger.error(f"❌ Error starting service: {e}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 @ai_agent_integrated_bp.route('/api/service/stop', methods=['POST'])
