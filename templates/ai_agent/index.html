@@ -1,1365 +1,642 @@
 {% extends "base.html" %}
 
-{% block title %}AI Voice Agent - Sibasi PBX{% endblock %}
-
-{% block page_title %}AI Voice Agent{% endblock %}
+{% block title %}AI Agent Management - Sibasi PBX{% endblock %}
+{% block page_title %}AI Agent Management{% endblock %}
 
 {% block extra_css %}
 <style>
-    /* Status Badge Styles */
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.375rem;
-        padding: 0.375rem 0.75rem;
-        border-radius: 6px;
-        font-size: 0.8125rem;
-        font-weight: 500;
-    }
-
-    .status-badge.online {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .status-badge.offline {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-
-    .status-badge.starting {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        animation: pulse 2s infinite;
-    }
-
-    .status-dot.online {
-        background: #16a34a;
-    }
-
-    .status-dot.offline {
-        background: #dc2626;
-    }
-
-    .status-dot.starting {
-        background: #f59e0b;
-    }
-
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-
-    /* Connection Status Cards */
     .connection-card {
-        padding: 1rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: white;
-        text-align: center;
+        border-left: 4px solid #dee2e6;
     }
-
-    .connection-card.connected {
-        border-color: #86efac;
-        background: #f0fdf4;
-    }
-
-    .connection-card.disconnected {
-        border-color: #fca5a5;
-        background: #fef2f2;
-    }
-
-    .connection-icon {
-        font-size: 1.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .connection-icon.connected {
-        color: #16a34a;
-    }
-
-    .connection-icon.disconnected {
-        color: #dc2626;
-    }
-
-    .connection-label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    /* Stat Cards */
+    .connection-card.connected { border-left-color: #22c55e; background-color: #f0fdf4; }
+    .connection-card.disconnected { border-left-color: #ef4444; background-color: #fef2f2; }
     .stat-card {
-        padding: 1.25rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: white;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        padding: 1.5rem;
     }
-
-    .stat-value {
-        font-size: 1.875rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        margin: 0.5rem 0;
-    }
-
-    .stat-label {
-        font-size: 0.8125rem;
-        color: var(--text-secondary);
-        font-weight: 500;
-    }
-
-    .stat-icon {
-        font-size: 1.25rem;
-        color: var(--primary);
-    }
-
-    /* Call Log Styles */
-    .call-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-
-    .call-status-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-    }
-
-    .call-status.completed .call-status-dot {
-        background: #16a34a;
-    }
-
-    .call-status.transferred .call-status-dot {
-        background: #3b82f6;
-    }
-
-    .call-status.active .call-status-dot {
-        background: #f59e0b;
-    }
-
-    /* Form Styles */
-    .form-label {
-        font-weight: 500;
-        font-size: 0.8125rem;
-        margin-bottom: 0.5rem;
-        color: var(--text-primary);
-    }
-
-    .form-control, .form-select {
-        font-size: 0.875rem;
-        border-radius: 6px;
-        border: 1px solid var(--border);
-    }
-
-    .form-control:focus, .form-select:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
-
-    textarea.form-control {
-        min-height: 120px;
-    }
-
-    /* Modal Improvements */
-    .modal-header {
-        border-bottom: 1px solid var(--border);
-    }
-
-    .modal-footer {
-        border-top: 1px solid var(--border);
-    }
-
-    /* Loading Spinner */
-    .spinner {
-        display: inline-block;
-        width: 1rem;
-        height: 1rem;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-top-color: white;
-        border-radius: 50%;
-        animation: spin 0.6s linear infinite;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-
-    /* Table Improvements */
-    .table-hover tbody tr:hover {
-        background: var(--hover-bg);
-        cursor: pointer;
-    }
-
-    .table-actions {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: flex-end;
-    }
-
-    .btn-sm {
-        padding: 0.375rem 0.75rem;
-        font-size: 0.8125rem;
-    }
-
-    /* Alert Improvements */
-    .alert {
-        border-radius: 8px;
-        border-width: 1px;
-    }
-
-    /* Empty State */
-    .empty-state {
-        text-align: center;
-        padding: 3rem 1rem;
-        color: var(--text-secondary);
-    }
-
-    .empty-state-icon {
-        font-size: 3rem;
-        color: var(--border);
-        margin-bottom: 1rem;
-    }
-
-    /* Tabs */
-    .nav-tabs {
-        border-bottom: 2px solid var(--border);
-    }
-
-    .nav-tabs .nav-link {
-        border: none;
-        color: var(--text-secondary);
-        font-weight: 500;
-        padding: 0.75rem 1.25rem;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -2px;
-    }
-
-    .nav-tabs .nav-link:hover {
-        border-color: transparent;
-        color: var(--text-primary);
-    }
-
-    .nav-tabs .nav-link.active {
-        color: var(--primary);
-        border-bottom-color: var(--primary);
-    }
-
-    /* Transcript Viewer */
-    .transcript-turn {
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        border: 1px solid var(--border);
-    }
-
-    .transcript-turn.user {
-        background: #f0f9ff;
-        border-color: #bfdbfe;
-    }
-
-    .transcript-turn.assistant {
-        background: #f0fdf4;
-        border-color: #bbf7d0;
-    }
-
-    .turn-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.5rem;
-    }
-
-    .turn-speaker {
-        font-weight: 600;
-        font-size: 0.8125rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .turn-confidence {
-        font-size: 0.75rem;
-        padding: 0.125rem 0.5rem;
-        border-radius: 4px;
-        background: white;
-    }
-
-    .turn-text {
-        font-size: 0.875rem;
-        line-height: 1.6;
-        color: var(--text-primary);
-    }
-
-    .function-call-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        background: #fef3c7;
-        color: #92400e;
-        margin-top: 0.5rem;
-    }
+    .call-log-row { cursor: pointer; }
+    .call-log-row:hover { background-color: #f8f9fa; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Service Control Header -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="stat-icon">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <div>
-                            <h5 class="mb-1">AI Voice Agent Service</h5>
-                            <div id="service-status-badge">
-                                <span class="status-badge offline">
-                                    <span class="status-dot offline"></span>
-                                    <span>Offline</span>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6 text-end">
-                    <button id="btn-start-service" class="btn btn-success" onclick="startService()">
-                        <i class="fas fa-play"></i> Start Service
-                    </button>
-                    <button id="btn-stop-service" class="btn btn-danger" style="display: none;" onclick="stopService()">
-                        <i class="fas fa-stop"></i> Stop Service
-                    </button>
-                </div>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="mb-1"><i class="fas fa-robot"></i> AI Voice Agent</h4>
+                <p class="text-muted mb-0">Real-time monitoring and configuration</p>
             </div>
-
-            <!-- Connection Status Grid -->
-            <div class="row g-3 mt-3" id="connection-status" style="display: none;">
-                <div class="col-6 col-md-2">
-                    <div class="connection-card" id="status-azure-openai">
-                        <div class="connection-icon"><i class="fas fa-brain"></i></div>
-                        <div class="connection-label">Azure OpenAI</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-2">
-                    <div class="connection-card" id="status-azure-speech">
-                        <div class="connection-icon"><i class="fas fa-microphone"></i></div>
-                        <div class="connection-label">Azure Speech</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-2">
-                    <div class="connection-card" id="status-ari">
-                        <div class="connection-icon"><i class="fas fa-phone-volume"></i></div>
-                        <div class="connection-label">Asterisk ARI</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-2">
-                    <div class="connection-card" id="status-ssh">
-                        <div class="connection-icon"><i class="fas fa-terminal"></i></div>
-                        <div class="connection-label">SSH</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-2">
-                    <div class="connection-card" id="status-dataverse">
-                        <div class="connection-icon"><i class="fas fa-database"></i></div>
-                        <div class="connection-label">Dataverse</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-2">
-                    <div class="connection-card" id="status-cache">
-                        <div class="connection-icon"><i class="fas fa-layer-group"></i></div>
-                        <div class="connection-label">TTS Cache</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Service Stats -->
-            <div class="row g-3 mt-3" id="service-stats" style="display: none;">
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-label">Active Calls</div>
-                        <div class="stat-value" id="stat-active-calls">0</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-label">Total Calls Handled</div>
-                        <div class="stat-value" id="stat-total-calls">0</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-label">Uptime</div>
-                        <div class="stat-value" id="stat-uptime">--</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-label">Cached Phrases</div>
-                        <div class="stat-value" id="stat-cached-phrases">0</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Active Calls List -->
-            <div id="active-calls-section" style="display: none;">
-                <h6 class="mt-4 mb-3">Active Calls</h6>
-                <div id="active-calls-list"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Tabs -->
-    <ul class="nav nav-tabs mb-4" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-config">
-                <i class="fas fa-cog"></i> Configuration
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-departments">
-                <i class="fas fa-building"></i> Departments
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-calls">
-                <i class="fas fa-phone"></i> Call Logs
-            </button>
-        </li>
-    </ul>
-
-    <!-- Tab Content -->
-    <div class="tab-content">
-        <!-- Configuration Tab -->
-        <div class="tab-pane fade show active" id="tab-config">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-cog"></i> AI Agent Configuration</span>
-                    <button class="btn btn-primary btn-sm" onclick="saveConfig()">
-                        <i class="fas fa-save"></i> Save Configuration
-                    </button>
-                </div>
-                <div class="card-body">
-                    <form id="config-form">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Configuration Name</label>
-                                    <input type="text" class="form-control" id="config-name" name="name" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Company Name</label>
-                                    <input type="text" class="form-control" id="config-company" name="company_name" required>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">System Prompt</label>
-                            <textarea class="form-control" id="config-system-prompt" name="system_prompt" rows="6"></textarea>
-                            <small class="text-muted">Instructions for how the AI should behave and respond</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Greeting Template</label>
-                            <textarea class="form-control" id="config-greeting" name="greeting_template" rows="3"></textarea>
-                            <small class="text-muted">Use {time_greeting} and {company_name} as placeholders</small>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Max Conversation Turns</label>
-                                    <input type="number" class="form-control" id="config-max-turns" name="max_turns" min="3" max="20">
-                                    <small class="text-muted">3-20 turns</small>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Recording Duration (seconds)</label>
-                                    <input type="number" class="form-control" id="config-recording-duration" name="recording_duration" min="3" max="15">
-                                    <small class="text-muted">3-15 seconds</small>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Silence Duration (seconds)</label>
-                                    <input type="number" class="form-control" id="config-silence-duration" name="silence_duration" min="1" max="5" step="0.1">
-                                    <small class="text-muted">1-5 seconds</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="config-store-recordings" name="store_recordings">
-                                    <label class="form-check-label" for="config-store-recordings">
-                                        Store Audio Recordings
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="config-store-transcripts" name="store_transcripts">
-                                    <label class="form-check-label" for="config-store-transcripts">
-                                        Store Conversation Transcripts
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="config-enabled" name="enabled">
-                            <label class="form-check-label" for="config-enabled">
-                                <strong>Enable AI Agent</strong>
-                            </label>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- Departments Tab -->
-        <div class="tab-pane fade" id="tab-departments">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-building"></i> Transfer Departments</span>
-                    <button class="btn btn-primary btn-sm" onclick="showAddDepartmentModal()">
-                        <i class="fas fa-plus"></i> Add Department
-                    </button>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Display Name</th>
-                                    <th>Extension</th>
-                                    <th>Endpoint</th>
-                                    <th>Context</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="departments-table-body">
-                                <tr>
-                                    <td colspan="6" class="text-center py-4">
-                                        <div class="spinner-border text-primary" role="status"></div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Call Logs Tab -->
-        <div class="tab-pane fade" id="tab-calls">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-phone"></i> Call History</span>
-                    <button class="btn btn-secondary btn-sm" onclick="refreshCallLogs()">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
-                </div>
-                <div class="card-body">
-                    <!-- Filters -->
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <input type="date" class="form-control" id="filter-start-date" placeholder="Start Date">
-                        </div>
-                        <div class="col-md-4">
-                            <input type="date" class="form-control" id="filter-end-date" placeholder="End Date">
-                        </div>
-                        <div class="col-md-4">
-                            <input type="text" class="form-control" id="filter-caller" placeholder="Search by caller number">
-                        </div>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Caller</th>
-                                    <th>Name</th>
-                                    <th>Duration</th>
-                                    <th>Turns</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="calls-table-body">
-                                <tr>
-                                    <td colspan="7" class="text-center py-4">
-                                        <div class="spinner-border text-primary" role="status"></div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <nav id="pagination-container" class="mt-3"></nav>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Department Modal -->
-<div class="modal fade" id="addDepartmentModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-building"></i> Add Transfer Department</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="add-department-form">
-                    <div class="mb-3">
-                        <label class="form-label">Name (Internal) *</label>
-                        <input type="text" class="form-control" id="dept-name" required>
-                        <small class="text-muted">Lowercase, no spaces (e.g., "sales", "support")</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Display Name *</label>
-                        <input type="text" class="form-control" id="dept-display-name" required>
-                        <small class="text-muted">User-friendly name (e.g., "Sales Team")</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Extension *</label>
-                        <input type="text" class="form-control" id="dept-extension" required>
-                        <small class="text-muted">Extension number to transfer to</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Endpoint *</label>
-                        <input type="text" class="form-control" id="dept-endpoint" required>
-                        <small class="text-muted">PJSIP endpoint (e.g., "PJSIP/1001")</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Context</label>
-                        <input type="text" class="form-control" id="dept-context" value="from-internal">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" id="dept-description" rows="2"></textarea>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="dept-enabled" checked>
-                        <label class="form-check-label" for="dept-enabled">
-                            Enabled
-                        </label>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="addDepartment()">
-                    <i class="fas fa-plus"></i> Add Department
+            <div>
+                <button class="btn btn-success btn-sm" id="startBtn" onclick="startService()">
+                    <i class="fas fa-play"></i> Start
+                </button>
+                <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopService()" disabled>
+                    <i class="fas fa-stop"></i> Stop
+                </button>
+                <button class="btn btn-outline-primary btn-sm" onclick="refreshStatus()">
+                    <i class="fas fa-sync-alt"></i> Refresh
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Call Detail Modal -->
-<div class="modal fade" id="callDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-info-circle"></i> Call Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Service Status Overview -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card rounded">
+            <div class="small opacity-75 mb-2">Service Status</div>
+            <h2 id="serviceStatus" class="mb-0"><i class="fas fa-circle"></i></h2>
+            <div id="uptimeDisplay" class="mt-2 small">Checking...</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card rounded">
+            <div class="small opacity-75 mb-2">Active Calls</div>
+            <h2 id="activeCalls" class="mb-0">-</h2>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card rounded">
+            <div class="small opacity-75 mb-2">Total Calls</div>
+            <h2 id="totalCalls" class="mb-0">-</h2>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card rounded">
+            <div class="small opacity-75 mb-2">Cached Phrases</div>
+            <h2 id="cachedPhrases" class="mb-0">-</h2>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Status Grid -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-plug"></i> System Connections</h5>
+        <small class="text-muted">Last update: <span id="lastUpdate">Never</span></small>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4 col-sm-6">
+                <div class="connection-card card" id="card-azure-openai">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-brain"></i> Azure OpenAI</h6>
+                                <small class="text-muted">GPT-4 API</small>
+                            </div>
+                            <span class="badge bg-secondary" id="status-azure-openai">Unknown</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="modal-body" id="call-detail-content">
-                <!-- Content loaded dynamically -->
+            <div class="col-md-4 col-sm-6">
+                <div class="connection-card card" id="card-azure-speech">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-microphone"></i> Azure Speech</h6>
+                                <small class="text-muted">Speech Recognition</small>
+                            </div>
+                            <span class="badge bg-secondary" id="status-azure-speech">Unknown</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <div class="connection-card card" id="card-ari">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-phone-volume"></i> Asterisk ARI</h6>
+                                <small class="text-muted">Call Interface</small>
+                            </div>
+                            <span class="badge bg-secondary" id="status-ari">Unknown</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <div class="connection-card card" id="card-ssh">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-terminal"></i> SSH Connection</h6>
+                                <small class="text-muted">File Upload</small>
+                            </div>
+                            <span class="badge bg-secondary" id="status-ssh">Unknown</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <div class="connection-card card" id="card-dataverse">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-database"></i> Dataverse</h6>
+                                <small class="text-muted">Customer Data</small>
+                            </div>
+                            <span class="badge bg-secondary" id="status-dataverse">Unknown</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <div class="connection-card card" id="card-cache">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1"><i class="fas fa-box"></i> TTS Cache</h6>
+                                <small class="text-muted">Audio Cache</small>
+                            </div>
+                            <span class="badge bg-secondary" id="status-cache">Unknown</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Active Calls -->
+<div class="card mb-4" id="activeCallsSection" style="display: none;">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-phone-alt"></i> Active Calls</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Channel ID</th>
+                        <th>Caller Number</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody id="activeCallsList"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Error Display -->
+<div class="alert alert-danger" id="errorAlert" style="display: none;">
+    <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Last Error</h6>
+    <p id="errorMessage" class="mb-0"></p>
+</div>
+
+<!-- Configuration Tabs -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configTab">
+            <i class="fas fa-cog"></i> Configuration
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#departmentsTab" onclick="loadDepartments()">
+            <i class="fas fa-building"></i> Departments
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#callsTab" onclick="loadCallHistory()">
+            <i class="fas fa-history"></i> Call History
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Configuration Tab -->
+    <div class="tab-pane fade show active" id="configTab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-sliders-h"></i> AI Agent Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form id="configForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Company Name</label>
+                            <input type="text" class="form-control" id="companyName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Max Conversation Turns</label>
+                            <input type="number" class="form-control" id="maxTurns" min="1" max="20" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">System Prompt</label>
+                        <textarea class="form-control" id="systemPrompt" rows="8" required></textarea>
+                        <small class="text-muted">Instructions for the AI agent's behavior</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Greeting Template</label>
+                        <textarea class="form-control" id="greetingTemplate" rows="3" required></textarea>
+                        <small class="text-muted">Available variables: {time_greeting}, {company_name}</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="storeRecordings">
+                                <label class="form-check-label" for="storeRecordings">Store Call Recordings</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="storeTranscripts">
+                                <label class="form-check-label" for="storeTranscripts">Store Transcripts</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="enabled">
+                                <label class="form-check-label" for="enabled">Enable AI Agent</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Configuration
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Departments Tab -->
+    <div class="tab-pane fade" id="departmentsTab">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-building"></i> Transfer Departments</h5>
+                <button class="btn btn-primary btn-sm" onclick="showAddDepartmentModal()">
+                    <i class="fas fa-plus"></i> Add Department
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="departmentsList">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call History Tab -->
+    <div class="tab-pane fade" id="callsTab">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history"></i> Recent Call Logs</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Caller</th>
+                                <th>Duration</th>
+                                <th>Turns</th>
+                                <th>Transferred</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="callHistoryBody">
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <div class="spinner-border text-primary"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-let statusInterval = null;
-let currentPage = 1;
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadConfiguration();
-    loadDepartments();
-    loadCallLogs();
-    updateServiceStatus();
-    startStatusPolling();
-});
-
-// Start status polling
-function startStatusPolling() {
-    statusInterval = setInterval(updateServiceStatus, 5000);
-}
-
-// Update service status
-async function updateServiceStatus() {
-    try {
-        const response = await fetch('/ai_agent/api/service/status');
-        const data = await response.json();
-
-        if (data.success) {
-            updateStatusDisplay(data.status);
-        }
-    } catch (error) {
-        console.error('Status update failed:', error);
-    }
-}
-
-// Update status display
-function updateStatusDisplay(status) {
-    const isRunning = status.running;
-    const badge = document.getElementById('service-status-badge');
-    const btnStart = document.getElementById('btn-start-service');
-    const btnStop = document.getElementById('btn-stop-service');
-    const connStatus = document.getElementById('connection-status');
-    const serviceStats = document.getElementById('service-stats');
-    const activeCalls = document.getElementById('active-calls-section');
-
-    // Update badge
-    if (isRunning) {
-        badge.innerHTML = `
-            <span class="status-badge online">
-                <span class="status-dot online"></span>
-                <span>Online</span>
-            </span>
-        `;
-        btnStart.style.display = 'none';
-        btnStop.style.display = 'inline-block';
-        connStatus.style.display = 'flex';
-        serviceStats.style.display = 'flex';
-    } else {
-        badge.innerHTML = `
-            <span class="status-badge offline">
-                <span class="status-dot offline"></span>
-                <span>Offline</span>
-            </span>
-        `;
-        btnStart.style.display = 'inline-block';
-        btnStop.style.display = 'none';
-        connStatus.style.display = 'none';
-        serviceStats.style.display = 'none';
-        activeCalls.style.display = 'none';
-    }
-
-    // Update connections
-    if (isRunning && status.connections) {
-        updateConnectionCard('status-azure-openai', status.connections.azure_openai);
-        updateConnectionCard('status-azure-speech', status.connections.azure_speech);
-        updateConnectionCard('status-ari', status.connections.ari);
-        updateConnectionCard('status-ssh', status.connections.ssh);
-        updateConnectionCard('status-dataverse', status.connections.dataverse);
-        updateConnectionCard('status-cache', status.cache?.loaded || false);
-    }
-
-    // Update stats
-    if (isRunning) {
-        document.getElementById('stat-active-calls').textContent = status.active_calls || 0;
-        document.getElementById('stat-total-calls').textContent = status.total_calls_handled || 0;
-        document.getElementById('stat-uptime').textContent = formatUptime(status.uptime_seconds);
-        document.getElementById('stat-cached-phrases').textContent = status.cache?.phrases_count || 0;
-
-        // Update active calls
-        if (status.active_calls > 0 && status.calls) {
-            activeCalls.style.display = 'block';
-            renderActiveCalls(status.calls);
-        } else {
-            activeCalls.style.display = 'none';
-        }
-    }
-}
-
-// Update connection card
-function updateConnectionCard(elementId, connected) {
-    const card = document.getElementById(elementId);
-    if (connected) {
-        card.className = 'connection-card connected';
-        card.querySelector('.connection-icon').className = 'connection-icon connected';
-    } else {
-        card.className = 'connection-card disconnected';
-        card.querySelector('.connection-icon').className = 'connection-icon disconnected';
-    }
-}
-
-// Render active calls
-function renderActiveCalls(calls) {
-    const container = document.getElementById('active-calls-list');
-    container.innerHTML = calls.map(call => `
-        <div class="alert alert-warning mb-2">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>${call.caller_number}</strong> - Duration: ${call.duration}s
-                </div>
-                <span class="badge bg-warning">Active</span>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Format uptime
-function formatUptime(seconds) {
-    if (!seconds) return '--';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-}
-
-// Start service
-async function startService() {
-    const btn = document.getElementById('btn-start-service');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Starting...';
-
-    try {
-        const response = await fetch('/ai_agent/api/service/start', {
-            method: 'POST'
-        });
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('AI Agent service started successfully', 'success');
-            setTimeout(updateServiceStatus, 2000);
-        } else {
-            showToast('Failed to start service: ' + data.error, 'danger');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-play"></i> Start Service';
-        }
-    } catch (error) {
-        showToast('Error starting service: ' + error.message, 'danger');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-play"></i> Start Service';
-    }
-}
-
-// Stop service
-async function stopService() {
-    if (!confirm('Stop the AI Agent service? Active calls will be terminated.')) {
-        return;
-    }
-
-    const btn = document.getElementById('btn-stop-service');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Stopping...';
-
-    try {
-        const response = await fetch('/ai_agent/api/service/stop', {
-            method: 'POST'
-        });
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('AI Agent service stopped', 'success');
-            setTimeout(updateServiceStatus, 1000);
-        } else {
-            showToast('Failed to stop service: ' + data.error, 'danger');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-stop"></i> Stop Service';
-        }
-    } catch (error) {
-        showToast('Error stopping service: ' + error.message, 'danger');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-stop"></i> Stop Service';
-    }
-}
+let isUpdating = false;
 
 // Load configuration
-async function loadConfiguration() {
+async function loadConfig() {
     try {
         const response = await fetch('/ai_agent/api/config');
         const data = await response.json();
 
         if (data.success && data.config) {
             const config = data.config;
-            document.getElementById('config-name').value = config.name || '';
-            document.getElementById('config-company').value = config.company_name || '';
-            document.getElementById('config-system-prompt').value = config.system_prompt || '';
-            document.getElementById('config-greeting').value = config.greeting_template || '';
-            document.getElementById('config-max-turns').value = config.max_turns || 6;
-            document.getElementById('config-recording-duration').value = config.recording_duration || 8;
-            document.getElementById('config-silence-duration').value = config.silence_duration || 2.0;
-            document.getElementById('config-store-recordings').checked = config.store_recordings || false;
-            document.getElementById('config-store-transcripts').checked = config.store_transcripts || false;
-            document.getElementById('config-enabled').checked = config.enabled || false;
+            document.getElementById('companyName').value = config.company_name || '';
+            document.getElementById('maxTurns').value = config.max_turns || 6;
+            document.getElementById('systemPrompt').value = config.system_prompt || '';
+            document.getElementById('greetingTemplate').value = config.greeting_template || '';
+            document.getElementById('storeRecordings').checked = config.store_recordings || false;
+            document.getElementById('storeTranscripts').checked = config.store_transcripts || false;
+            document.getElementById('enabled').checked = config.enabled || false;
         }
     } catch (error) {
-        showToast('Error loading configuration: ' + error.message, 'danger');
+        console.error('Failed to load config:', error);
     }
 }
 
 // Save configuration
-async function saveConfig() {
+document.getElementById('configForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
     const config = {
-        name: document.getElementById('config-name').value,
-        company_name: document.getElementById('config-company').value,
-        system_prompt: document.getElementById('config-system-prompt').value,
-        greeting_template: document.getElementById('config-greeting').value,
-        max_turns: parseInt(document.getElementById('config-max-turns').value),
-        recording_duration: parseInt(document.getElementById('config-recording-duration').value),
-        silence_duration: parseFloat(document.getElementById('config-silence-duration').value),
-        store_recordings: document.getElementById('config-store-recordings').checked,
-        store_transcripts: document.getElementById('config-store-transcripts').checked,
-        enabled: document.getElementById('config-enabled').checked
+        company_name: document.getElementById('companyName').value,
+        max_turns: parseInt(document.getElementById('maxTurns').value),
+        system_prompt: document.getElementById('systemPrompt').value,
+        greeting_template: document.getElementById('greetingTemplate').value,
+        store_recordings: document.getElementById('storeRecordings').checked,
+        store_transcripts: document.getElementById('storeTranscripts').checked,
+        enabled: document.getElementById('enabled').checked
     };
 
     try {
         const response = await fetch('/ai_agent/api/config', {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(config)
         });
 
         const data = await response.json();
-
         if (data.success) {
-            showToast('Configuration saved successfully', 'success');
+            alert('Configuration saved successfully!');
         } else {
-            showToast('Failed to save configuration: ' + data.error, 'danger');
+            alert('Failed to save: ' + data.error);
         }
     } catch (error) {
-        showToast('Error saving configuration: ' + error.message, 'danger');
+        alert('Error saving configuration: ' + error);
+    }
+});
+
+// Refresh status - MANUAL ONLY (NO AUTO-REFRESH)
+async function refreshStatus() {
+    if (isUpdating) return;
+    isUpdating = true;
+
+    try {
+        const response = await fetch('/ai_agent/api/service/status');
+
+        if (!response.ok) {
+            console.warn(`Status check failed: ${response.status}`);
+            alert('Failed to fetch status. Please try again.');
+            return;
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+            updateStatusDisplay(data.status);
+            updateLastUpdateTime();
+        } else {
+            alert('Failed to get status: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Failed to refresh status:', error);
+        alert('Error connecting to service. Please check your connection.');
+    } finally {
+        setTimeout(() => { isUpdating = false; }, 500);
     }
 }
 
-// Load departments
+function updateLastUpdateTime() {
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+}
+
+function updateStatusDisplay(status) {
+    const running = status.running;
+    const statusIcon = document.getElementById('serviceStatus');
+
+    statusIcon.innerHTML = running ?
+        '<i class="fas fa-check-circle"></i>' :
+        '<i class="fas fa-times-circle"></i>';
+
+    document.getElementById('startBtn').disabled = running;
+    document.getElementById('stopBtn').disabled = !running;
+
+    document.getElementById('activeCalls').textContent = status.active_calls || 0;
+    document.getElementById('totalCalls').textContent = status.total_calls_handled || 0;
+    document.getElementById('cachedPhrases').textContent = status.cache?.phrases_count || 0;
+
+    if (running && status.uptime_seconds !== null && status.uptime_seconds !== undefined) {
+        const hours = Math.floor(status.uptime_seconds / 3600);
+        const minutes = Math.floor((status.uptime_seconds % 3600) / 60);
+        const seconds = status.uptime_seconds % 60;
+
+        if (hours > 0) {
+            document.getElementById('uptimeDisplay').textContent = `Uptime: ${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+            document.getElementById('uptimeDisplay').textContent = `Uptime: ${minutes}m ${seconds}s`;
+        } else {
+            document.getElementById('uptimeDisplay').textContent = `Uptime: ${seconds}s`;
+        }
+    } else {
+        document.getElementById('uptimeDisplay').textContent = running ? 'Starting...' : 'Offline';
+    }
+
+    updateConnection('azure-openai', status.connections?.azure_openai);
+    updateConnection('azure-speech', status.connections?.azure_speech);
+    updateConnection('ari', status.connections?.ari);
+    updateConnection('ssh', status.connections?.ssh);
+    updateConnection('dataverse', status.connections?.dataverse);
+    updateConnection('cache', status.cache?.loaded);
+
+    if (status.calls && status.calls.length > 0) {
+        document.getElementById('activeCallsSection').style.display = 'block';
+        const tbody = document.getElementById('activeCallsList');
+        tbody.innerHTML = status.calls.map(call => `
+            <tr>
+                <td><code>${call.channel_id}</code></td>
+                <td><strong>${call.caller_number}</strong></td>
+                <td><span class="badge bg-info">${call.duration}s</span></td>
+            </tr>
+        `).join('');
+    } else {
+        document.getElementById('activeCallsSection').style.display = 'none';
+    }
+
+    if (status.last_error) {
+        document.getElementById('errorAlert').style.display = 'block';
+        document.getElementById('errorMessage').textContent = status.last_error;
+    } else {
+        document.getElementById('errorAlert').style.display = 'none';
+    }
+}
+
+function updateConnection(name, connected) {
+    const card = document.getElementById(`card-${name}`);
+    const badge = document.getElementById(`status-${name}`);
+
+    if (!card || !badge) return;
+
+    card.classList.remove('connected', 'disconnected');
+
+    if (connected === true) {
+        card.classList.add('connected');
+        badge.className = 'badge bg-success';
+        badge.innerHTML = '<i class="fas fa-check"></i> Connected';
+    } else if (connected === false) {
+        card.classList.add('disconnected');
+        badge.className = 'badge bg-danger';
+        badge.innerHTML = '<i class="fas fa-times"></i> Disconnected';
+    } else {
+        badge.className = 'badge bg-secondary';
+        badge.innerHTML = 'Unknown';
+    }
+}
+
+async function startService() {
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+
+    try {
+        const response = await fetch('/ai_agent/api/service/start', {method: 'POST'});
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Service started successfully! Click Refresh to update status.');
+            // Automatically refresh once after starting
+            setTimeout(refreshStatus, 2000);
+        } else {
+            alert('Failed to start: ' + data.message);
+            btn.disabled = false;
+        }
+    } catch (error) {
+        alert('Error starting service: ' + error);
+        btn.disabled = false;
+    } finally {
+        btn.innerHTML = '<i class="fas fa-play"></i> Start';
+    }
+}
+
+async function stopService() {
+    const btn = document.getElementById('stopBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+
+    try {
+        const response = await fetch('/ai_agent/api/service/stop', {method: 'POST'});
+        const data = await response.json();
+
+        if (data.success) {
+            alert('Service stopped successfully! Click Refresh to update status.');
+            // Automatically refresh once after stopping
+            setTimeout(refreshStatus, 1000);
+        } else {
+            alert('Failed to stop: ' + data.message);
+            btn.disabled = false;
+        }
+    } catch (error) {
+        alert('Error stopping service: ' + error);
+        btn.disabled = false;
+    } finally {
+        btn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+    }
+}
+
 async function loadDepartments() {
     try {
         const response = await fetch('/ai_agent/api/departments');
         const data = await response.json();
 
-        if (data.success) {
-            renderDepartments(data.departments);
-        }
-    } catch (error) {
-        showToast('Error loading departments: ' + error.message, 'danger');
-    }
-}
+        const container = document.getElementById('departmentsList');
 
-// Render departments table
-function renderDepartments(departments) {
-    const tbody = document.getElementById('departments-table-body');
-
-    if (departments.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6">
-                    <div class="empty-state">
-                        <div class="empty-state-icon"><i class="fas fa-building"></i></div>
-                        <p>No departments configured yet</p>
-                        <button class="btn btn-primary btn-sm" onclick="showAddDepartmentModal()">
-                            <i class="fas fa-plus"></i> Add First Department
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = departments.map(dept => `
-        <tr>
-            <td><strong>${dept.display_name}</strong></td>
-            <td><code>${dept.extension}</code></td>
-            <td><code>${dept.endpoint}</code></td>
-            <td>${dept.context}</td>
-            <td>
-                ${dept.enabled
-                    ? '<span class="badge bg-success">Enabled</span>'
-                    : '<span class="badge bg-secondary">Disabled</span>'}
-            </td>
-            <td>
-                <div class="table-actions">
-                    <button class="btn btn-sm btn-danger" onclick="deleteDepartment(${dept.id}, '${dept.display_name}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-// Show add department modal
-function showAddDepartmentModal() {
-    document.getElementById('add-department-form').reset();
-    document.getElementById('dept-enabled').checked = true;
-    new bootstrap.Modal(document.getElementById('addDepartmentModal')).show();
-}
-
-// Add department
-async function addDepartment() {
-    const department = {
-        name: document.getElementById('dept-name').value.toLowerCase().trim(),
-        display_name: document.getElementById('dept-display-name').value.trim(),
-        extension: document.getElementById('dept-extension').value.trim(),
-        endpoint: document.getElementById('dept-endpoint').value.trim(),
-        context: document.getElementById('dept-context').value.trim() || 'from-internal',
-        description: document.getElementById('dept-description').value.trim(),
-        enabled: document.getElementById('dept-enabled').checked
-    };
-
-    // Validation
-    if (!department.name || !department.display_name || !department.extension || !department.endpoint) {
-        showToast('Please fill in all required fields', 'warning');
-        return;
-    }
-
-    try {
-        const response = await fetch('/ai_agent/api/departments', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(department)
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('Department added successfully', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('addDepartmentModal')).hide();
-            loadDepartments();
-        } else {
-            showToast('Failed to add department: ' + data.error, 'danger');
-        }
-    } catch (error) {
-        showToast('Error adding department: ' + error.message, 'danger');
-    }
-}
-
-// Delete department
-async function deleteDepartment(id, name) {
-    if (!confirm(`Delete department "${name}"? This cannot be undone.`)) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`/ai_agent/api/departments/${id}`, {
-            method: 'DELETE'
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('Department deleted successfully', 'success');
-            loadDepartments();
-        } else {
-            showToast('Failed to delete department: ' + data.error, 'danger');
-        }
-    } catch (error) {
-        showToast('Error deleting department: ' + error.message, 'danger');
-    }
-}
-
-// Load call logs
-async function loadCallLogs(page = 1) {
-    currentPage = page;
-    const startDate = document.getElementById('filter-start-date').value;
-    const endDate = document.getElementById('filter-end-date').value;
-    const caller = document.getElementById('filter-caller').value;
-
-    let url = `/ai_agent/api/calls?page=${page}`;
-    if (startDate) url += `&start_date=${startDate}`;
-    if (endDate) url += `&end_date=${endDate}`;
-    if (caller) url += `&caller=${caller}`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.success) {
-            renderCallLogs(data.calls);
-            renderPagination(data.current_page, data.pages);
-        }
-    } catch (error) {
-        showToast('Error loading call logs: ' + error.message, 'danger');
-    }
-}
-
-// Render call logs
-function renderCallLogs(calls) {
-    const tbody = document.getElementById('calls-table-body');
-
-    if (calls.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7">
-                    <div class="empty-state">
-                        <div class="empty-state-icon"><i class="fas fa-phone"></i></div>
-                        <p>No call logs found</p>
-                    </div>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = calls.map(call => {
-        const date = new Date(call.call_start);
-        const duration = call.call_duration || 0;
-        const status = call.transferred_to ? 'transferred' : 'completed';
-
-        return `
-            <tr onclick="showCallDetail(${call.id})" style="cursor: pointer;">
-                <td>${date.toLocaleString()}</td>
-                <td><code>${call.caller_number}</code></td>
-                <td>${call.caller_name || 'Unknown'}</td>
-                <td>${formatDuration(duration)}</td>
-                <td><span class="badge bg-primary">${call.turns_count || 0}</span></td>
-                <td>
-                    <span class="call-status ${status}">
-                        <span class="call-status-dot"></span>
-                        ${call.transferred_to ? 'Transferred to ' + call.transferred_to : 'Completed'}
-                    </span>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); showCallDetail(${call.id})">
-                        <i class="fas fa-info-circle"></i> Details
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-// Format duration
-function formatDuration(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Render pagination
-function renderPagination(currentPage, totalPages) {
-    const container = document.getElementById('pagination-container');
-
-    if (totalPages <= 1) {
-        container.innerHTML = '';
-        return;
-    }
-
-    let html = '<ul class="pagination justify-content-center">';
-
-    // Previous button
-    html += `
-        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="loadCallLogs(${currentPage - 1}); return false;">Previous</a>
-        </li>
-    `;
-
-    // Page numbers
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-            html += `
-                <li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="loadCallLogs(${i}); return false;">${i}</a>
-                </li>
-            `;
-        } else if (i === currentPage - 3 || i === currentPage + 3) {
-            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-        }
-    }
-
-    // Next button
-    html += `
-        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-            <a class="page-link" href="#" onclick="loadCallLogs(${currentPage + 1}); return false;">Next</a>
-        </li>
-    `;
-
-    html += '</ul>';
-    container.innerHTML = html;
-}
-
-// Show call detail
-async function showCallDetail(callId) {
-    try {
-        const response = await fetch(`/ai_agent/api/calls/${callId}`);
-        const data = await response.json();
-
-        if (data.success) {
-            renderCallDetail(data.call, data.turns);
-            new bootstrap.Modal(document.getElementById('callDetailModal')).show();
-        }
-    } catch (error) {
-        showToast('Error loading call details: ' + error.message, 'danger');
-    }
-}
-
-// Render call detail
-function renderCallDetail(call, turns) {
-    const container = document.getElementById('call-detail-content');
-    const date = new Date(call.call_start);
-    const duration = call.call_duration || 0;
-
-    let html = `
-        <div class="mb-4">
-            <h6>Call Information</h6>
-            <table class="table table-sm">
-                <tr>
-                    <th style="width: 30%;">Time:</th>
-                    <td>${date.toLocaleString()}</td>
-                </tr>
-                <tr>
-                    <th>Caller:</th>
-                    <td><code>${call.caller_number}</code> - ${call.caller_name || 'Unknown'}</td>
-                </tr>
-                <tr>
-                    <th>Duration:</th>
-                    <td>${formatDuration(duration)}</td>
-                </tr>
-                <tr>
-                    <th>Turns:</th>
-                    <td>${call.turns_count || 0}</td>
-                </tr>
-                ${call.transferred_to ? `
-                <tr>
-                    <th>Transferred To:</th>
-                    <td><span class="badge bg-info">${call.transferred_to}</span></td>
-                </tr>
-                ` : ''}
-            </table>
-        </div>
-    `;
-
-    // Add conversation transcript
-    if (turns && turns.length > 0) {
-        html += '<h6 class="mb-3">Conversation Transcript</h6>';
-
-        turns.forEach(turn => {
-            const isUser = turn.user_text && turn.user_text.trim();
-            const isAssistant = turn.ai_text && turn.ai_text.trim();
-
-            if (isUser) {
-                html += `
-                    <div class="transcript-turn user">
-                        <div class="turn-header">
-                            <span class="turn-speaker">Customer</span>
-                            ${turn.user_confidence ? `
-                                <span class="turn-confidence">${turn.user_confidence} confidence</span>
-                            ` : ''}
-                        </div>
-                        <div class="turn-text">${escapeHtml(turn.user_text)}</div>
-                    </div>
-                `;
-            }
-
-            if (isAssistant) {
-                html += `
-                    <div class="transcript-turn assistant">
-                        <div class="turn-header">
-                            <span class="turn-speaker">AI Agent</span>
-                        </div>
-                        <div class="turn-text">${escapeHtml(turn.ai_text)}</div>
-                        ${turn.function_called ? `
-                            <div class="function-call-badge">
-                                <i class="fas fa-code"></i>
-                                Function: ${turn.function_called}
+        if (data.success && data.departments && data.departments.length > 0) {
+            container.innerHTML = data.departments.map(dept => `
+                <div class="card mb-2">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">${dept.display_name}</h6>
+                                <small class="text-muted">
+                                    Extension: ${dept.extension} | Endpoint: ${dept.endpoint}
+                                </small>
+                                ${dept.description ? `<p class="mb-0 mt-2 small">${dept.description}</p>` : ''}
                             </div>
-                        ` : ''}
+                            <span class="badge ${dept.enabled ? 'bg-success' : 'bg-secondary'}">
+                                ${dept.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                        </div>
                     </div>
-                `;
-            }
-        });
-    } else if (call.transcript) {
-        html += '<h6 class="mb-3">Transcript</h6>';
-        html += `<div class="alert alert-light"><pre class="mb-0">${escapeHtml(call.transcript)}</pre></div>`;
-    } else {
-        html += '<div class="alert alert-info">No transcript available</div>';
-    }
-
-    // Add functions called
-    if (call.functions_called) {
-        try {
-            const functions = JSON.parse(call.functions_called);
-            if (functions.length > 0) {
-                html += '<h6 class="mt-4 mb-3">Functions Called</h6>';
-                html += '<div class="table-responsive"><table class="table table-sm">';
-                html += '<thead><tr><th>Function</th><th>Time</th><th>Result</th></tr></thead><tbody>';
-
-                functions.forEach(func => {
-                    html += `
-                        <tr>
-                            <td><code>${func.name}</code></td>
-                            <td>${new Date(func.time).toLocaleTimeString()}</td>
-                            <td><small>${JSON.stringify(func.result).substring(0, 50)}...</small></td>
-                        </tr>
-                    `;
-                });
-
-                html += '</tbody></table></div>';
-            }
-        } catch (e) {
-            console.error('Error parsing functions:', e);
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = `
+                <div class="text-center py-4">
+                    <i class="fas fa-building fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No departments configured yet</p>
+                </div>
+            `;
         }
+    } catch (error) {
+        console.error('Failed to load departments:', error);
     }
-
-    container.innerHTML = html;
 }
 
-// Escape HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+async function loadCallHistory(page = 1) {
+    try {
+        const response = await fetch(`/ai_agent/api/calls?page=${page}&per_page=20`);
+        const data = await response.json();
 
-// Refresh call logs
-function refreshCallLogs() {
-    loadCallLogs(currentPage);
-}
+        const tbody = document.getElementById('callHistoryBody');
 
-// Add filter event listeners
-document.getElementById('filter-start-date').addEventListener('change', () => loadCallLogs(1));
-document.getElementById('filter-end-date').addEventListener('change', () => loadCallLogs(1));
-document.getElementById('filter-caller').addEventListener('input', debounce(() => loadCallLogs(1), 500));
-
-// Debounce helper
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', function() {
-    if (statusInterval) {
-        clearInterval(statusInterval);
+        if (data.success && data.calls && data.calls.length > 0) {
+            tbody.innerHTML = data.calls.map(call => `
+                <tr class="call-log-row" onclick="viewCallDetail(${call.id})">
+                    <td>${new Date(call.created_at).toLocaleString()}</td>
+                    <td>
+                        <strong>${call.caller_name || 'Unknown'}</strong><br>
+                        <small class="text-muted">${call.caller_number}</small>
+                    </td>
+                    <td>${call.call_duration ? call.call_duration + 's' : '-'}</td>
+                    <td><span class="badge bg-info">${call.turns_count || 0}</span></td>
+                    <td>${call.transferred_to ? `<span class="badge bg-success">${call.transferred_to}</span>` : '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewCallDetail(${call.id})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-4">
+                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">No call history yet</p>
+                    </td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('Failed to load call history:', error);
     }
+}
+
+function viewCallDetail(callId) {
+    alert('Call detail view - coming soon');
+}
+
+function showAddDepartmentModal() {
+    alert('Add department modal - coming soon');
+}
+
+// Load initial data on page load - NO AUTO-REFRESH
+document.addEventListener('DOMContentLoaded', () => {
+    loadConfig();
+    refreshStatus(); // Initial load only
 });
 </script>
 {% endblock %}
