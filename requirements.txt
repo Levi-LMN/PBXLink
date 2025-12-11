@@ -10,3 +10,8 @@ qrcode[pil]
 pillow
 python-dotenv
 msal
+openai
+azure-cognitiveservices-speech
+pydub
+gtts
+pyttsx3
