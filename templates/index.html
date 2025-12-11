@@ -614,18 +614,52 @@
         }
     }
 
+    // FIXED: New AI Agent status check using service/status endpoint
     async function testAIAgent() {
         updateServiceStatus('ai-agent-status', false, 'Checking...');
         try {
-            const response = await fetch('/ai_agent/api/status');
+            const response = await fetch('/ai_agent/api/service/status');
             const data = await response.json();
-            if (data.success && data.status.active) {
-                updateServiceStatus('ai-agent-status', true, data.status.status);
+
+            if (data.success && data.status) {
+                const status = data.status;
+                const isRunning = status.running;
+
+                if (isRunning) {
+                    // Check critical connections
+                    const connections = status.connections || {};
+                    const criticalConnections = [
+                        connections.azure_openai,
+                        connections.azure_speech,
+                        connections.ari
+                    ];
+
+                    const connectedCount = criticalConnections.filter(c => c === true).length;
+
+                    if (connectedCount === 3) {
+                        // All critical services connected
+                        const activeCalls = status.active_calls || 0;
+                        if (activeCalls > 0) {
+                            updateServiceStatus('ai-agent-status', true, `Online (${activeCalls} call${activeCalls > 1 ? 's' : ''})`);
+                        } else {
+                            updateServiceStatus('ai-agent-status', true, 'Online');
+                        }
+                    } else if (connectedCount > 0) {
+                        // Partially connected - still starting up
+                        updateServiceStatus('ai-agent-status', true, 'Starting...');
+                    } else {
+                        // Service running but no connections
+                        updateServiceStatus('ai-agent-status', false, 'Error');
+                    }
+                } else {
+                    // Service not running
+                    updateServiceStatus('ai-agent-status', false, 'Offline');
+                }
             } else {
-                updateServiceStatus('ai-agent-status', false, data.status.status || 'Offline');
+                updateServiceStatus('ai-agent-status', false, 'Offline');
             }
         } catch (error) {
-            updateServiceStatus('ai-agent-status', false);
+            updateServiceStatus('ai-agent-status', false, 'Error');
             console.error('AI Agent check failed:', error);
         }
     }
@@ -654,7 +688,9 @@
         }
     }
 
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
+        // Load all stats and test connections
         loadStats();
         loadExtensionStats();
         loadVPNStats();
@@ -665,6 +701,7 @@
         testTG100();
         testWireGuard();
 
+        // Refresh every 30 seconds
         setInterval(() => {
             loadStats();
             loadExtensionStats();

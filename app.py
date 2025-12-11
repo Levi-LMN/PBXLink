@@ -1,9 +1,10 @@
 """
 Main application file for FreePBX Dashboard
-Includes Azure AD authentication, audit logging, database support, and automatic log cleanup
+Includes Azure AD authentication, audit logging, database support, automatic log cleanup, and AI Agent
+FIXED: Proper JSON error handling for API routes
 """
 
-from flask import Flask, render_template, redirect, url_for, session, request
+from flask import Flask, render_template, redirect, url_for, session, request, jsonify
 import logging
 import os
 
@@ -23,10 +24,10 @@ from blueprints.api_core import api_core_bp
 from blueprints.extensions import extensions_bp
 from blueprints.cdr import cdr_bp
 from blueprints.wireguard import wireguard_bp, wg_manager
-from blueprints.ai_agent import ai_agent_bp
 from blueprints.tg100 import tg100_bp
 from blueprints.auth import auth_bp, login_required
 from blueprints.admin import admin_bp
+from blueprints.ai_agent_integrated import ai_agent_integrated_bp
 
 # Import SSH manager
 from ssh_manager import init_ssh_manager, ssh_manager
@@ -73,9 +74,9 @@ def create_app(config_name=None):
     app.register_blueprint(extensions_bp, url_prefix='/extensions')
     app.register_blueprint(cdr_bp, url_prefix='/cdr')
     app.register_blueprint(wireguard_bp, url_prefix='/wireguard')
-    app.register_blueprint(ai_agent_bp, url_prefix='/ai_agent')
     app.register_blueprint(tg100_bp, url_prefix='/tg100')
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(ai_agent_integrated_bp, url_prefix='/ai_agent')
 
     # Global authentication check
     @app.before_request
@@ -100,9 +101,13 @@ def create_app(config_name=None):
 
         # Require authentication for all other routes
         if 'user' not in session:
-            # For API routes, return JSON error
-            if request.path.startswith('/api/'):
-                return {'error': 'Unauthorized', 'message': 'Please log in'}, 401
+            # For API routes, return JSON error (FIXED: Check path more accurately)
+            if request.path.startswith('/api/') or '/api/' in request.path:
+                return jsonify({
+                    'error': 'Unauthorized',
+                    'message': 'Please log in',
+                    'success': False
+                }), 401
             # For web routes, redirect to login
             return redirect(url_for('auth.login_page'))
 
@@ -203,15 +208,15 @@ def create_app(config_name=None):
     @app.errorhandler(401)
     def unauthorized(e):
         """Redirect to login page for unauthorized access"""
-        if request.path.startswith('/api/'):
-            return {'error': 'Unauthorized', 'message': 'Please log in'}, 401
+        if request.path.startswith('/api/') or '/api/' in request.path:
+            return jsonify({'error': 'Unauthorized', 'message': 'Please log in', 'success': False}), 401
         return redirect(url_for('auth.login_page'))
 
     @app.errorhandler(403)
     def forbidden(e):
         """Handle forbidden access"""
-        if request.path.startswith('/api/'):
-            return {'error': 'Forbidden', 'message': 'Insufficient permissions'}, 403
+        if request.path.startswith('/api/') or '/api/' in request.path:
+            return jsonify({'error': 'Forbidden', 'message': 'Insufficient permissions', 'success': False}), 403
         # Check if error template exists, otherwise use simple message
         try:
             return render_template('errors/403.html'), 403
@@ -221,8 +226,8 @@ def create_app(config_name=None):
     @app.errorhandler(404)
     def not_found(e):
         """Handle not found errors"""
-        if request.path.startswith('/api/'):
-            return {'error': 'Not found'}, 404
+        if request.path.startswith('/api/') or '/api/' in request.path:
+            return jsonify({'error': 'Not found', 'success': False}), 404
         # Check if error template exists, otherwise use simple message
         try:
             return render_template('errors/404.html'), 404
@@ -233,8 +238,8 @@ def create_app(config_name=None):
     def internal_error(e):
         """Handle internal server errors"""
         logger.error(f"Internal error: {str(e)}")
-        if request.path.startswith('/api/'):
-            return {'error': 'Internal server error'}, 500
+        if request.path.startswith('/api/') or '/api/' in request.path:
+            return jsonify({'error': 'Internal server error', 'success': False}), 500
         # Check if error template exists, otherwise use simple message
         try:
             return render_template('errors/500.html'), 500
