@@ -1,7 +1,7 @@
 """
 Main application file for FreePBX Dashboard
 Includes Azure AD authentication, audit logging, database support, automatic log cleanup, and AI Agent
-FIXED: Proper JSON error handling for API routes
+FIXED: Proper JSON error handling for API routes and AI Agent status polling
 """
 
 from flask import Flask, render_template, redirect, url_for, session, request, jsonify
@@ -99,9 +99,19 @@ def create_app(config_name=None):
         if request.path.startswith('/static/'):
             return None
 
+        # FIXED: Handle AI Agent API routes separately to prevent flickering
+        if request.path.startswith('/ai_agent/api/'):
+            if 'user' not in session:
+                return jsonify({
+                    'error': 'Unauthorized',
+                    'message': 'Please log in',
+                    'success': False
+                }), 401
+            return None
+
         # Require authentication for all other routes
         if 'user' not in session:
-            # For API routes, return JSON error (FIXED: Check path more accurately)
+            # For API routes, return JSON error
             if request.path.startswith('/api/') or '/api/' in request.path:
                 return jsonify({
                     'error': 'Unauthorized',
@@ -217,7 +227,6 @@ def create_app(config_name=None):
         """Handle forbidden access"""
         if request.path.startswith('/api/') or '/api/' in request.path:
             return jsonify({'error': 'Forbidden', 'message': 'Insufficient permissions', 'success': False}), 403
-        # Check if error template exists, otherwise use simple message
         try:
             return render_template('errors/403.html'), 403
         except:
@@ -228,7 +237,6 @@ def create_app(config_name=None):
         """Handle not found errors"""
         if request.path.startswith('/api/') or '/api/' in request.path:
             return jsonify({'error': 'Not found', 'success': False}), 404
-        # Check if error template exists, otherwise use simple message
         try:
             return render_template('errors/404.html'), 404
         except:
@@ -240,7 +248,6 @@ def create_app(config_name=None):
         logger.error(f"Internal error: {str(e)}")
         if request.path.startswith('/api/') or '/api/' in request.path:
             return jsonify({'error': 'Internal server error', 'success': False}), 500
-        # Check if error template exists, otherwise use simple message
         try:
             return render_template('errors/500.html'), 500
         except:
