@@ -28,8 +28,8 @@
     }
 
     .connection-card.unknown {
-        border-left-color: var(--text-secondary);
-        background-color: var(--bg-page);
+        border-left-color: #94a3b8;
+        background-color: #f8fafc;
     }
 
     .stat-card {
@@ -51,6 +51,10 @@
 
     .stat-card.variant-3 {
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+
+    .stat-card.offline {
+        background: linear-gradient(135deg, #64748b 0%, #475569 100%);
     }
 
     .stat-value {
@@ -89,6 +93,11 @@
         margin-left: 0.5rem;
     }
 
+    .update-indicator.paused {
+        background: #94a3b8;
+        animation: none;
+    }
+
     @keyframes blink {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.3; }
@@ -118,6 +127,18 @@
     .call-log-row:hover {
         background: var(--hover-bg);
     }
+
+    .status-online {
+        color: #22c55e;
+    }
+
+    .status-offline {
+        color: #ef4444;
+    }
+
+    .status-starting {
+        color: #f59e0b;
+    }
 </style>
 {% endblock %}
 
@@ -136,7 +157,7 @@
                 <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopService()" disabled>
                     <i class="fas fa-stop"></i> Stop
                 </button>
-                <button class="btn btn-outline-primary btn-sm" onclick="refreshStatus()">
+                <button class="btn btn-outline-primary btn-sm" onclick="refreshStatus()" id="refreshBtn">
                     <i class="fas fa-sync-alt"></i>
                 </button>
             </div>
@@ -147,10 +168,10 @@
 <!-- Service Status Overview -->
 <div class="row mb-4">
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stat-card">
+        <div class="stat-card" id="statusCard">
             <div class="stat-label">Service Status</div>
             <div class="stat-value" id="serviceStatus">
-                <i class="fas fa-circle"></i>
+                <i class="fas fa-circle status-offline"></i>
             </div>
             <div id="uptimeDisplay" class="mt-2 small">Checking...</div>
         </div>
@@ -180,7 +201,8 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-plug"></i> System Connections</h5>
         <small class="text-muted">
-            Auto-refreshing <span class="update-indicator"></span>
+            <span id="updateStatus">Auto-refresh active</span>
+            <span class="update-indicator" id="updateIndicator"></span>
             <span id="lastUpdate" class="ms-2"></span>
         </small>
     </div>
@@ -483,6 +505,25 @@
 <script>
     let statusInterval = null;
     let isUpdating = false;
+    let lastKnownStatus = null;
+    let statusCheckCount = 0;
+    const STATUS_CHECK_INTERVAL = 3000; // 3 seconds
+
+    // Toast notification helper
+    function showToast(message, type = 'info') {
+        // Simple toast implementation
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type} position-fixed`;
+        toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        toast.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span>${message}</span>
+                <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
 
     // Load configuration
     async function loadConfig() {
@@ -609,10 +650,8 @@
                     </tr>
                 `).join('');
 
-                // Show pagination if needed
                 if (data.pages > 1) {
                     document.getElementById('callHistoryPagination').style.display = 'block';
-                    // Add pagination logic here
                 }
             } else {
                 tbody.innerHTML = `
@@ -637,9 +676,10 @@
         showToast('Add department modal - coming soon', 'info');
     }
 
-    // Start/Stop service functions
+    // Start service
     async function startService() {
         const btn = document.getElementById('startBtn');
+        const originalHTML = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
 
@@ -648,23 +688,24 @@
             const data = await response.json();
 
             if (data.success) {
-                document.getElementById('stopBtn').disabled = false;
                 showToast('Service started successfully', 'success');
-                startStatusPolling();
+                // Service will be detected by status polling
             } else {
                 showToast('Failed to start: ' + data.message, 'danger');
                 btn.disabled = false;
+                btn.innerHTML = originalHTML;
             }
         } catch (error) {
             showToast('Error starting service: ' + error, 'danger');
             btn.disabled = false;
-        } finally {
-            btn.innerHTML = '<i class="fas fa-play"></i> Start';
+            btn.innerHTML = originalHTML;
         }
     }
 
+    // Stop service
     async function stopService() {
         const btn = document.getElementById('stopBtn');
+        const originalHTML = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
 
@@ -673,18 +714,17 @@
             const data = await response.json();
 
             if (data.success) {
-                document.getElementById('startBtn').disabled = false;
                 showToast('Service stopped successfully', 'success');
-                stopStatusPolling();
+                // Service will be detected as stopped by status polling
             } else {
                 showToast('Failed to stop: ' + data.message, 'danger');
                 btn.disabled = false;
+                btn.innerHTML = originalHTML;
             }
         } catch (error) {
             showToast('Error stopping service: ' + error, 'danger');
             btn.disabled = false;
-        } finally {
-            btn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+            btn.innerHTML = originalHTML;
         }
     }
 
@@ -693,6 +733,11 @@
         if (isUpdating) return;
         isUpdating = true;
 
+        const refreshBtn = document.getElementById('refreshBtn');
+        const originalHTML = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        refreshBtn.disabled = true;
+
         try {
             const response = await fetch('/ai_agent/api/service/status');
             const data = await response.json();
@@ -700,11 +745,20 @@
             if (data.success) {
                 updateStatusDisplay(data.status);
                 updateLastUpdateTime();
+                statusCheckCount++;
             }
         } catch (error) {
             console.error('Failed to refresh status:', error);
+            // Don't show error toast on every failed check
+            if (statusCheckCount % 10 === 0) {
+                console.warn('Status check failing repeatedly');
+            }
         } finally {
-            setTimeout(() => { isUpdating = false; }, 500);
+            setTimeout(() => {
+                isUpdating = false;
+                refreshBtn.innerHTML = originalHTML;
+                refreshBtn.disabled = false;
+            }, 500);
         }
     }
 
@@ -719,20 +773,33 @@
     }
 
     function updateStatusDisplay(status) {
-        const running = status.running;
-        const statusIcon = document.getElementById('serviceStatus');
-        statusIcon.innerHTML = running ?
-            '<i class="fas fa-check-circle"></i>' :
-            '<i class="fas fa-times-circle"></i>';
+        // Store last known status
+        const previousRunning = lastKnownStatus?.running;
+        lastKnownStatus = status;
 
+        const running = status.running === true;
+        const statusIcon = document.getElementById('serviceStatus');
+        const statusCard = document.getElementById('statusCard');
+
+        // Update main status icon
+        if (running) {
+            statusIcon.innerHTML = '<i class="fas fa-check-circle status-online"></i>';
+            statusCard.classList.remove('offline');
+        } else {
+            statusIcon.innerHTML = '<i class="fas fa-times-circle status-offline"></i>';
+            statusCard.classList.add('offline');
+        }
+
+        // Update control buttons
         document.getElementById('startBtn').disabled = running;
         document.getElementById('stopBtn').disabled = !running;
 
+        // Update metrics
         document.getElementById('activeCalls').textContent = status.active_calls || 0;
         document.getElementById('totalCalls').textContent = status.total_calls_handled || 0;
         document.getElementById('cachedPhrases').textContent = status.cache?.phrases_count || 0;
 
-        // Fixed uptime display
+        // Update uptime display
         if (running && status.uptime_seconds !== null && status.uptime_seconds !== undefined) {
             const hours = Math.floor(status.uptime_seconds / 3600);
             const minutes = Math.floor((status.uptime_seconds % 3600) / 60);
@@ -749,13 +816,25 @@
             document.getElementById('uptimeDisplay').textContent = running ? 'Starting...' : 'Offline';
         }
 
-        updateConnection('azure-openai', status.connections?.azure_openai);
-        updateConnection('azure-speech', status.connections?.azure_speech);
-        updateConnection('ari', status.connections?.ari);
-        updateConnection('ssh', status.connections?.ssh);
-        updateConnection('dataverse', status.connections?.dataverse);
-        updateConnection('cache', status.cache?.loaded);
+        // Update connection statuses - only update when running
+        if (running) {
+            updateConnection('azure-openai', status.connections?.azure_openai);
+            updateConnection('azure-speech', status.connections?.azure_speech);
+            updateConnection('ari', status.connections?.ari);
+            updateConnection('ssh', status.connections?.ssh);
+            updateConnection('dataverse', status.connections?.dataverse);
+            updateConnection('cache', status.cache?.loaded);
+        } else {
+            // When service is offline, show all as disconnected
+            updateConnection('azure-openai', false);
+            updateConnection('azure-speech', false);
+            updateConnection('ari', false);
+            updateConnection('ssh', false);
+            updateConnection('dataverse', false);
+            updateConnection('cache', false);
+        }
 
+        // Update active calls section
         if (status.calls && status.calls.length > 0) {
             document.getElementById('activeCallsSection').style.display = 'block';
             const tbody = document.getElementById('activeCallsList');
@@ -770,11 +849,21 @@
             document.getElementById('activeCallsSection').style.display = 'none';
         }
 
+        // Update error display
         if (status.last_error) {
             document.getElementById('errorAlert').style.display = 'block';
             document.getElementById('errorMessage').textContent = status.last_error;
         } else {
             document.getElementById('errorAlert').style.display = 'none';
+        }
+
+        // Notify on state change
+        if (previousRunning !== null && previousRunning !== running) {
+            if (running) {
+                showToast('✅ AI Agent is now online', 'success');
+            } else {
+                showToast('⚠️ AI Agent is now offline', 'warning');
+            }
         }
     }
 
@@ -803,25 +892,42 @@
 
     function startStatusPolling() {
         if (statusInterval) return;
-        statusInterval = setInterval(refreshStatus, 3000);
-        refreshStatus();
+        console.log('Starting status polling every', STATUS_CHECK_INTERVAL, 'ms');
+        statusInterval = setInterval(refreshStatus, STATUS_CHECK_INTERVAL);
+        document.getElementById('updateIndicator').classList.remove('paused');
+        document.getElementById('updateStatus').textContent = 'Auto-refresh active';
+        refreshStatus(); // Initial check
     }
 
     function stopStatusPolling() {
         if (statusInterval) {
             clearInterval(statusInterval);
             statusInterval = null;
+            console.log('Status polling stopped');
+            document.getElementById('updateIndicator').classList.add('paused');
+            document.getElementById('updateStatus').textContent = 'Auto-refresh paused';
         }
     }
 
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
+        console.log('AI Agent Management page loaded');
         loadConfig();
-        refreshStatus();
         startStatusPolling();
     });
 
+    // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
         stopStatusPolling();
+    });
+
+    // Handle visibility change to pause/resume polling
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopStatusPolling();
+        } else {
+            startStatusPolling();
+        }
     });
 </script>
 {% endblock %}

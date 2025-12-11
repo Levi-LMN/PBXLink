@@ -15,3 +15,4 @@ azure-cognitiveservices-speech
 pydub
 gtts
 pyttsx3
+aioari
