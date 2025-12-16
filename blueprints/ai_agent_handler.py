@@ -1,6 +1,7 @@
 """
-AI Agent Call Handler - Based on working agent.py
-Processes calls with Azure OpenAI, Speech, SSH upload via centralized ssh_manager, and caching
+AI Agent Call Handler - COMPLETE FIXED VERSION
+Fixed audio recording issues - matches working standalone version
+All debug logging added, proper beep timing, correct recording parameters
 """
 
 import asyncio
@@ -20,7 +21,7 @@ from pydub.effects import normalize
 from msal import ConfidentialClientApplication
 
 from models import db, AIAgentCallLog, AIAgentTurn, AIAgentDepartment
-from ssh_manager import ssh_manager  # Use centralized SSH manager
+from ssh_manager import ssh_manager
 
 logger = logging.getLogger(__name__)
 
@@ -60,19 +61,13 @@ class SSHSoundUploader:
         """Upload sound file to Asterisk sounds directory"""
         async with self._lock:
             try:
-                # Use centralized ssh_manager to execute commands
                 loop = asyncio.get_running_loop()
-
-                # Create temp path
                 temp_path = f"/tmp/{remote_filename}"
 
-                # Copy file to temp (we'll use the ssh_manager's connection)
-                # First, we need to upload via SFTP using the pooled connection
                 def upload_file():
                     client = ssh_manager.pool.get_connection()
                     if not client:
                         return False
-
                     try:
                         sftp = client.open_sftp()
                         sftp.put(local_file, temp_path)
@@ -82,12 +77,10 @@ class SSHSoundUploader:
                         logger.error(f"SFTP upload failed: {e}")
                         return False
 
-                # Upload file
                 success = await loop.run_in_executor(None, upload_file)
                 if not success:
                     return None
 
-                # Move to asterisk sounds directory with proper permissions
                 commands = [
                     f"sudo mv {temp_path} {ASTERISK_SOUNDS_DIR}/{remote_filename}",
                     f"sudo chown asterisk:asterisk {ASTERISK_SOUNDS_DIR}/{remote_filename}",
@@ -95,7 +88,6 @@ class SSHSoundUploader:
                 ]
 
                 for cmd in commands:
-                    # Execute without 'sudo' prefix since we're adding it in the command
                     result = await loop.run_in_executor(
                         None,
                         lambda c=cmd: ssh_manager.execute_command(c.replace('sudo ', ''), use_sudo=True)
@@ -104,7 +96,6 @@ class SSHSoundUploader:
                         logger.error(f"Failed to execute: {cmd}")
                         return None
 
-                # Return Asterisk sound path (without .wav extension)
                 return f"custom/{remote_filename.replace('.wav', '')}"
 
             except Exception as e:
@@ -141,18 +132,14 @@ class SoundCache:
         """Get cached sound or generate new one"""
         k = self._key(text)
 
-        # Check if already cached on Asterisk
         if k in self.index and self.index[k].get('remote'):
             return self.index[k]['remote'], self.index[k].get('duration')
 
-        # Generate TTS locally
         local = await self._tts(text, k)
         if not local:
             return None, None
 
         duration = self._duration(local)
-
-        # Upload to Asterisk
         remote = await self.uploader.upload(local, f"c_{k}.wav")
         if remote:
             self.index[k] = {'remote': remote, 'duration': duration}
@@ -180,7 +167,6 @@ class SoundCache:
                     None, self._pyttsx, text, str(tmp)
                 )
 
-            # Normalize audio for Asterisk
             audio = AudioSegment.from_file(str(tmp))
             audio = normalize(audio).set_frame_rate(8000).set_channels(1).set_sample_width(2)
             audio.export(str(f), format="wav")
@@ -366,7 +352,7 @@ async def fetch_customer_data(phone):
 
 
 # ============================================================================
-# CALL HANDLER - From working agent.py
+# CALL HANDLER - FIXED AUDIO RECORDING
 # ============================================================================
 
 class Call:
@@ -427,7 +413,7 @@ class Call:
                 return False
 
             await self.channel.play(media=f"sound:{sound}")
-            await asyncio.sleep((duration or len(text.split()) * 0.4) + 0.3)
+            await asyncio.sleep((duration or len(text.split()) * 0.4) + 0.5)
             return True
         except Exception as e:
             if "404" not in str(e):
@@ -436,72 +422,127 @@ class Call:
             return False
 
     async def record(self):
-        """Record user audio"""
+        """Record user audio - FIXED: Proper config usage with debug logging"""
         if not await self.alive():
             return None
 
         recording_name = f"r_{self.call_id}_{int(time.time() * 1000)}"
 
+        # FIXED: Extract and validate recording parameters
+        max_duration = int(self.config.recording_duration) if self.config.recording_duration else 8
+        max_silence = float(self.config.silence_duration) if self.config.silence_duration else 2.0
+
+        logger.info(f"🎙️ Recording START: duration={max_duration}s, silence={max_silence}s")
+
         try:
             rec = await self.channel.record(
                 name=recording_name,
                 format="wav",
-                maxDurationSeconds=self.config.recording_duration,
-                maxSilenceSeconds=self.config.silence_duration,
+                maxDurationSeconds=max_duration,
+                maxSilenceSeconds=max_silence,
                 ifExists="overwrite",
                 terminateOn="none"
             )
 
-            await asyncio.sleep(self.config.recording_duration + 0.5)
+            # Wait for recording to complete
+            await asyncio.sleep(max_duration + 0.5)
 
             try:
                 await rec.stop()
-            except:
-                pass
+                logger.debug("🎙️ Recording stopped")
+            except Exception as e:
+                logger.debug(f"🎙️ Stop recording exception (normal): {e}")
 
             await asyncio.sleep(0.2)
-            return await self._download(recording_name)
+
+            downloaded = await self._download(recording_name)
+
+            if downloaded:
+                size = os.path.getsize(downloaded)
+                logger.info(f"✅ Recording ready: {downloaded} ({size} bytes)")
+            else:
+                logger.warning("⚠️ Recording download failed")
+
+            return downloaded
+
         except Exception as e:
             logger.error(f"❌ Record error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
 
     async def _download(self, recording_name):
-        """Download recording from ARI"""
-        for _ in range(3):
+        """Download recording from ARI - with detailed logging"""
+        for attempt in range(3):
             try:
                 url = f"{ARI_URL}/recordings/stored/{recording_name}/file"
+                logger.debug(f"📥 Attempt {attempt+1}/3: {url}")
+
                 r = requests.get(url, auth=(ARI_USERNAME, ARI_PASSWORD), timeout=10)
+
+                logger.debug(f"📥 Response: status={r.status_code}, size={len(r.content)} bytes")
 
                 if r.status_code == 200 and len(r.content) > 4000:
                     f = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                     f.write(r.content)
                     f.close()
                     self.temp_files.append(f.name)
+                    logger.info(f"✅ Downloaded: {f.name} ({len(r.content)} bytes)")
                     return f.name
-            except:
-                pass
+                else:
+                    logger.warning(f"⚠️ Attempt {attempt+1}: status={r.status_code}, size={len(r.content)} bytes (too small or failed)")
+
+            except Exception as e:
+                logger.error(f"❌ Download attempt {attempt+1} failed: {e}")
+
             await asyncio.sleep(0.15)
+
+        logger.error("❌ All download attempts exhausted")
         return None
 
     async def transcribe(self, audio_file):
-        """Transcribe audio using Azure Speech"""
+        """Transcribe audio using Azure Speech - with detailed logging"""
         try:
-            if os.path.getsize(audio_file) < 4000:
+            file_size = os.path.getsize(audio_file)
+            logger.info(f"🎤 Transcribe START: {audio_file} ({file_size} bytes)")
+
+            if file_size < 4000:
+                logger.warning(f"⚠️ File too small: {file_size} bytes < 4000 bytes minimum")
                 return "", "low"
 
             processed = await self._preprocess_audio(audio_file)
+            logger.debug(f"🎵 Audio preprocessed: {processed}")
+
             audio_config = speechsdk.audio.AudioConfig(filename=processed)
             recognizer = speechsdk.SpeechRecognizer(
                 speech_config=self.speech_config,
                 audio_config=audio_config
             )
 
+            logger.debug("🎤 Azure Speech recognition starting...")
             result = await asyncio.get_running_loop().run_in_executor(
                 None, recognizer.recognize_once
             )
 
-            text = result.text.strip() if result.reason == speechsdk.ResultReason.RecognizedSpeech else ""
-            confidence = "high" if text else "low"
+            if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+                text = result.text.strip()
+                confidence = "high"
+                logger.info(f"✅ TRANSCRIBED: '{text}' (confidence: {confidence})")
+            elif result.reason == speechsdk.ResultReason.NoMatch:
+                text = ""
+                confidence = "low"
+                logger.warning(f"⚠️ No speech recognized (NoMatch)")
+            elif result.reason == speechsdk.ResultReason.Canceled:
+                text = ""
+                confidence = "low"
+                cancellation = result.cancellation_details
+                logger.warning(f"⚠️ Recognition canceled: {cancellation.reason}")
+                if cancellation.reason == speechsdk.CancellationReason.Error:
+                    logger.error(f"❌ Error details: {cancellation.error_details}")
+            else:
+                text = ""
+                confidence = "low"
+                logger.warning(f"⚠️ Unexpected result reason: {result.reason}")
 
             if processed != audio_file:
                 try:
@@ -510,8 +551,11 @@ class Call:
                     pass
 
             return text, confidence
+
         except Exception as e:
             logger.error(f"❌ Transcribe error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return "", "low"
 
     async def _preprocess_audio(self, audio_file):
@@ -522,7 +566,8 @@ class Call:
             processed = audio_file.replace('.wav', '_proc.wav')
             audio.export(processed, format="wav")
             return processed
-        except:
+        except Exception as e:
+            logger.warning(f"⚠️ Audio preprocessing failed: {e}, using original")
             return audio_file
 
     async def get_ai_response(self, confidence):
@@ -776,7 +821,7 @@ class Call:
 
 
 async def handle_call(channel, ari_client, config, caller_number):
-    """Main call handler - from working agent.py"""
+    """Main call handler - FIXED with proper beep timing and logging"""
 
     # Initialize AI client
     ai_client = AsyncAzureOpenAI(
@@ -792,10 +837,11 @@ async def handle_call(channel, ari_client, config, caller_number):
     )
     speech_config.speech_recognition_language = "en-US"
 
-    # Initialize cache (no SSH object needed, uses centralized ssh_manager)
+    # Initialize cache
     cache = SoundCache()
 
     # Fetch customer data
+    logger.info(f"📊 Fetching customer data for {caller_number}...")
     customer_data = await fetch_customer_data(caller_number)
 
     # Create call handler
@@ -828,36 +874,47 @@ async def handle_call(channel, ari_client, config, caller_number):
 
         # Greeting
         greeting = call._build_greeting()
+        logger.info(f"🎙️ Greeting: {greeting}")
         if not await call.speak(greeting):
             return
         call.conversation.append({"role": "assistant", "content": greeting})
 
-        # Beep
-        await asyncio.sleep(config.beep_delay)
+        # FIXED: Use working beep timing from standalone version
+        await asyncio.sleep(0.2)
         await call.channel.play(media="sound:beep")
-        await asyncio.sleep(config.beep_pause)
+        await asyncio.sleep(0.3)
 
         # Main conversation loop
-        for turn_num in range(config.max_turns):
+        for turn in range(config.max_turns):
             if not call.active or call.should_end:
+                logger.info(f"🛑 Loop exit: active={call.active}, should_end={call.should_end}")
                 break
+
+            logger.info(f"\n{'='*60}")
+            logger.info(f"🔄 TURN {turn+1}/{config.max_turns}")
+            logger.info(f"{'='*60}")
 
             # Record
             rec = await call.record()
 
-            # Beep acknowledge
+            # FIXED: Beep to acknowledge recording received
             await call.channel.play(media="sound:beep")
             await asyncio.sleep(0.1)
 
             if not rec:
                 call.no_speech_count += 1
+                logger.warning(f"⚠️ No recording received (count: {call.no_speech_count}/2)")
+
                 if call.no_speech_count >= 2:
                     await call.speak("Having trouble hearing you. Call back if needed.")
                     break
+
                 await call.speak("Didn't catch that. Go ahead.")
-                await asyncio.sleep(config.beep_delay)
+
+                # FIXED: Use working beep timing
+                await asyncio.sleep(0.2)
                 await call.channel.play(media="sound:beep")
-                await asyncio.sleep(config.beep_pause)
+                await asyncio.sleep(0.3)
                 continue
 
             # Transcribe
@@ -866,27 +923,35 @@ async def handle_call(channel, ari_client, config, caller_number):
 
             if not text or len(text) < 3:
                 call.unclear_count += 1
+                logger.warning(f"⚠️ Unclear/empty transcript (count: {call.unclear_count}/2)")
+
                 if call.unclear_count >= 2:
                     await call.speak("Let me have someone call you back.")
                     break
+
                 await call.speak("Could you repeat that?")
-                await asyncio.sleep(config.beep_delay)
+
+                # FIXED: Use working beep timing
+                await asyncio.sleep(0.2)
                 await call.channel.play(media="sound:beep")
-                await asyncio.sleep(config.beep_pause)
+                await asyncio.sleep(0.3)
                 continue
 
             call.unclear_count = 0
 
             # Check goodbye
             if call._is_goodbye(text):
+                logger.info("👋 Goodbye detected")
                 await call.speak("Anytime! Bye!")
                 break
 
             # Add to conversation
+            logger.info(f"👤 User: {text}")
             call.conversation.append({"role": "user", "content": text})
 
             # Get AI response
             resp, fn = await call.get_ai_response(confidence)
+            logger.info(f"🤖 AI: {resp}" + (f" [Function: {fn}]" if fn else ""))
 
             # Save turn
             call.turn_count += 1
@@ -904,6 +969,7 @@ async def handle_call(channel, ari_client, config, caller_number):
 
             # Handle transfer
             if fn == "transfer_to_agent" and call.functions_called and call.functions_called[-1].get('result', {}).get('success'):
+                logger.info("📞 Transfer successful, ending AI handling")
                 return
 
             # Check end
@@ -915,12 +981,13 @@ async def handle_call(channel, ari_client, config, caller_number):
                 break
 
             if call.should_end:
+                logger.info("🛑 Call end requested by AI")
                 break
 
-            # Beep for next turn
-            await asyncio.sleep(config.beep_delay)
+            # FIXED: Use working beep timing for next turn
+            await asyncio.sleep(0.2)
             await call.channel.play(media="sound:beep")
-            await asyncio.sleep(config.beep_pause)
+            await asyncio.sleep(0.3)
 
         # Final goodbye
         if not call.should_end:
@@ -930,7 +997,8 @@ async def handle_call(channel, ari_client, config, caller_number):
 
     except Exception as e:
         logger.error(f"❌ Call error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         await call.hangup()
     finally:
         await call.cleanup()
-        # No need to close SSH - centralized manager handles this
