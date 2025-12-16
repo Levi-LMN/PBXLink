@@ -422,19 +422,31 @@ class Call:
             return False
 
     async def record(self):
-        """Record user audio - FIXED: Proper timing for file system operations"""
+        """Record user audio - DIAGNOSTIC VERSION to find the issue"""
         if not await self.alive():
+            logger.error("❌ Channel not alive before recording")
             return None
 
         recording_name = f"r_{self.call_id}_{int(time.time() * 1000)}"
-
-        # Extract and validate recording parameters
         max_duration = int(self.config.recording_duration) if self.config.recording_duration else 8
         max_silence = float(self.config.silence_duration) if self.config.silence_duration else 2.0
 
-        logger.info(f"🎙️ Recording START: duration={max_duration}s, silence={max_silence}s")
+        logger.info(f"🎙️ ========== RECORDING DIAGNOSTIC ==========")
+        logger.info(f"🎙️ Name: {recording_name}")
+        logger.info(f"🎙️ Channel ID: {self.call_id}")
+        logger.info(f"🎙️ Duration: {max_duration}s, Silence: {max_silence}s")
+
+        # Check channel state
+        try:
+            channel_info = await self.ari_client.channels.get(channelId=self.call_id)
+            logger.info(f"🎙️ Channel state: {channel_info.json.get('state')}")
+            logger.info(f"🎙️ Channel name: {channel_info.json.get('name')}")
+        except Exception as e:
+            logger.error(f"❌ Cannot get channel info: {e}")
 
         try:
+            # Start recording with logging
+            logger.info(f"🎙️ Sending record command...")
             rec = await self.channel.record(
                 name=recording_name,
                 format="wav",
@@ -443,34 +455,118 @@ class Call:
                 ifExists="overwrite",
                 terminateOn="none"
             )
+            logger.info(f"🎙️ Record command accepted, object: {rec}")
+            logger.info(f"🎙️ Recording object type: {type(rec)}")
 
-            # FIXED: Wait for recording to complete with extra buffer
-            await asyncio.sleep(max_duration + 1.0)  # Increased from 0.5 to 1.0
-
-            try:
-                await rec.stop()
-                logger.debug("🎙️ Recording stopped")
-            except Exception as e:
-                logger.debug(f"🎙️ Stop recording exception (normal): {e}")
-
-            # CRITICAL FIX: Wait for Asterisk to flush file to disk
+            # Immediately check if recording started
             await asyncio.sleep(0.5)
 
+            try:
+                live_url = f"{ARI_URL}/recordings/live/{recording_name}"
+                logger.info(f"🔍 Checking live recording: GET {live_url}")
+                live_check = requests.get(live_url, auth=(ARI_USERNAME, ARI_PASSWORD), timeout=5)
+                logger.info(f"🔍 Live recording check: HTTP {live_check.status_code}")
+
+                if live_check.ok:
+                    live_data = live_check.json()
+                    logger.info(f"✅ RECORDING IS ACTIVE!")
+                    logger.info(f"   State: {live_data.get('state')}")
+                    logger.info(f"   Format: {live_data.get('format')}")
+                    logger.info(f"   Duration: {live_data.get('duration')}")
+                else:
+                    logger.error(f"❌ RECORDING NOT ACTIVE - Response: {live_check.text}")
+
+                    # Check all live recordings
+                    all_live_url = f"{ARI_URL}/recordings/live"
+                    all_live = requests.get(all_live_url, auth=(ARI_USERNAME, ARI_PASSWORD), timeout=5)
+                    if all_live.ok:
+                        logger.info(f"📋 All live recordings: {all_live.json()}")
+
+            except Exception as e:
+                logger.error(f"❌ Error checking live recording: {e}")
+
+            # Wait for recording to complete
+            logger.info(f"⏳ Waiting {max_duration + 1.0}s for recording to complete...")
+            await asyncio.sleep(max_duration + 1.0)
+
+            # Stop recording
+            try:
+                logger.info(f"🛑 Stopping recording...")
+                await rec.stop()
+                logger.info(f"✅ Recording stopped")
+            except Exception as e:
+                logger.warning(f"⚠️ Stop exception (may be normal): {e}")
+
+            # Wait for file system
+            logger.info(f"⏳ Waiting 0.5s for file system flush...")
+            await asyncio.sleep(0.5)
+
+            # List all stored recordings
+            try:
+                list_url = f"{ARI_URL}/recordings/stored"
+                logger.info(f"📋 Listing stored recordings: GET {list_url}")
+                list_resp = requests.get(list_url, auth=(ARI_USERNAME, ARI_PASSWORD), timeout=5)
+                logger.info(f"📋 List response: HTTP {list_resp.status_code}")
+
+                if list_resp.ok:
+                    all_recordings = list_resp.json()
+                    logger.info(f"📋 Total stored recordings: {len(all_recordings)}")
+
+                    # Show recent recordings
+                    recent_names = [r.get('name', 'unknown') for r in all_recordings[-10:]]
+                    logger.info(f"📋 Recent recordings: {recent_names}")
+
+                    # Check if ours is there
+                    our_rec = [r for r in all_recordings if r.get('name') == recording_name]
+                    if our_rec:
+                        logger.info(f"✅ OUR RECORDING FOUND: {our_rec[0]}")
+                    else:
+                        logger.error(f"❌ OUR RECORDING ({recording_name}) NOT IN LIST!")
+                else:
+                    logger.error(f"❌ Failed to list recordings: {list_resp.text}")
+
+            except Exception as e:
+                logger.error(f"❌ Error listing recordings: {e}")
+
+            # Try to download
+            logger.info(f"📥 Attempting download...")
             downloaded = await self._download(recording_name)
 
             if downloaded:
                 size = os.path.getsize(downloaded)
-                logger.info(f"✅ Recording ready: {downloaded} ({size} bytes)")
+                logger.info(f"✅ SUCCESS: Downloaded {size} bytes to {downloaded}")
             else:
-                logger.warning("⚠️ Recording download failed")
+                logger.error(f"❌ DOWNLOAD FAILED")
 
+                # Final diagnostic - check Asterisk recording directory via SSH
+                logger.info(f"🔍 Checking Asterisk filesystem...")
+                try:
+                    from ssh_manager import ssh_manager
+                    result = ssh_manager.execute_command(
+                        f"find /var/lib/asterisk -name '*{recording_name}*' -o -name 'r_{self.call_id}*' 2>/dev/null | head -20"
+                    )
+                    if result:
+                        logger.info(f"📁 Files found on Asterisk: {result}")
+                    else:
+                        logger.error(f"❌ No recording files found on Asterisk filesystem")
+
+                    # Check recording directory permissions
+                    perms = ssh_manager.execute_command("ls -la /var/spool/asterisk/recording/ 2>/dev/null | tail -5")
+                    if perms:
+                        logger.info(f"📁 /var/spool/asterisk/recording/ contents:\n{perms}")
+                except Exception as e:
+                    logger.error(f"❌ SSH check failed: {e}")
+
+            logger.info(f"🎙️ ========== END DIAGNOSTIC ==========")
             return downloaded
 
         except Exception as e:
-            logger.error(f"❌ Record error: {e}")
+            logger.error(f"❌ FATAL RECORDING ERROR: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            logger.info(f"🎙️ ========== END DIAGNOSTIC ==========")
             return None
+
 
     async def _download(self, recording_name):
         """Download recording from ARI - with progressive retry logic"""
