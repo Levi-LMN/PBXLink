@@ -1,22 +1,16 @@
 """
-Integrated AI Agent Blueprint - FIXED AUDIO RECORDING ISSUES
-Fixed by implementing standalone SSH connection in background thread
+Integrated AI Agent Blueprint - FIXED FLICKERING ISSUE
+Fixed status flickering by using proper threading locks and status states
 """
 
-from flask import Blueprint, render_template, jsonify, request, current_app
+from flask import Blueprint, render_template, jsonify, request, session, current_app
 import logging
 import asyncio
 import threading
 import json
 import os
 import traceback
-import tempfile
-import time
-import hashlib
-import requests
-import paramiko
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 from audit_utils import log_action
 from models import db, AIAgentConfig, AIAgentDepartment, AIAgentCallLog, AIAgentTurn
 
@@ -24,6 +18,7 @@ from models import db, AIAgentConfig, AIAgentDepartment, AIAgentCallLog, AIAgent
 # CLEAR FOCUSED LOGGING SETUP
 # =============================================================================
 
+# Suppress debug noise from other modules
 logging.getLogger('paramiko').setLevel(logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logging.getLogger('ssh_manager').setLevel(logging.WARNING)
@@ -34,44 +29,40 @@ logging.getLogger('aioari.client').setLevel(logging.WARNING)
 logging.getLogger('aioari.model').setLevel(logging.WARNING)
 logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
 
+# Create AI Agent specific logger with CLEAR formatting
 ai_logger = logging.getLogger('AI_AGENT')
 ai_logger.setLevel(logging.INFO)
-ai_logger.handlers = []
+ai_logger.handlers = []  # Clear any existing handlers
 
+# Console handler with clean format
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
-formatter = logging.Formatter('\n%(asctime)s 🤖 [AI-AGENT] %(message)s', datefmt='%H:%M:%S')
+
+# CLEAR, EASY-TO-READ FORMAT
+formatter = logging.Formatter(
+    '\n%(asctime)s 🤖 [AI-AGENT] %(message)s',
+    datefmt='%H:%M:%S'
+)
 console.setFormatter(formatter)
 ai_logger.addHandler(console)
 ai_logger.propagate = False
 
+# Use ai_logger for all AI agent logs
 logger = ai_logger
 
 ai_agent_integrated_bp = Blueprint('ai_agent_integrated', __name__)
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-
-CACHE_DIR = Path.home() / ".asterisk_cache"
-CACHE_DIR.mkdir(exist_ok=True)
-CACHE_INDEX_FILE = CACHE_DIR / "cache_index.json"
-
-ASTERISK_SOUNDS_DIR = "/var/lib/asterisk/sounds/custom"
-
-# Global cache for Dataverse token
-dataverse_token = None
-dataverse_token_expiry = 0
-
 
 # ============================================================================
-# CONFIGURATION CONTAINER
+# CONFIGURATION CONTAINER - Replaces ORM object for thread safety
 # ============================================================================
 
 class AIAgentConfigContainer:
-    """Thread-safe configuration container"""
+    """Thread-safe configuration container - NOT a SQLAlchemy object"""
 
     def __init__(self, config_dict):
+        """Initialize from dictionary of config values"""
+        # User-configurable settings
         self.id = config_dict.get('id')
         self.name = config_dict.get('name')
         self.enabled = config_dict.get('enabled', True)
@@ -92,12 +83,6 @@ class AIAgentConfigContainer:
         self.azure_deployment = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini')
         self.azure_speech_key = os.environ.get('AZURE_SPEECH_KEY')
         self.azure_speech_region = os.environ.get('AZURE_SPEECH_REGION', 'eastus')
-
-        # SSH credentials from environment
-        freepbx_host = os.environ.get('FREEPBX_HOST', 'http://10.200.200.2:80')
-        self.ssh_host = freepbx_host.replace('http://', '').replace('https://', '').split(':')[0]
-        self.ssh_user = os.environ.get('FREEPBX_SSH_USER', 'root')
-        self.ssh_password = os.environ.get('FREEPBX_SSH_PASSWORD')
 
     @classmethod
     def from_db_config(cls, db_config):
@@ -120,769 +105,11 @@ class AIAgentConfigContainer:
 
 
 # ============================================================================
-# STANDALONE SSH FOR BACKGROUND THREAD - NO FLASK CONTEXT NEEDED
-# ============================================================================
-
-class StandaloneSSH:
-    """Standalone SSH connection for background thread - doesn't need Flask context"""
-
-    def __init__(self, host, user, password):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.client = None
-        self.sftp = None
-        self._lock = asyncio.Lock()
-
-    async def connect(self):
-        """Connect to SSH server"""
-        try:
-            self.client = paramiko.SSHClient()
-            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-            await asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: self.client.connect(
-                    self.host,
-                    username=self.user,
-                    password=self.password,
-                    timeout=10,
-                    look_for_keys=False,
-                    allow_agent=False
-                )
-            )
-
-            self.sftp = self.client.open_sftp()
-            logger.info(f"✅ SSH connected to {self.host}")
-            return True
-        except Exception as e:
-            logger.error(f"❌ SSH connection failed: {e}")
-            return False
-
-    async def _cmd(self, command):
-        """Execute command"""
-        try:
-            _, stdout, _ = await asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: self.client.exec_command(command)
-            )
-            return stdout.channel.recv_exit_status() == 0
-        except:
-            return False
-
-    async def upload(self, local_file, remote_filename):
-        """Upload file to Asterisk sounds directory"""
-        async with self._lock:
-            try:
-                if not self.sftp and not await self.connect():
-                    return None
-
-                temp_path = f"/tmp/{remote_filename}"
-
-                # Upload to temp
-                await asyncio.get_running_loop().run_in_executor(
-                    None,
-                    lambda: self.sftp.put(local_file, temp_path)
-                )
-
-                # Move to sounds directory with proper permissions
-                await self._cmd(f"sudo mv {temp_path} {ASTERISK_SOUNDS_DIR}/{remote_filename}")
-                await self._cmd(f"sudo chown asterisk:asterisk {ASTERISK_SOUNDS_DIR}/{remote_filename}")
-                await self._cmd(f"sudo chmod 644 {ASTERISK_SOUNDS_DIR}/{remote_filename}")
-
-                return f"custom/{remote_filename.replace('.wav', '')}"
-            except Exception as e:
-                logger.error(f"❌ Upload failed: {e}")
-                return None
-
-    def close(self):
-        """Close SSH connection"""
-        try:
-            if self.sftp:
-                self.sftp.close()
-            if self.client:
-                self.client.close()
-        except:
-            pass
-
-
-# ============================================================================
-# SOUND CACHE
-# ============================================================================
-
-class SoundCache:
-    """Cache TTS audio files locally and on Asterisk"""
-
-    def __init__(self):
-        self.index = json.load(open(CACHE_INDEX_FILE)) if CACHE_INDEX_FILE.exists() else {}
-
-    def _save(self):
-        try:
-            json.dump(self.index, open(CACHE_INDEX_FILE, 'w'))
-        except:
-            pass
-
-    def _key(self, text):
-        return hashlib.md5(text.encode()).hexdigest()
-
-    def _duration(self, path):
-        try:
-            from pydub import AudioSegment
-            return len(AudioSegment.from_file(path)) / 1000.0
-        except:
-            return None
-
-    async def get(self, text, ssh):
-        """Get cached sound or generate new one"""
-        k = self._key(text)
-
-        # Check if already cached on Asterisk
-        if k in self.index and self.index[k].get('remote'):
-            return self.index[k]['remote'], self.index[k].get('duration')
-
-        # Generate TTS locally
-        local = await self._tts(text, k)
-        if not local:
-            return None, None
-
-        duration = self._duration(local)
-
-        # Upload to Asterisk
-        remote = await ssh.upload(local, f"c_{k}.wav")
-        if remote:
-            self.index[k] = {'remote': remote, 'duration': duration}
-            self._save()
-
-        return (remote or local), duration
-
-    async def _tts(self, text, k):
-        """Generate TTS audio"""
-        try:
-            f = CACHE_DIR / f"{k}.wav"
-            if f.exists():
-                return str(f)
-
-            tmp = CACHE_DIR / f"{k}_t.wav"
-
-            try:
-                from gtts import gTTS
-                await asyncio.get_running_loop().run_in_executor(
-                    None,
-                    lambda: gTTS(text=text, lang='en', slow=False).save(str(tmp))
-                )
-            except:
-                await asyncio.get_running_loop().run_in_executor(
-                    None, self._pyttsx, text, str(tmp)
-                )
-
-            # Normalize audio
-            from pydub import AudioSegment
-            from pydub.effects import normalize
-            audio = AudioSegment.from_file(str(tmp))
-            audio = normalize(audio).set_frame_rate(8000).set_channels(1).set_sample_width(2)
-            audio.export(str(f), format="wav")
-
-            try:
-                tmp.unlink()
-            except:
-                pass
-
-            return str(f)
-        except Exception as e:
-            logger.error(f"❌ TTS failed: {e}")
-            return None
-
-    def _pyttsx(self, text, output):
-        """Fallback TTS"""
-        try:
-            import pyttsx3
-            engine = pyttsx3.init()
-            engine.setProperty('rate', 165)
-            engine.save_to_file(text, output)
-            engine.runAndWait()
-            engine.stop()
-        except:
-            pass
-
-
-# ============================================================================
-# DATAVERSE INTEGRATION
-# ============================================================================
-
-def normalize_phone(phone):
-    """Normalize Kenyan phone to +254 format"""
-    if not phone:
-        return None
-    cleaned = ''.join(c for c in phone if c.isdigit() or c == '+')
-    if cleaned.startswith('+'):
-        cleaned = cleaned[1:]
-
-    if cleaned.startswith('0') and len(cleaned) == 10:
-        cleaned = '254' + cleaned[1:]
-    elif (cleaned.startswith('7') or cleaned.startswith('1')) and len(cleaned) == 9:
-        cleaned = '254' + cleaned
-
-    if cleaned.startswith('254') and len(cleaned) == 12:
-        return '+' + cleaned
-    return phone
-
-
-async def get_dataverse_token():
-    """Get Dataverse access token with caching"""
-    global dataverse_token, dataverse_token_expiry
-
-    dataverse_url = os.environ.get('DATAVERSE_URL')
-    tenant_id = os.environ.get('TENANT_ID')
-    client_id = os.environ.get('CLIENT_ID')
-    client_secret = os.environ.get('CLIENT_SECRET')
-
-    if not all([dataverse_url, tenant_id, client_id, client_secret]):
-        return None
-
-    if dataverse_token and time.time() < (dataverse_token_expiry - 300):
-        return dataverse_token
-
-    try:
-        from msal import ConfidentialClientApplication
-
-        app = ConfidentialClientApplication(
-            client_id,
-            authority=f"https://login.microsoftonline.com/{tenant_id}",
-            client_credential=client_secret
-        )
-
-        loop = asyncio.get_running_loop()
-        token_response = await loop.run_in_executor(
-            None,
-            lambda: app.acquire_token_for_client(scopes=[f"{dataverse_url}/.default"])
-        )
-
-        if "access_token" not in token_response:
-            logger.error(f"❌ Token failed: {token_response.get('error_description', 'Unknown')}")
-            return None
-
-        dataverse_token = token_response["access_token"]
-        dataverse_token_expiry = time.time() + token_response.get("expires_in", 3600)
-        return dataverse_token
-    except Exception as e:
-        logger.error(f"❌ Token error: {e}")
-        return None
-
-
-async def fetch_customer_claims(phone):
-    """Fetch customer claims from Dataverse"""
-    token = await get_dataverse_token()
-    if not token:
-        return None
-
-    dataverse_url = os.environ.get('DATAVERSE_URL')
-    normalized = normalize_phone(phone)
-    variants = list(set([
-        phone,
-        normalized,
-        normalized[1:] if normalized and normalized.startswith('+') else None,
-        '0' + normalized[4:] if normalized and normalized.startswith('+254') else None,
-        normalized[4:] if normalized and normalized.startswith('+254') else None
-    ]))
-    variants = [v for v in variants if v]
-
-    logger.info(f"📊 Searching: {normalized} with {len(variants)} variants")
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/json",
-        "Prefer": "odata.include-annotations=*"
-    }
-
-    columns = "cra47_testclaimid,cra47_claimnumber,cra47_claimstatus,cra47_estimatedresolution,cra47_amountapproved,cra47_useremail,cra47_username,cra47_newcolumn,cra47_userphone"
-
-    filter_parts = [f"cra47_userphone eq '{v.replace(chr(39), chr(39)+chr(39))}'" for v in variants]
-    filter_query = " or ".join(filter_parts)
-
-    from urllib.parse import quote
-    url = f"{dataverse_url}/api/data/v9.2/cra47_testclaims?$select={columns}&$filter={quote(filter_query)}"
-
-    loop = asyncio.get_running_loop()
-    response = await loop.run_in_executor(
-        None,
-        lambda: requests.get(url, headers=headers, timeout=10)
-    )
-
-    if not response.ok:
-        logger.error(f"❌ Query failed: {response.status_code}")
-        return None
-
-    claims_data = response.json().get("value", [])
-
-    if not claims_data:
-        logger.warning(f"⚠️ No claims found for {normalized}")
-        return None
-
-    formatted_claims = []
-    customer_name = customer_email = customer_phone = None
-
-    for claim in claims_data:
-        formatted_claims.append({
-            "claim_id": claim.get("cra47_claimnumber", "N/A"),
-            "type": claim.get("cra47_newcolumn", "N/A"),
-            "status": claim.get("cra47_claimstatus", "Pending"),
-            "amount": claim.get("cra47_amountapproved", "N/A"),
-            "estimated_resolution": claim.get("cra47_estimatedresolution", "N/A")
-        })
-
-        if not customer_name:
-            customer_name = claim.get("cra47_username", "Valued Customer")
-            customer_email = claim.get("cra47_useremail", "")
-            customer_phone = claim.get("cra47_userphone", normalized)
-
-    clean = ''.join(filter(str.isdigit, normalized or phone))
-    logger.info(f"✅ Found {len(formatted_claims)} claim(s) for {customer_name}")
-
-    return {
-        "phone": customer_phone or normalized or phone,
-        "name": customer_name,
-        "email": customer_email,
-        "account_number": f"ACC{clean[-6:]}" if clean else "ACC000000",
-        "account_status": "Active",
-        "claims": formatted_claims,
-        "services": ["Claims Management", "Insurance Services"],
-        "last_contact": time.strftime("%Y-%m-%d")
-    }
-
-
-async def fetch_customer_data(phone):
-    """Fetch customer data - Dataverse first, fallback to defaults"""
-    dataverse_url = os.environ.get('DATAVERSE_URL')
-    tenant_id = os.environ.get('TENANT_ID')
-    client_id = os.environ.get('CLIENT_ID')
-    client_secret = os.environ.get('CLIENT_SECRET')
-
-    if dataverse_url and tenant_id and client_id and client_secret:
-        data = await fetch_customer_claims(phone)
-        if data:
-            return data
-
-    clean = ''.join(filter(str.isdigit, phone))
-    return {
-        "phone": phone,
-        "name": "Valued Customer",
-        "email": "",
-        "account_number": f"ACC{clean[-6:]}" if clean else "ACC000000",
-        "account_status": "Active",
-        "claims": [],
-        "services": ["Business Consulting", "Cloud Solutions"],
-        "last_contact": time.strftime("%Y-%m-%d")
-    }
-
-
-# ============================================================================
-# CALL HANDLER
-# ============================================================================
-
-"""
-Fix for SQLAlchemy DetachedInstanceError in Call class
-
-The issue: call_log object is created in one session but accessed later when 
-the session has expired. Solution: Store primitive values instead of accessing 
-ORM attributes directly, and always wrap DB operations in app context.
-"""
-
-
-# Replace the Call class __init__ and cleanup methods with these fixed versions:
-
-class Call:
-    """Handles an individual call - FIXED SQLAlchemy session issues"""
-
-    def __init__(self, channel, ari_client, config, caller_number, ai_client, speech_config, cache, ssh, app_instance):
-        self.channel = channel
-        self.ari_client = ari_client
-        self.config = config
-        self.caller_number = caller_number
-        self.call_id = channel.id
-        self.ai_client = ai_client
-        self.speech_config = speech_config
-        self.cache = cache
-        self.ssh = ssh
-        self.app = app_instance
-
-        self.active = True
-        self.conversation = []
-        self.customer_data = {}
-        self.temp_files = []
-        self.functions_called = []
-        self.start_time = datetime.utcnow()
-        self.should_end = False
-
-        self.turn_count = 0
-        self.no_speech_count = 0
-        self.unclear_count = 0
-
-        # Create call log and store its ID (not the object itself)
-        with self.app.app_context():
-            call_log = AIAgentCallLog(
-                call_id=self.call_id,
-                caller_number=caller_number,
-                call_start=self.start_time
-            )
-            db.session.add(call_log)
-            db.session.commit()
-
-            # Store the ID, not the object
-            self.call_log_id = call_log.id
-
-            # Detach from session to prevent issues
-            db.session.expunge(call_log)
-
-    async def cleanup(self):
-        """Cleanup and finalize call log - FIXED session handling"""
-        # Clean up temp files
-        for f in self.temp_files:
-            try:
-                os.unlink(f)
-            except:
-                pass
-
-        # Update call log in database
-        try:
-            with self.app.app_context():
-                # Get a fresh instance from the database
-                call_log = db.session.query(AIAgentCallLog).filter_by(id=self.call_log_id).first()
-
-                if call_log:
-                    # Calculate end time and duration
-                    call_end = datetime.utcnow()
-                    call_log.call_end = call_end
-                    call_log.call_duration = (call_end - call_log.call_start).seconds
-
-                    # Store transcript if enabled
-                    if self.config.store_transcripts:
-                        transcript = "\n\n".join([
-                            f"{'Customer' if m['role'] == 'user' else 'AI'}: {m.get('content', '')}"
-                            for m in self.conversation if m['role'] in ['user', 'assistant'] and m.get('content')
-                        ])
-                        call_log.transcript = transcript
-
-                    # Store function calls
-                    call_log.functions_called = json.dumps(self.functions_called)
-
-                    # Store metrics
-                    call_log.turns_count = self.turn_count
-                    call_log.no_speech_count = self.no_speech_count
-                    call_log.unclear_count = self.unclear_count
-
-                    # Commit changes
-                    db.session.commit()
-                    logger.info(f"✅ Call log saved: {self.call_log_id}")
-                else:
-                    logger.error(f"❌ Call log not found: {self.call_log_id}")
-
-        except Exception as e:
-            logger.error(f"❌ Error saving call log: {e}")
-            try:
-                with self.app.app_context():
-                    db.session.rollback()
-            except:
-                pass
-
-    async def _save_turn(self, turn_num, user_text, confidence, ai_text, function_name, audio_path):
-        """Save conversation turn - FIXED session handling"""
-        try:
-            with self.app.app_context():
-                turn = AIAgentTurn(
-                    call_log_id=self.call_log_id,  # Use the stored ID
-                    turn_number=turn_num,
-                    user_text=user_text,
-                    user_confidence=confidence,
-                    ai_text=ai_text,
-                    function_called=function_name,
-                    user_audio_path=audio_path if self.config.store_recordings else None
-                )
-                db.session.add(turn)
-                db.session.commit()
-        except Exception as e:
-            logger.error(f"Failed to save turn: {e}")
-            try:
-                with self.app.app_context():
-                    db.session.rollback()
-            except:
-                pass
-
-    # Also fix the execute_function method for ticket creation and transfers:
-
-    async def execute_function(self, fn, args):
-        """Execute AI function call - FIXED session handling"""
-        if fn == "create_ticket":
-            ticket_id = f"TKT-{int(time.time())}"
-            logger.info(f"🎫 Ticket: {ticket_id} - {args.get('subject')}")
-
-            try:
-                with self.app.app_context():
-                    # Get fresh instance from database
-                    call_log = db.session.query(AIAgentCallLog).filter_by(id=self.call_log_id).first()
-
-                    if call_log:
-                        if not call_log.tickets_created:
-                            call_log.tickets_created = json.dumps([])
-
-                        tickets = json.loads(call_log.tickets_created)
-                        tickets.append({
-                            'ticket_id': ticket_id,
-                            'subject': args.get('subject'),
-                            'priority': args.get('priority'),
-                            'description': args.get('description')
-                        })
-                        call_log.tickets_created = json.dumps(tickets)
-                        db.session.commit()
-            except Exception as e:
-                logger.error(f"❌ Error saving ticket: {e}")
-                try:
-                    with self.app.app_context():
-                        db.session.rollback()
-                except:
-                    pass
-
-            return {"status": "success", "ticket_id": ticket_id, "estimated_response": "24 hours"}
-
-        elif fn == "transfer_to_agent":
-            dept_name = args.get('department')
-
-            try:
-                with self.app.app_context():
-                    department = AIAgentDepartment.query.filter_by(name=dept_name, enabled=True).first()
-
-                    if not department:
-                        logger.error(f"Department not found: {dept_name}")
-                        return {"status": "failed", "success": False}
-
-                    logger.info(f"📞 Transfer to {department.display_name}")
-
-                    msg = f"Connecting you to {department.display_name} now."
-                    await self.speak(msg)
-
-                    # Update call log
-                    call_log = db.session.query(AIAgentCallLog).filter_by(id=self.call_log_id).first()
-                    if call_log:
-                        call_log.transferred_to = department.display_name
-                        db.session.commit()
-
-                    # Perform transfer
-                    try:
-                        await self.channel.continueInDialplan(
-                            context=department.context,
-                            extension=department.extension,
-                            priority=1
-                        )
-                        return {"status": "transferred", "department": dept_name, "success": True}
-                    except Exception as e:
-                        logger.error(f"❌ Transfer failed: {e}")
-                        return {"status": "failed", "error": str(e), "success": False}
-
-            except Exception as e:
-                logger.error(f"❌ Error in transfer: {e}")
-                try:
-                    with self.app.app_context():
-                        db.session.rollback()
-                except:
-                    pass
-                return {"status": "failed", "error": str(e), "success": False}
-
-        elif fn == "schedule_callback":
-            cb_id = f"CB-{int(time.time())}"
-            logger.info(f"📅 Callback: {cb_id} at {args.get('preferred_time')}")
-            return {"status": "scheduled", "callback_id": cb_id}
-
-        elif fn == "end_call":
-            self.should_end = True
-            return {"status": "ending", "reason": args.get('reason')}
-
-        return {"status": "unknown"}
-
-
-# Update handle_call function to use the fixed approach:
-
-async def handle_call(channel, ari_client, config, caller_number, ssh, app_instance):
-    """Main call handler - FIXED session handling"""
-
-    from openai import AsyncAzureOpenAI
-    import azure.cognitiveservices.speech as speechsdk
-
-    # Initialize AI client
-    ai_client = AsyncAzureOpenAI(
-        api_key=config.azure_api_key,
-        api_version="2024-08-01-preview",
-        azure_endpoint=config.azure_endpoint
-    )
-
-    # Initialize speech config
-    speech_config = speechsdk.SpeechConfig(
-        subscription=config.azure_speech_key,
-        region=config.azure_speech_region
-    )
-    speech_config.speech_recognition_language = "en-US"
-
-    # Initialize cache
-    cache = SoundCache()
-
-    # Fetch customer data
-    customer_data = await fetch_customer_data(caller_number)
-
-    # Create call handler
-    call = Call(channel, ari_client, config, caller_number, ai_client, speech_config, cache, ssh, app_instance)
-    call.customer_data = customer_data
-
-    # Update call log with customer data
-    try:
-        with app_instance.app_context():
-            call_log = db.session.query(AIAgentCallLog).filter_by(id=call.call_log_id).first()
-            if call_log:
-                call_log.caller_name = customer_data.get('name', 'Valued Customer')
-                call_log.customer_data = json.dumps(customer_data)
-                db.session.commit()
-    except Exception as e:
-        logger.error(f"❌ Error updating call log: {e}")
-        try:
-            with app_instance.app_context():
-                db.session.rollback()
-        except:
-            pass
-
-    try:
-        await channel.answer()
-        await asyncio.sleep(0.2)
-
-        # Print customer context
-        print(f"\n{'=' * 60}")
-        print(f"📞 CALL FROM: {customer_data.get('name')} ({customer_data.get('phone')})")
-        print(f"📋 Account: {customer_data.get('account_number')}")
-        claims = customer_data.get('claims', [])
-        if claims:
-            print(f"🎫 Claims: {len(claims)} found")
-            for i, claim in enumerate(claims, 1):
-                print(f"   {i}. #{claim['claim_id']} - {claim['status']} - {claim['amount']}")
-        else:
-            print(f"🎫 Claims: None")
-        print(f"{'=' * 60}\n")
-
-        # Build system context
-        system_prompt = call._build_system_prompt()
-        call.conversation.append({"role": "system", "content": system_prompt})
-
-        # Greeting
-        greeting = call._build_greeting()
-        if not await call.speak(greeting):
-            return
-        call.conversation.append({"role": "assistant", "content": greeting})
-
-        # Beep
-        await asyncio.sleep(config.beep_delay)
-        await call.channel.play(media="sound:beep")
-        await asyncio.sleep(config.beep_pause)
-
-        # Main conversation loop
-        for turn_num in range(config.max_turns):
-            if not call.active or call.should_end:
-                break
-
-            # Record
-            rec = await call.record()
-
-            # Beep acknowledge
-            await call.channel.play(media="sound:beep")
-            await asyncio.sleep(0.1)
-
-            if not rec:
-                call.no_speech_count += 1
-                if call.no_speech_count >= 2:
-                    await call.speak("Having trouble hearing you. Call back if needed.")
-                    break
-                await call.speak("Didn't catch that. Go ahead.")
-                await asyncio.sleep(config.beep_delay)
-                await call.channel.play(media="sound:beep")
-                await asyncio.sleep(config.beep_pause)
-                continue
-
-            # Transcribe
-            text, confidence = await call.transcribe(rec)
-            call.no_speech_count = 0
-
-            if not text or len(text) < 3:
-                call.unclear_count += 1
-                if call.unclear_count >= 2:
-                    await call.speak("Let me have someone call you back.")
-                    break
-                await call.speak("Could you repeat that?")
-                await asyncio.sleep(config.beep_delay)
-                await call.channel.play(media="sound:beep")
-                await asyncio.sleep(config.beep_pause)
-                continue
-
-            call.unclear_count = 0
-
-            # Check goodbye
-            if call._is_goodbye(text):
-                await call.speak("Anytime! Bye!")
-                break
-
-            # Add to conversation
-            call.conversation.append({"role": "user", "content": text})
-
-            # Get AI response
-            resp, fn = await call.get_ai_response(confidence)
-
-            # Save turn
-            call.turn_count += 1
-            await call._save_turn(
-                call.turn_count,
-                text,
-                confidence,
-                resp,
-                fn,
-                rec
-            )
-
-            # Add response
-            call.conversation.append({"role": "assistant", "content": resp})
-
-            # Handle transfer
-            if fn == "transfer_to_agent" and call.functions_called and call.functions_called[-1].get('result', {}).get(
-                    'success'):
-                return
-
-            # Check end
-            if fn == "end_call":
-                call.should_end = True
-
-            # Speak response
-            if resp and not await call.speak(resp):
-                break
-
-            if call.should_end:
-                break
-
-            # Beep for next turn
-            await asyncio.sleep(config.beep_delay)
-            await call.channel.play(media="sound:beep")
-            await asyncio.sleep(config.beep_pause)
-
-        # Final goodbye
-        if not call.should_end:
-            await call.speak("Thanks for calling!")
-
-        await call.hangup()
-
-    except Exception as e:
-        logger.error(f"❌ Call error: {e}")
-        logger.error(traceback.format_exc())
-        await call.hangup()
-    finally:
-        await call.cleanup()
-
-# ============================================================================
-# AI AGENT SERVICE MANAGER
+# AI AGENT SERVICE MANAGER - FIXED FLICKERING WITH PROPER LOCKS
 # ============================================================================
 
 class AIAgentService:
-    """Manages the AI agent service lifecycle"""
+    """Manages the AI agent service lifecycle with comprehensive monitoring"""
 
     def __init__(self):
         self.running = False
@@ -891,11 +118,14 @@ class AIAgentService:
         self.active_calls = {}
         self.app = None
         self.config_container = None
-        self.ssh = None
 
+        # FIXED: Add thread lock for status updates
         self._status_lock = threading.Lock()
-        self._service_state = "stopped"
 
+        # FIXED: Add explicit status states
+        self._service_state = "stopped"  # stopped, starting, running, stopping
+
+        # System stats - protected by lock
         self.stats = {
             'azure_openai_connected': False,
             'azure_speech_connected': False,
@@ -911,7 +141,7 @@ class AIAgentService:
         }
 
     def start(self, config):
-        """Start AI agent service"""
+        """Start AI agent service with given config"""
         with self._status_lock:
             if self.running or self._service_state in ["starting", "running"]:
                 return False, "Service already running or starting"
@@ -920,13 +150,14 @@ class AIAgentService:
                 from flask import current_app
                 self.app = current_app._get_current_object()
 
-                # Get credentials
+                # Get credentials from environment
                 azure_endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
                 azure_api_key = os.environ.get('AZURE_OPENAI_API_KEY')
                 azure_deployment = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini')
                 azure_speech_key = os.environ.get('AZURE_SPEECH_KEY')
                 azure_speech_region = os.environ.get('AZURE_SPEECH_REGION', 'eastus')
 
+                # Validate credentials
                 if not all([azure_endpoint, azure_api_key, azure_speech_key]):
                     error = "Missing Azure credentials in environment"
                     self.stats['last_error'] = error
@@ -942,18 +173,22 @@ class AIAgentService:
                     error = f"Missing required Python module: {str(e)}"
                     self.stats['last_error'] = error
                     logger.error(f"❌ {error}")
+                    logger.error(
+                        "Install with: pip install openai aioari azure-cognitiveservices-speech msal pydub gtts")
                     return False, error
 
-                # Create thread-safe config container
+                # FIXED: Create thread-safe config container from ORM object
                 self.config_container = AIAgentConfigContainer.from_db_config(config)
                 self.stats['config_loaded'] = True
 
+                # FIXED: Set state to starting BEFORE launching thread
                 self._service_state = "starting"
 
                 # Start service in background thread
                 self.thread = threading.Thread(target=self._run_service, daemon=True)
                 self.thread.start()
 
+                # FIXED: Set running flag AFTER thread starts
                 self.running = True
                 self.stats['start_time'] = datetime.utcnow()
 
@@ -977,6 +212,7 @@ class AIAgentService:
             try:
                 logger.info("🛑 STOPPING AI AGENT SERVICE...")
 
+                # FIXED: Set state to stopping
                 self._service_state = "stopping"
                 self.running = False
 
@@ -991,12 +227,7 @@ class AIAgentService:
                         except:
                             pass
 
-                # Close SSH
-                if self.ssh:
-                    self.ssh.close()
-                    self.ssh = None
-
-                # Wait for thread
+                # Wait for thread to finish
                 if self.thread and self.thread.is_alive():
                     self.thread.join(timeout=5)
 
@@ -1016,6 +247,8 @@ class AIAgentService:
                 }
 
                 self.config_container = None
+
+                # FIXED: Set state to stopped at the very end
                 self._service_state = "stopped"
 
                 logger.info("✅ SERVICE STOPPED")
@@ -1051,10 +284,11 @@ class AIAgentService:
                 self._service_state = "stopped"
 
     async def _service_main(self):
-        """Main service loop"""
+        """Main service loop - connects to ARI and handles calls"""
         import aioari
         from openai import AsyncAzureOpenAI
         import azure.cognitiveservices.speech as speechsdk
+        from blueprints.ai_agent_handler import SoundCache, get_dataverse_token
 
         # Get ARI connection details
         ari_url = os.environ.get('ARI_URL', 'http://10.200.200.2:8088')
@@ -1063,7 +297,7 @@ class AIAgentService:
         ari_app = os.environ.get('ARI_APPLICATION', 'ai-agent')
 
         if not ari_pass:
-            logger.error("❌ ARI_PASSWORD not configured")
+            logger.error("❌ ARI_PASSWORD not configured in environment")
             with self._status_lock:
                 self.stats['last_error'] = "ARI_PASSWORD not configured"
                 self.running = False
@@ -1078,7 +312,7 @@ class AIAgentService:
 
         try:
             # Initialize Azure OpenAI
-            logger.info("🧠 Testing Azure OpenAI...")
+            logger.info("🧠 Testing Azure OpenAI connection...")
             ai_client = AsyncAzureOpenAI(
                 api_key=self.config_container.azure_api_key,
                 api_version="2024-08-01-preview",
@@ -1113,25 +347,24 @@ class AIAgentService:
                 self.stats['azure_speech_connected'] = True
             logger.info("   ✅ Azure Speech: CONFIGURED")
 
-            # Initialize standalone SSH
-            logger.info("🔌 Connecting SSH...")
-            self.ssh = StandaloneSSH(
-                self.config_container.ssh_host,
-                self.config_container.ssh_user,
-                self.config_container.ssh_password
-            )
+            # Initialize SSH
+            logger.info("🔌 Testing SSH connection...")
+            try:
+                with self.app.app_context():
+                    from ssh_manager import ssh_manager
+                    if ssh_manager.test_connection():
+                        with self._status_lock:
+                            self.stats['ssh_connected'] = True
+                        logger.info("   ✅ SSH: CONNECTED")
+                    else:
+                        logger.warning("   ⚠️  SSH: FAILED (non-critical)")
+            except Exception as e:
+                logger.warning(f"   ⚠️  SSH: ERROR - {e} (non-critical)")
 
-            if await self.ssh.connect():
-                with self._status_lock:
-                    self.stats['ssh_connected'] = True
-                logger.info("   ✅ SSH: CONNECTED")
-            else:
-                logger.warning("   ⚠️ SSH: FAILED (TTS may not work)")
-
-            # Test Dataverse
+            # Test Dataverse (optional)
             dataverse_url = os.environ.get('DATAVERSE_URL')
             if dataverse_url:
-                logger.info("📊 Testing Dataverse...")
+                logger.info("📊 Testing Dataverse connection...")
                 try:
                     token = await get_dataverse_token()
                     if token:
@@ -1139,12 +372,14 @@ class AIAgentService:
                             self.stats['dataverse_connected'] = True
                         logger.info("   ✅ Dataverse: CONNECTED")
                     else:
-                        logger.warning("   ⚠️ Dataverse: AUTH FAILED (optional)")
+                        logger.warning("   ⚠️  Dataverse: AUTH FAILED (optional)")
                 except Exception as e:
-                    logger.warning(f"   ⚠️ Dataverse: ERROR - {e} (optional)")
+                    logger.warning(f"   ⚠️  Dataverse: ERROR - {e} (optional)")
+            else:
+                logger.info("   ℹ️  Dataverse: NOT CONFIGURED (optional)")
 
-            # Pre-cache TTS
-            logger.info("📊 Pre-caching TTS phrases...")
+            # Pre-cache TTS phrases
+            logger.info("📊 Pre-caching common TTS phrases...")
             cache = SoundCache()
 
             common_phrases = [
@@ -1162,10 +397,10 @@ class AIAgentService:
             cached_count = 0
             for phrase in common_phrases:
                 try:
-                    await cache.get(phrase, self.ssh)
+                    await cache.get(phrase)
                     cached_count += 1
                 except Exception as e:
-                    logger.warning(f"   ⚠️ Cache warning: {e}")
+                    logger.warning(f"   ⚠️  Cache warning: {e}")
 
             with self._status_lock:
                 self.stats['cache_loaded'] = True
@@ -1197,11 +432,12 @@ class AIAgentService:
 
             ari_client.on_event('StasisStart', on_stasis_start)
 
+            # FIXED: Mark service as fully running AFTER all initialization
             with self._status_lock:
                 self._service_state = "running"
 
             logger.info("=" * 80)
-            logger.info("🎙️ AI AGENT READY - WAITING FOR CALLS...")
+            logger.info("🎙️  AI AGENT READY - WAITING FOR CALLS...")
             logger.info("=" * 80)
 
             # Run until stopped
@@ -1229,11 +465,12 @@ class AIAgentService:
             logger.info("🛑 ARI Connection closed")
 
     async def _handle_call(self, channel_id, event, ari_client):
-        """Handle incoming call"""
+        """Handle incoming call - WITH PROPER SESSION MANAGEMENT"""
         try:
             channel = await ari_client.channels.get(channelId=channel_id)
             caller_number = event.get('channel', {}).get('caller', {}).get('number', 'Unknown')
 
+            # Store active call
             with self._status_lock:
                 self.active_calls[channel_id] = {
                     'start_time': datetime.utcnow(),
@@ -1243,8 +480,10 @@ class AIAgentService:
 
             logger.info(f"🎯 Processing call from {caller_number}...")
 
-            # Use standalone SSH that doesn't need Flask context
-            await handle_call(channel, ari_client, self.config_container, caller_number, self.ssh, self.app)
+            # Use config container directly (no DB access in background thread)
+            with self.app.app_context():
+                from blueprints.ai_agent_handler import handle_call
+                await handle_call(channel, ari_client, self.config_container, caller_number)
 
             logger.info(f"✅ Call from {caller_number} completed")
 
@@ -1254,6 +493,7 @@ class AIAgentService:
             with self._status_lock:
                 self.stats['last_error'] = f"Call handling: {str(e)}"
         finally:
+            # Remove from active calls
             with self._status_lock:
                 self.active_calls.pop(channel_id, None)
 
@@ -1269,14 +509,16 @@ class AIAgentService:
                 pass
 
     def get_status(self):
-        """Get comprehensive service status"""
+        """Get comprehensive service status - THREAD SAFE"""
         with self._status_lock:
+            # FIXED: Base running status on service state
             is_running = self._service_state == "running"
 
             uptime = None
             if self.stats['start_time'] and is_running:
                 uptime = (datetime.utcnow() - self.stats['start_time']).seconds
 
+            # Create snapshot of active calls
             active_calls_snapshot = [
                 {
                     'channel_id': cid,
@@ -1288,7 +530,7 @@ class AIAgentService:
 
             return {
                 'running': is_running,
-                'service_state': self._service_state,
+                'service_state': self._service_state,  # For debugging
                 'active_calls': len(active_calls_snapshot),
                 'calls': active_calls_snapshot,
                 'uptime_seconds': uptime,
@@ -1319,7 +561,7 @@ ai_service = AIAgentService()
 
 @ai_agent_integrated_bp.route('/')
 def index():
-    """AI Agent configuration page"""
+    """AI Agent configuration and management page"""
     try:
         log_action(
             action='view',
@@ -1376,7 +618,7 @@ def update_config():
             config = AIAgentConfig(name=data.get('name', 'Default Configuration'))
             db.session.add(config)
 
-        # Update fields
+        # Update user-configurable fields only
         if 'enabled' in data:
             config.enabled = data['enabled']
         if 'system_prompt' in data:
@@ -1513,7 +755,7 @@ def delete_department(dept_id):
 
 @ai_agent_integrated_bp.route('/api/service/status', methods=['GET'])
 def service_status():
-    """Get AI agent service status"""
+    """Get AI agent service status with detailed stats"""
     try:
         status = ai_service.get_status()
 
@@ -1569,6 +811,7 @@ def start_service():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+
 @ai_agent_integrated_bp.route('/api/service/stop', methods=['POST'])
 def stop_service():
     """Stop AI agent service"""
@@ -1604,7 +847,7 @@ def get_call_logs():
 
         query = AIAgentCallLog.query.order_by(AIAgentCallLog.created_at.desc())
 
-        # Filter by date range
+        # Filter by date range if provided
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
@@ -1613,7 +856,7 @@ def get_call_logs():
         if end_date:
             query = query.filter(AIAgentCallLog.created_at <= end_date)
 
-        # Filter by caller
+        # Filter by caller number if provided
         caller = request.args.get('caller')
         if caller:
             query = query.filter(AIAgentCallLog.caller_number.contains(caller))
@@ -1635,7 +878,7 @@ def get_call_logs():
 
 @ai_agent_integrated_bp.route('/api/calls/<int:call_id>', methods=['GET'])
 def get_call_detail(call_id):
-    """Get detailed call information"""
+    """Get detailed call information including turns"""
     try:
         call = AIAgentCallLog.query.get_or_404(call_id)
         turns = AIAgentTurn.query.filter_by(call_log_id=call_id).order_by(AIAgentTurn.turn_number).all()
