@@ -1,6 +1,6 @@
 """
 AI Agent Call Handler - COMPLETE FIXED VERSION
-Fixed audio recording issues - matches working standalone version
+Fixed audio recording issues - proper timing for file system operations
 All debug logging added, proper beep timing, correct recording parameters
 """
 
@@ -352,7 +352,7 @@ async def fetch_customer_data(phone):
 
 
 # ============================================================================
-# CALL HANDLER - FIXED AUDIO RECORDING
+# CALL HANDLER - FIXED AUDIO RECORDING WITH PROPER TIMING
 # ============================================================================
 
 class Call:
@@ -422,13 +422,13 @@ class Call:
             return False
 
     async def record(self):
-        """Record user audio - FIXED: Proper config usage with debug logging"""
+        """Record user audio - FIXED: Proper timing for file system operations"""
         if not await self.alive():
             return None
 
         recording_name = f"r_{self.call_id}_{int(time.time() * 1000)}"
 
-        # FIXED: Extract and validate recording parameters
+        # Extract and validate recording parameters
         max_duration = int(self.config.recording_duration) if self.config.recording_duration else 8
         max_silence = float(self.config.silence_duration) if self.config.silence_duration else 2.0
 
@@ -444,8 +444,8 @@ class Call:
                 terminateOn="none"
             )
 
-            # Wait for recording to complete
-            await asyncio.sleep(max_duration + 0.5)
+            # FIXED: Wait for recording to complete with extra buffer
+            await asyncio.sleep(max_duration + 1.0)  # Increased from 0.5 to 1.0
 
             try:
                 await rec.stop()
@@ -453,7 +453,8 @@ class Call:
             except Exception as e:
                 logger.debug(f"🎙️ Stop recording exception (normal): {e}")
 
-            await asyncio.sleep(0.2)
+            # CRITICAL FIX: Wait for Asterisk to flush file to disk
+            await asyncio.sleep(0.5)
 
             downloaded = await self._download(recording_name)
 
@@ -472,11 +473,12 @@ class Call:
             return None
 
     async def _download(self, recording_name):
-        """Download recording from ARI - with detailed logging"""
-        for attempt in range(3):
+        """Download recording from ARI - with progressive retry logic"""
+        # FIXED: More attempts with progressive backoff
+        for attempt in range(5):  # Increased from 3 to 5
             try:
                 url = f"{ARI_URL}/recordings/stored/{recording_name}/file"
-                logger.debug(f"📥 Attempt {attempt+1}/3: {url}")
+                logger.debug(f"📥 Attempt {attempt+1}/5: {url}")
 
                 r = requests.get(url, auth=(ARI_USERNAME, ARI_PASSWORD), timeout=10)
 
@@ -490,12 +492,19 @@ class Call:
                     logger.info(f"✅ Downloaded: {f.name} ({len(r.content)} bytes)")
                     return f.name
                 else:
-                    logger.warning(f"⚠️ Attempt {attempt+1}: status={r.status_code}, size={len(r.content)} bytes (too small or failed)")
+                    logger.warning(f"⚠️ Attempt {attempt+1}: status={r.status_code}, size={len(r.content)} bytes")
+
+                    # FIXED: Progressive backoff for 404 (file not ready)
+                    if r.status_code == 404:
+                        wait_time = 0.5 + (attempt * 0.2)
+                        logger.debug(f"⏳ 404 error - waiting {wait_time}s before retry")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        await asyncio.sleep(0.3)
 
             except Exception as e:
                 logger.error(f"❌ Download attempt {attempt+1} failed: {e}")
-
-            await asyncio.sleep(0.15)
+                await asyncio.sleep(0.3)
 
         logger.error("❌ All download attempts exhausted")
         return None
@@ -821,7 +830,7 @@ class Call:
 
 
 async def handle_call(channel, ari_client, config, caller_number):
-    """Main call handler - FIXED with proper beep timing and logging"""
+    """Main call handler - FIXED with proper timing and file system sync"""
 
     # Initialize AI client
     ai_client = AsyncAzureOpenAI(
@@ -879,7 +888,7 @@ async def handle_call(channel, ari_client, config, caller_number):
             return
         call.conversation.append({"role": "assistant", "content": greeting})
 
-        # FIXED: Use working beep timing from standalone version
+        # Beep timing from working version
         await asyncio.sleep(0.2)
         await call.channel.play(media="sound:beep")
         await asyncio.sleep(0.3)
@@ -897,7 +906,7 @@ async def handle_call(channel, ari_client, config, caller_number):
             # Record
             rec = await call.record()
 
-            # FIXED: Beep to acknowledge recording received
+            # Beep to acknowledge recording received
             await call.channel.play(media="sound:beep")
             await asyncio.sleep(0.1)
 
@@ -911,7 +920,6 @@ async def handle_call(channel, ari_client, config, caller_number):
 
                 await call.speak("Didn't catch that. Go ahead.")
 
-                # FIXED: Use working beep timing
                 await asyncio.sleep(0.2)
                 await call.channel.play(media="sound:beep")
                 await asyncio.sleep(0.3)
@@ -931,7 +939,6 @@ async def handle_call(channel, ari_client, config, caller_number):
 
                 await call.speak("Could you repeat that?")
 
-                # FIXED: Use working beep timing
                 await asyncio.sleep(0.2)
                 await call.channel.play(media="sound:beep")
                 await asyncio.sleep(0.3)
@@ -984,7 +991,7 @@ async def handle_call(channel, ari_client, config, caller_number):
                 logger.info("🛑 Call end requested by AI")
                 break
 
-            # FIXED: Use working beep timing for next turn
+            # Beep for next turn
             await asyncio.sleep(0.2)
             await call.channel.play(media="sound:beep")
             await asyncio.sleep(0.3)
