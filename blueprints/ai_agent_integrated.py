@@ -479,8 +479,19 @@ async def fetch_customer_data(phone):
 # CALL HANDLER
 # ============================================================================
 
+"""
+Fix for SQLAlchemy DetachedInstanceError in Call class
+
+The issue: call_log object is created in one session but accessed later when 
+the session has expired. Solution: Store primitive values instead of accessing 
+ORM attributes directly, and always wrap DB operations in app context.
+"""
+
+
+# Replace the Call class __init__ and cleanup methods with these fixed versions:
+
 class Call:
-    """Handles an individual AI agent call"""
+    """Handles an individual call - FIXED SQLAlchemy session issues"""
 
     def __init__(self, channel, ari_client, config, caller_number, ai_client, speech_config, cache, ssh, app_instance):
         self.channel = channel
@@ -494,7 +505,6 @@ class Call:
         self.ssh = ssh
         self.app = app_instance
 
-        # Call state
         self.active = True
         self.conversation = []
         self.customer_data = {}
@@ -503,277 +513,178 @@ class Call:
         self.start_time = datetime.utcnow()
         self.should_end = False
 
-        # Metrics
         self.turn_count = 0
         self.no_speech_count = 0
         self.unclear_count = 0
 
-        # Create call log entry (with app context)
+        # Create call log and store its ID (not the object itself)
         with self.app.app_context():
-            self.call_log = AIAgentCallLog(
+            call_log = AIAgentCallLog(
                 call_id=self.call_id,
                 caller_number=caller_number,
                 call_start=self.start_time
             )
-            db.session.add(self.call_log)
+            db.session.add(call_log)
             db.session.commit()
 
-    async def alive(self):
-        """Check if call is still active"""
-        if not self.active:
-            return False
-        try:
-            await self.ari_client.channels.get(channelId=self.call_id)
-            return True
-        except:
-            self.active = False
-            return False
+            # Store the ID, not the object
+            self.call_log_id = call_log.id
 
-    async def speak(self, text):
-        """Speak text using cached TTS"""
-        if not await self.alive():
-            return False
+            # Detach from session to prevent issues
+            db.session.expunge(call_log)
 
-        try:
-            sound, duration = await self.cache.get(text, self.ssh)
-            if not sound:
-                return False
-
-            await self.channel.play(media=f"sound:{sound}")
-            await asyncio.sleep((duration or len(text.split()) * 0.4) + 0.5)
-            return True
-        except Exception as e:
-            if "404" not in str(e):
-                logger.error(f"❌ Speak error: {e}")
-            self.active = False
-            return False
-
-    async def record(self):
-        """Record user audio"""
-        if not await self.alive():
-            return None
-
-        recording_name = f"r_{self.call_id}_{int(time.time() * 1000)}"
-
-        try:
-            rec = await self.channel.record(
-                name=recording_name,
-                format="wav",
-                maxDurationSeconds=self.config.recording_duration,
-                maxSilenceSeconds=self.config.silence_duration,
-                ifExists="overwrite",
-                terminateOn="none"
-            )
-
-            await asyncio.sleep(self.config.recording_duration + 0.5)
-
+    async def cleanup(self):
+        """Cleanup and finalize call log - FIXED session handling"""
+        # Clean up temp files
+        for f in self.temp_files:
             try:
-                await rec.stop()
+                os.unlink(f)
             except:
                 pass
 
-            await asyncio.sleep(0.2)
-            return await self._download(recording_name)
+        # Update call log in database
+        try:
+            with self.app.app_context():
+                # Get a fresh instance from the database
+                call_log = db.session.query(AIAgentCallLog).filter_by(id=self.call_log_id).first()
+
+                if call_log:
+                    # Calculate end time and duration
+                    call_end = datetime.utcnow()
+                    call_log.call_end = call_end
+                    call_log.call_duration = (call_end - call_log.call_start).seconds
+
+                    # Store transcript if enabled
+                    if self.config.store_transcripts:
+                        transcript = "\n\n".join([
+                            f"{'Customer' if m['role'] == 'user' else 'AI'}: {m.get('content', '')}"
+                            for m in self.conversation if m['role'] in ['user', 'assistant'] and m.get('content')
+                        ])
+                        call_log.transcript = transcript
+
+                    # Store function calls
+                    call_log.functions_called = json.dumps(self.functions_called)
+
+                    # Store metrics
+                    call_log.turns_count = self.turn_count
+                    call_log.no_speech_count = self.no_speech_count
+                    call_log.unclear_count = self.unclear_count
+
+                    # Commit changes
+                    db.session.commit()
+                    logger.info(f"✅ Call log saved: {self.call_log_id}")
+                else:
+                    logger.error(f"❌ Call log not found: {self.call_log_id}")
+
         except Exception as e:
-            logger.error(f"❌ Record error: {e}")
-            return None
-
-    async def _download(self, recording_name):
-        """Download recording from ARI"""
-        ari_url = os.environ.get("ARI_URL", "http://10.200.200.2:8088/ari")
-        ari_username = os.environ.get("ARI_USERNAME", "asterisk")
-        ari_password = os.environ.get("ARI_PASSWORD")
-
-        for _ in range(3):
+            logger.error(f"❌ Error saving call log: {e}")
             try:
-                url = f"{ari_url}/recordings/stored/{recording_name}/file"
-                r = requests.get(url, auth=(ari_username, ari_password), timeout=10)
-
-                if r.status_code == 200 and len(r.content) > 4000:
-                    f = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    f.write(r.content)
-                    f.close()
-                    self.temp_files.append(f.name)
-                    return f.name
+                with self.app.app_context():
+                    db.session.rollback()
             except:
                 pass
-            await asyncio.sleep(0.15)
-        return None
 
-    async def transcribe(self, audio_file):
-        """Transcribe audio using Azure Speech"""
+    async def _save_turn(self, turn_num, user_text, confidence, ai_text, function_name, audio_path):
+        """Save conversation turn - FIXED session handling"""
         try:
-            if os.path.getsize(audio_file) < 4000:
-                return "", "low"
-
-            processed = await self._preprocess_audio(audio_file)
-
-            import azure.cognitiveservices.speech as speechsdk
-            audio_config = speechsdk.audio.AudioConfig(filename=processed)
-            recognizer = speechsdk.SpeechRecognizer(
-                speech_config=self.speech_config,
-                audio_config=audio_config
-            )
-
-            result = await asyncio.get_running_loop().run_in_executor(
-                None, recognizer.recognize_once
-            )
-
-            text = result.text.strip() if result.reason == speechsdk.ResultReason.RecognizedSpeech else ""
-            confidence = "high" if text else "low"
-
-            if processed != audio_file:
-                try:
-                    os.unlink(processed)
-                except:
-                    pass
-
-            return text, confidence
-        except Exception as e:
-            logger.error(f"❌ Transcribe error: {e}")
-            return "", "low"
-
-    async def _preprocess_audio(self, audio_file):
-        """Preprocess audio for better recognition"""
-        try:
-            from pydub import AudioSegment
-            from pydub.effects import normalize
-
-            audio = AudioSegment.from_file(audio_file)
-            audio = normalize(audio).set_frame_rate(16000).set_channels(1).set_sample_width(2)
-            processed = audio_file.replace('.wav', '_proc.wav')
-            audio.export(processed, format="wav")
-            return processed
-        except:
-            return audio_file
-
-    async def get_ai_response(self, confidence):
-        """Get AI response with function calling"""
-        messages = self.conversation.copy()
-
-        if confidence == "low":
-            messages.append({
-                "role": "system",
-                "content": "Poor audio. Ask once for clarification, then offer callback."
-            })
-
-        try:
-            tools = self._get_ai_tools()
-
-            r = await self.ai_client.chat.completions.create(
-                model=self.config.azure_deployment,
-                messages=messages,
-                max_tokens=200,
-                temperature=0.9,
-                tools=tools,
-                tool_choice="auto"
-            )
-
-            msg = r.choices[0].message
-
-            if msg.tool_calls:
-                tc = msg.tool_calls[0]
-                fn = tc.function.name
-                args = json.loads(tc.function.arguments)
-
-                result = await self.execute_function(fn, args)
-
-                self.functions_called.append({
-                    'name': fn,
-                    'args': args,
-                    'result': result,
-                    'time': datetime.utcnow().isoformat()
-                })
-
-                messages.append({
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [{
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": fn,
-                            "arguments": tc.function.arguments
-                        }
-                    }]
-                })
-
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": fn,
-                    "content": json.dumps(result)
-                })
-
-                r2 = await self.ai_client.chat.completions.create(
-                    model=self.config.azure_deployment,
-                    messages=messages,
-                    max_tokens=200,
-                    temperature=0.9
+            with self.app.app_context():
+                turn = AIAgentTurn(
+                    call_log_id=self.call_log_id,  # Use the stored ID
+                    turn_number=turn_num,
+                    user_text=user_text,
+                    user_confidence=confidence,
+                    ai_text=ai_text,
+                    function_called=function_name,
+                    user_audio_path=audio_path if self.config.store_recordings else None
                 )
-
-                resp = r2.choices[0].message.content.strip()
-
-                if fn == "transfer_to_agent" and result.get('success'):
-                    return "", fn
-
-                return resp, fn
-
-            return msg.content.strip(), None
+                db.session.add(turn)
+                db.session.commit()
         except Exception as e:
-            logger.error(f"❌ AI error: {e}")
-            return "Technical issue. Repeat that?", None
+            logger.error(f"Failed to save turn: {e}")
+            try:
+                with self.app.app_context():
+                    db.session.rollback()
+            except:
+                pass
+
+    # Also fix the execute_function method for ticket creation and transfers:
 
     async def execute_function(self, fn, args):
-        """Execute AI function call"""
+        """Execute AI function call - FIXED session handling"""
         if fn == "create_ticket":
             ticket_id = f"TKT-{int(time.time())}"
             logger.info(f"🎫 Ticket: {ticket_id} - {args.get('subject')}")
 
-            with self.app.app_context():
-                if not self.call_log.tickets_created:
-                    self.call_log.tickets_created = json.dumps([])
+            try:
+                with self.app.app_context():
+                    # Get fresh instance from database
+                    call_log = db.session.query(AIAgentCallLog).filter_by(id=self.call_log_id).first()
 
-                tickets = json.loads(self.call_log.tickets_created)
-                tickets.append({
-                    'ticket_id': ticket_id,
-                    'subject': args.get('subject'),
-                    'priority': args.get('priority'),
-                    'description': args.get('description')
-                })
-                self.call_log.tickets_created = json.dumps(tickets)
-                db.session.commit()
+                    if call_log:
+                        if not call_log.tickets_created:
+                            call_log.tickets_created = json.dumps([])
+
+                        tickets = json.loads(call_log.tickets_created)
+                        tickets.append({
+                            'ticket_id': ticket_id,
+                            'subject': args.get('subject'),
+                            'priority': args.get('priority'),
+                            'description': args.get('description')
+                        })
+                        call_log.tickets_created = json.dumps(tickets)
+                        db.session.commit()
+            except Exception as e:
+                logger.error(f"❌ Error saving ticket: {e}")
+                try:
+                    with self.app.app_context():
+                        db.session.rollback()
+                except:
+                    pass
 
             return {"status": "success", "ticket_id": ticket_id, "estimated_response": "24 hours"}
 
         elif fn == "transfer_to_agent":
             dept_name = args.get('department')
 
-            with self.app.app_context():
-                department = AIAgentDepartment.query.filter_by(name=dept_name, enabled=True).first()
+            try:
+                with self.app.app_context():
+                    department = AIAgentDepartment.query.filter_by(name=dept_name, enabled=True).first()
 
-                if not department:
-                    logger.error(f"Department not found: {dept_name}")
-                    return {"status": "failed", "success": False}
+                    if not department:
+                        logger.error(f"Department not found: {dept_name}")
+                        return {"status": "failed", "success": False}
 
-                logger.info(f"📞 Transfer to {department.display_name}")
+                    logger.info(f"📞 Transfer to {department.display_name}")
 
-                msg = f"Connecting you to {department.display_name} now."
-                await self.speak(msg)
+                    msg = f"Connecting you to {department.display_name} now."
+                    await self.speak(msg)
 
-                self.call_log.transferred_to = department.display_name
-                db.session.commit()
+                    # Update call log
+                    call_log = db.session.query(AIAgentCallLog).filter_by(id=self.call_log_id).first()
+                    if call_log:
+                        call_log.transferred_to = department.display_name
+                        db.session.commit()
 
+                    # Perform transfer
+                    try:
+                        await self.channel.continueInDialplan(
+                            context=department.context,
+                            extension=department.extension,
+                            priority=1
+                        )
+                        return {"status": "transferred", "department": dept_name, "success": True}
+                    except Exception as e:
+                        logger.error(f"❌ Transfer failed: {e}")
+                        return {"status": "failed", "error": str(e), "success": False}
+
+            except Exception as e:
+                logger.error(f"❌ Error in transfer: {e}")
                 try:
-                    await self.channel.continueInDialplan(
-                        context=department.context,
-                        extension=department.extension,
-                        priority=1
-                    )
-                    return {"status": "transferred", "department": dept_name, "success": True}
-                except Exception as e:
-                    logger.error(f"❌ Transfer failed: {e}")
-                    return {"status": "failed", "error": str(e), "success": False}
+                    with self.app.app_context():
+                        db.session.rollback()
+                except:
+                    pass
+                return {"status": "failed", "error": str(e), "success": False}
 
         elif fn == "schedule_callback":
             cb_id = f"CB-{int(time.time())}"
@@ -786,126 +697,11 @@ class Call:
 
         return {"status": "unknown"}
 
-    def _get_ai_tools(self):
-        """Get AI function tools"""
-        with self.app.app_context():
-            departments = AIAgentDepartment.query.filter_by(enabled=True).all()
-            dept_names = [dept.name for dept in departments]
 
-        tools = [
-            {"type": "function", "function": {"name": "end_call", "description": "End call when done", "parameters": {"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]}}},
-            {"type": "function", "function": {"name": "create_ticket", "description": "Create support ticket", "parameters": {"type": "object", "properties": {"subject": {"type": "string"}, "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"]}, "description": {"type": "string"}}, "required": ["subject", "priority", "description"]}}},
-            {"type": "function", "function": {"name": "schedule_callback", "description": "Schedule callback", "parameters": {"type": "object", "properties": {"preferred_time": {"type": "string"}, "reason": {"type": "string"}}, "required": ["preferred_time", "reason"]}}}
-        ]
-
-        if dept_names:
-            tools.append({"type": "function", "function": {"name": "transfer_to_agent", "description": "Transfer to human agent", "parameters": {"type": "object", "properties": {"department": {"type": "string", "enum": dept_names}, "reason": {"type": "string"}}, "required": ["department", "reason"]}}})
-
-        return tools
-
-    def _build_system_prompt(self):
-        """Build system prompt with customer context"""
-        prompt = self.config.system_prompt + "\n\n"
-
-        if self.customer_data:
-            prompt += "CUSTOMER CONTEXT:\n"
-            prompt += f"- Name: {self.customer_data.get('name')}\n"
-            prompt += f"- Account: {self.customer_data.get('account_number')}\n"
-            prompt += f"- Phone: {self.customer_data.get('phone')}\n"
-
-            claims = self.customer_data.get('claims', [])
-            if claims:
-                prompt += f"\nCLAIMS ({len(claims)} found):\n"
-                for i, c in enumerate(claims, 1):
-                    prompt += f"{i}. #{c['claim_id']} - {c['type']} - {c['status']} - {c['amount']}\n"
-                prompt += "\nProvide claim details when asked."
-            else:
-                prompt += "\nNO CLAIMS found. Offer to create ticket if asked about claims.\n"
-
-        return prompt
-
-    def _build_greeting(self):
-        """Build time-appropriate greeting"""
-        eat_time = datetime.utcnow() + timedelta(hours=3)
-        hour = eat_time.hour
-
-        if hour < 12:
-            time_greeting = 'Good morning'
-        elif hour < 17:
-            time_greeting = 'Good afternoon'
-        else:
-            time_greeting = 'Good evening'
-
-        return self.config.greeting_template.format(
-            time_greeting=time_greeting,
-            company_name=self.config.company_name
-        )
-
-    def _is_goodbye(self, text):
-        """Check if text is goodbye"""
-        if len(text.split()) <= 4:
-            text_lower = text.lower()
-            return any(p in text_lower for p in ["bye", "goodbye", "thanks", "thank you", "that's all", "done"])
-        return False
-
-    async def _save_turn(self, turn_num, user_text, confidence, ai_text, function_name, audio_path):
-        """Save conversation turn"""
-        try:
-            with self.app.app_context():
-                turn = AIAgentTurn(
-                    call_log_id=self.call_log.id,
-                    turn_number=turn_num,
-                    user_text=user_text,
-                    user_confidence=confidence,
-                    ai_text=ai_text,
-                    function_called=function_name,
-                    user_audio_path=audio_path if self.config.store_recordings else None
-                )
-                db.session.add(turn)
-                db.session.commit()
-        except Exception as e:
-            logger.error(f"Failed to save turn: {e}")
-            with self.app.app_context():
-                db.session.rollback()
-
-    async def hangup(self):
-        """Hangup call"""
-        try:
-            if self.active:
-                await self.channel.hangup()
-        except:
-            pass
-        self.active = False
-
-    async def cleanup(self):
-        """Cleanup and finalize call log"""
-        for f in self.temp_files:
-            try:
-                os.unlink(f)
-            except:
-                pass
-
-        with self.app.app_context():
-            self.call_log.call_end = datetime.utcnow()
-            self.call_log.call_duration = (self.call_log.call_end - self.call_log.call_start).seconds
-
-            if self.config.store_transcripts:
-                transcript = "\n\n".join([
-                    f"{'Customer' if m['role'] == 'user' else 'AI'}: {m.get('content', '')}"
-                    for m in self.conversation if m['role'] in ['user', 'assistant'] and m.get('content')
-                ])
-                self.call_log.transcript = transcript
-
-            self.call_log.functions_called = json.dumps(self.functions_called)
-            self.call_log.turns_count = self.turn_count
-            self.call_log.no_speech_count = self.no_speech_count
-            self.call_log.unclear_count = self.unclear_count
-
-            db.session.commit()
-
+# Update handle_call function to use the fixed approach:
 
 async def handle_call(channel, ari_client, config, caller_number, ssh, app_instance):
-    """Main call handler"""
+    """Main call handler - FIXED session handling"""
 
     from openai import AsyncAzureOpenAI
     import azure.cognitiveservices.speech as speechsdk
@@ -934,17 +730,28 @@ async def handle_call(channel, ari_client, config, caller_number, ssh, app_insta
     call = Call(channel, ari_client, config, caller_number, ai_client, speech_config, cache, ssh, app_instance)
     call.customer_data = customer_data
 
-    with app_instance.app_context():
-        call.call_log.caller_name = customer_data.get('name', 'Valued Customer')
-        call.call_log.customer_data = json.dumps(customer_data)
-        db.session.commit()
+    # Update call log with customer data
+    try:
+        with app_instance.app_context():
+            call_log = db.session.query(AIAgentCallLog).filter_by(id=call.call_log_id).first()
+            if call_log:
+                call_log.caller_name = customer_data.get('name', 'Valued Customer')
+                call_log.customer_data = json.dumps(customer_data)
+                db.session.commit()
+    except Exception as e:
+        logger.error(f"❌ Error updating call log: {e}")
+        try:
+            with app_instance.app_context():
+                db.session.rollback()
+        except:
+            pass
 
     try:
         await channel.answer()
         await asyncio.sleep(0.2)
 
         # Print customer context
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"📞 CALL FROM: {customer_data.get('name')} ({customer_data.get('phone')})")
         print(f"📋 Account: {customer_data.get('account_number')}")
         claims = customer_data.get('claims', [])
@@ -954,7 +761,7 @@ async def handle_call(channel, ari_client, config, caller_number, ssh, app_insta
                 print(f"   {i}. #{claim['claim_id']} - {claim['status']} - {claim['amount']}")
         else:
             print(f"🎫 Claims: None")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Build system context
         system_prompt = call._build_system_prompt()
@@ -1037,7 +844,8 @@ async def handle_call(channel, ari_client, config, caller_number, ssh, app_insta
             call.conversation.append({"role": "assistant", "content": resp})
 
             # Handle transfer
-            if fn == "transfer_to_agent" and call.functions_called and call.functions_called[-1].get('result', {}).get('success'):
+            if fn == "transfer_to_agent" and call.functions_called and call.functions_called[-1].get('result', {}).get(
+                    'success'):
                 return
 
             # Check end
@@ -1064,10 +872,10 @@ async def handle_call(channel, ari_client, config, caller_number, ssh, app_insta
 
     except Exception as e:
         logger.error(f"❌ Call error: {e}")
+        logger.error(traceback.format_exc())
         await call.hangup()
     finally:
         await call.cleanup()
-
 
 # ============================================================================
 # AI AGENT SERVICE MANAGER
