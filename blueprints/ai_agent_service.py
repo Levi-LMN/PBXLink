@@ -1,5 +1,6 @@
 """
-AI Agent Service Manager - Complete Working Version with Proper Logging
+AI Agent Service Manager - Complete Working Version
+Fixed: Permissions, PATH, and proper subprocess management
 """
 
 import subprocess
@@ -95,9 +96,29 @@ class AIAgentService:
                 logger.error(f"Cannot open log file: {e}")
                 return False, f"Cannot create log file: {e}"
 
-            # Prepare environment
+            # Prepare environment with proper PATH
             env = os.environ.copy()
             env['PYTHONUNBUFFERED'] = '1'
+
+            # Ensure PATH includes standard binary locations for ffmpeg/ffprobe
+            current_path = env.get('PATH', '')
+            additional_paths = [
+                '/usr/local/bin',
+                '/usr/bin',
+                '/bin',
+                '/usr/local/sbin',
+                '/usr/sbin',
+                '/sbin'
+            ]
+
+            # Add paths that aren't already in PATH
+            path_parts = current_path.split(':') if current_path else []
+            for path in additional_paths:
+                if path not in path_parts:
+                    path_parts.insert(0, path)
+
+            env['PATH'] = ':'.join(path_parts)
+            logger.info(f"PATH set to: {env['PATH']}")
 
             # Start process - completely detached from Flask
             try:
@@ -124,11 +145,18 @@ class AIAgentService:
             if self.process.poll() is not None:
                 self.running = False
                 log_handle.close()
-                return False, f"Agent failed to start (exit code: {self.process.returncode})"
+                # Read last few lines of log to see why it failed
+                try:
+                    with open(self.log_file, 'r') as f:
+                        lines = f.readlines()
+                        error_msg = ''.join(lines[-10:]) if lines else "No log output"
+                except:
+                    error_msg = "Could not read log"
+                return False, f"Agent failed to start (exit code: {self.process.returncode}). Check logs: {self.log_file}\n{error_msg}"
 
             logger.info(f"✅ AI Agent started (PID: {self.process.pid})")
             logger.info(f"📋 Logs: tail -f {self.log_file}")
-            return True, f"Service started (PID: {self.process.pid}). Logs: {self.log_file}"
+            return True, f"Service started (PID: {self.process.pid}). Logs: tail -f {self.log_file}"
 
         except Exception as e:
             logger.error(f"Failed to start: {e}")
