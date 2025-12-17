@@ -1,642 +1,631 @@
 {% extends "base.html" %}
 
-{% block title %}AI Agent Management - Sibasi PBX{% endblock %}
-{% block page_title %}AI Agent Management{% endblock %}
+{% block title %}AI Agent Control - Sibasi PBX{% endblock %}
+
+{% block page_title %}AI Agent Control{% endblock %}
 
 {% block extra_css %}
 <style>
-    .connection-card {
-        border-left: 4px solid #dee2e6;
-    }
-    .connection-card.connected { border-left-color: #22c55e; background-color: #f0fdf4; }
-    .connection-card.disconnected { border-left-color: #ef4444; background-color: #fef2f2; }
-    .stat-card {
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    .status-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 1.5rem;
+        border: none;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
     }
-    .call-log-row { cursor: pointer; }
-    .call-log-row:hover { background-color: #f8f9fa; }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+    }
+
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    .status-indicator.running {
+        background: #10b981;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+
+    .status-indicator.stopped {
+        background: #ef4444;
+        animation: none;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        }
+        50% {
+            box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+        }
+    }
+
+    .stat-box {
+        background: white;
+        border-radius: 8px;
+        padding: 1.25rem;
+        border-left: 4px solid var(--primary);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1;
+    }
+
+    .stat-value.large-text {
+        font-size: 1rem;
+        font-weight: 600;
+        word-break: break-all;
+    }
+
+    .control-button {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+    }
+
+    .control-button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .control-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-start {
+        background: #10b981;
+        color: white;
+    }
+
+    .btn-start:hover:not(:disabled) {
+        background: #059669;
+    }
+
+    .btn-stop {
+        background: #ef4444;
+        color: white;
+    }
+
+    .btn-stop:hover:not(:disabled) {
+        background: #dc2626;
+    }
+
+    .btn-restart {
+        background: #f59e0b;
+        color: white;
+    }
+
+    .btn-restart:hover:not(:disabled) {
+        background: #d97706;
+    }
+
+    .env-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem;
+        background: var(--hover-bg);
+        border-radius: 6px;
+        margin-bottom: 0.625rem;
+        transition: background 0.2s ease;
+    }
+
+    .env-item:hover {
+        background: #e5e7eb;
+    }
+
+    .env-key {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .env-value {
+        font-family: 'Courier New', monospace;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        background: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .env-status {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-left: 0.75rem;
+    }
+
+    .env-status.configured {
+        background: #10b981;
+    }
+
+    .env-status.not-configured {
+        background: #ef4444;
+    }
+
+    .instruction-card {
+        background: #fffbeb;
+        border-left: 4px solid #f59e0b;
+        padding: 1.25rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+    .instruction-card h6 {
+        color: #92400e;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .instruction-card ul {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: #78350f;
+    }
+
+    .instruction-card li {
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .code-block {
+        background: #1f2937;
+        color: #d1d5db;
+        padding: 1rem;
+        border-radius: 6px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.8rem;
+        overflow-x: auto;
+        margin-top: 0.75rem;
+    }
+
+    .spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .alert-floating {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        min-width: 300px;
+        z-index: 9999;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h4 class="mb-1"><i class="fas fa-robot"></i> AI Voice Agent</h4>
-                <p class="text-muted mb-0">Real-time monitoring and configuration</p>
+<div class="container-fluid">
+    <!-- Status Overview -->
+    <div class="status-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">
+                <i class="fas fa-robot me-2"></i>
+                Service Status
+            </h3>
+            <span id="status-badge" class="status-badge">
+                <span class="status-indicator stopped"></span>
+                <span id="status-text">Loading...</span>
+            </span>
+        </div>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <div class="stat-label">
+                        <i class="far fa-clock me-1"></i>
+                        Uptime
+                    </div>
+                    <div class="stat-value" id="uptime">--</div>
+                </div>
             </div>
-            <div>
-                <button class="btn btn-success btn-sm" id="startBtn" onclick="startService()">
-                    <i class="fas fa-play"></i> Start
-                </button>
-                <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopService()" disabled>
-                    <i class="fas fa-stop"></i> Stop
-                </button>
-                <button class="btn btn-outline-primary btn-sm" onclick="refreshStatus()">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <div class="stat-label">
+                        <i class="fas fa-hashtag me-1"></i>
+                        Process ID
+                    </div>
+                    <div class="stat-value" id="pid">--</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <div class="stat-label">
+                        <i class="fas fa-file-code me-1"></i>
+                        Agent Script
+                    </div>
+                    <div class="stat-value large-text" id="agent-path">--</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <button id="btn-start" class="control-button btn-start" onclick="startService()">
+                <i class="fas fa-play"></i>
+                <span>Start Service</span>
+            </button>
+            <button id="btn-stop" class="control-button btn-stop ms-2" onclick="stopService()">
+                <i class="fas fa-stop"></i>
+                <span>Stop Service</span>
+            </button>
+            <button id="btn-restart" class="control-button btn-restart ms-2" onclick="restartService()">
+                <i class="fas fa-redo"></i>
+                <span>Restart Service</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Environment Configuration -->
+        <div class="col-lg-7 mb-4">
+            <div class="card">
+                <div class="card-header d-flex align-items-center">
+                    <i class="fas fa-cog me-2"></i>
+                    Environment Configuration
+                </div>
+                <div class="card-body">
+                    <div id="env-list">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="text-muted mt-2 mb-0">Loading configuration...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Setup Instructions -->
+        <div class="col-lg-5 mb-4">
+            <div class="card">
+                <div class="card-header d-flex align-items-center">
+                    <i class="fas fa-book me-2"></i>
+                    Quick Setup Guide
+                </div>
+                <div class="card-body">
+                    <div class="instruction-card">
+                        <h6><i class="fas fa-check-circle me-1"></i> Prerequisites</h6>
+                        <ul>
+                            <li>Place <code>agent.py</code> in <code>blueprints/</code></li>
+                            <li>Configure environment variables in <code>.env</code></li>
+                            <li>Ensure Azure OpenAI and Speech API keys are set</li>
+                            <li>Configure Asterisk ARI credentials</li>
+                        </ul>
+                    </div>
+
+                    <div class="instruction-card" style="background: #eff6ff; border-color: var(--primary);">
+                        <h6 style="color: var(--primary-dark);">
+                            <i class="fas fa-phone-alt me-1"></i> Dialplan Configuration
+                        </h6>
+                        <p class="mb-2" style="color: var(--primary-dark); font-size: 0.875rem;">
+                            Add to your Asterisk dialplan:
+                        </p>
+                        <div class="code-block">exten => 7000,1,NoOp(AI Agent)
+    same => n,Stasis(ai-agent)
+    same => n,Hangup()</div>
+                    </div>
+
+                    <div class="alert alert-info mb-0" style="font-size: 0.875rem;">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Tip:</strong> The AI agent runs as a standalone process for better stability and isolation.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Logs (Future Feature) -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                <i class="fas fa-terminal me-2"></i>
+                Service Logs
+            </span>
+            <span class="badge bg-secondary">Coming Soon</span>
+        </div>
+        <div class="card-body">
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-code fa-3x mb-3 opacity-25"></i>
+                <p class="mb-0">Real-time service logs will appear here</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Service Status Overview -->
-<div class="row mb-4">
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stat-card rounded">
-            <div class="small opacity-75 mb-2">Service Status</div>
-            <h2 id="serviceStatus" class="mb-0"><i class="fas fa-circle"></i></h2>
-            <div id="uptimeDisplay" class="mt-2 small">Checking...</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stat-card rounded">
-            <div class="small opacity-75 mb-2">Active Calls</div>
-            <h2 id="activeCalls" class="mb-0">-</h2>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stat-card rounded">
-            <div class="small opacity-75 mb-2">Total Calls</div>
-            <h2 id="totalCalls" class="mb-0">-</h2>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="stat-card rounded">
-            <div class="small opacity-75 mb-2">Cached Phrases</div>
-            <h2 id="cachedPhrases" class="mb-0">-</h2>
-        </div>
-    </div>
-</div>
-
-<!-- Connection Status Grid -->
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="fas fa-plug"></i> System Connections</h5>
-        <small class="text-muted">Last update: <span id="lastUpdate">Never</span></small>
-    </div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-4 col-sm-6">
-                <div class="connection-card card" id="card-azure-openai">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1"><i class="fas fa-brain"></i> Azure OpenAI</h6>
-                                <small class="text-muted">GPT-4 API</small>
-                            </div>
-                            <span class="badge bg-secondary" id="status-azure-openai">Unknown</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
-                <div class="connection-card card" id="card-azure-speech">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1"><i class="fas fa-microphone"></i> Azure Speech</h6>
-                                <small class="text-muted">Speech Recognition</small>
-                            </div>
-                            <span class="badge bg-secondary" id="status-azure-speech">Unknown</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
-                <div class="connection-card card" id="card-ari">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1"><i class="fas fa-phone-volume"></i> Asterisk ARI</h6>
-                                <small class="text-muted">Call Interface</small>
-                            </div>
-                            <span class="badge bg-secondary" id="status-ari">Unknown</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
-                <div class="connection-card card" id="card-ssh">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1"><i class="fas fa-terminal"></i> SSH Connection</h6>
-                                <small class="text-muted">File Upload</small>
-                            </div>
-                            <span class="badge bg-secondary" id="status-ssh">Unknown</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
-                <div class="connection-card card" id="card-dataverse">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1"><i class="fas fa-database"></i> Dataverse</h6>
-                                <small class="text-muted">Customer Data</small>
-                            </div>
-                            <span class="badge bg-secondary" id="status-dataverse">Unknown</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
-                <div class="connection-card card" id="card-cache">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1"><i class="fas fa-box"></i> TTS Cache</h6>
-                                <small class="text-muted">Audio Cache</small>
-                            </div>
-                            <span class="badge bg-secondary" id="status-cache">Unknown</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Active Calls -->
-<div class="card mb-4" id="activeCallsSection" style="display: none;">
-    <div class="card-header bg-primary text-white">
-        <h5 class="mb-0"><i class="fas fa-phone-alt"></i> Active Calls</h5>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th>Channel ID</th>
-                        <th>Caller Number</th>
-                        <th>Duration</th>
-                    </tr>
-                </thead>
-                <tbody id="activeCallsList"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Error Display -->
-<div class="alert alert-danger" id="errorAlert" style="display: none;">
-    <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Last Error</h6>
-    <p id="errorMessage" class="mb-0"></p>
-</div>
-
-<!-- Configuration Tabs -->
-<ul class="nav nav-tabs mb-3">
-    <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configTab">
-            <i class="fas fa-cog"></i> Configuration
-        </button>
-    </li>
-    <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#departmentsTab" onclick="loadDepartments()">
-            <i class="fas fa-building"></i> Departments
-        </button>
-    </li>
-    <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#callsTab" onclick="loadCallHistory()">
-            <i class="fas fa-history"></i> Call History
-        </button>
-    </li>
-</ul>
-
-<div class="tab-content">
-    <!-- Configuration Tab -->
-    <div class="tab-pane fade show active" id="configTab">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-sliders-h"></i> AI Agent Configuration</h5>
-            </div>
-            <div class="card-body">
-                <form id="configForm">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Company Name</label>
-                            <input type="text" class="form-control" id="companyName" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Max Conversation Turns</label>
-                            <input type="number" class="form-control" id="maxTurns" min="1" max="20" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">System Prompt</label>
-                        <textarea class="form-control" id="systemPrompt" rows="8" required></textarea>
-                        <small class="text-muted">Instructions for the AI agent's behavior</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Greeting Template</label>
-                        <textarea class="form-control" id="greetingTemplate" rows="3" required></textarea>
-                        <small class="text-muted">Available variables: {time_greeting}, {company_name}</small>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="storeRecordings">
-                                <label class="form-check-label" for="storeRecordings">Store Call Recordings</label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="storeTranscripts">
-                                <label class="form-check-label" for="storeTranscripts">Store Transcripts</label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="enabled">
-                                <label class="form-check-label" for="enabled">Enable AI Agent</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Save Configuration
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Departments Tab -->
-    <div class="tab-pane fade" id="departmentsTab">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-building"></i> Transfer Departments</h5>
-                <button class="btn btn-primary btn-sm" onclick="showAddDepartmentModal()">
-                    <i class="fas fa-plus"></i> Add Department
-                </button>
-            </div>
-            <div class="card-body">
-                <div id="departmentsList">
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-primary"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Call History Tab -->
-    <div class="tab-pane fade" id="callsTab">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-history"></i> Recent Call Logs</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Caller</th>
-                                <th>Duration</th>
-                                <th>Turns</th>
-                                <th>Transferred</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="callHistoryBody">
-                            <tr>
-                                <td colspan="6" class="text-center py-4">
-                                    <div class="spinner-border text-primary"></div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Alert Container -->
+<div id="alert-container"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-let isUpdating = false;
+    let statusInterval = null;
 
-// Load configuration
-async function loadConfig() {
-    try {
-        const response = await fetch('/ai_agent/api/config');
-        const data = await response.json();
+    // Show floating alert
+    function showAlert(message, type = 'success') {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show alert-floating`;
+        alertDiv.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.getElementById('alert-container').appendChild(alertDiv);
 
-        if (data.success && data.config) {
-            const config = data.config;
-            document.getElementById('companyName').value = config.company_name || '';
-            document.getElementById('maxTurns').value = config.max_turns || 6;
-            document.getElementById('systemPrompt').value = config.system_prompt || '';
-            document.getElementById('greetingTemplate').value = config.greeting_template || '';
-            document.getElementById('storeRecordings').checked = config.store_recordings || false;
-            document.getElementById('storeTranscripts').checked = config.store_transcripts || false;
-            document.getElementById('enabled').checked = config.enabled || false;
-        }
-    } catch (error) {
-        console.error('Failed to load config:', error);
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
     }
-}
 
-// Save configuration
-document.getElementById('configForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+    // Format uptime
+    function formatUptime(seconds) {
+        if (!seconds) return '--';
 
-    const config = {
-        company_name: document.getElementById('companyName').value,
-        max_turns: parseInt(document.getElementById('maxTurns').value),
-        system_prompt: document.getElementById('systemPrompt').value,
-        greeting_template: document.getElementById('greetingTemplate').value,
-        store_recordings: document.getElementById('storeRecordings').checked,
-        store_transcripts: document.getElementById('storeTranscripts').checked,
-        enabled: document.getElementById('enabled').checked
-    };
-
-    try {
-        const response = await fetch('/ai_agent/api/config', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(config)
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            alert('Configuration saved successfully!');
-        } else {
-            alert('Failed to save: ' + data.error);
-        }
-    } catch (error) {
-        alert('Error saving configuration: ' + error);
-    }
-});
-
-// Refresh status - MANUAL ONLY (NO AUTO-REFRESH)
-async function refreshStatus() {
-    if (isUpdating) return;
-    isUpdating = true;
-
-    try {
-        const response = await fetch('/ai_agent/api/service/status');
-
-        if (!response.ok) {
-            console.warn(`Status check failed: ${response.status}`);
-            alert('Failed to fetch status. Please try again.');
-            return;
-        }
-
-        const data = await response.json();
-
-        if (data.success) {
-            updateStatusDisplay(data.status);
-            updateLastUpdateTime();
-        } else {
-            alert('Failed to get status: ' + (data.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Failed to refresh status:', error);
-        alert('Error connecting to service. Please check your connection.');
-    } finally {
-        setTimeout(() => { isUpdating = false; }, 500);
-    }
-}
-
-function updateLastUpdateTime() {
-    const now = new Date();
-    document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
-}
-
-function updateStatusDisplay(status) {
-    const running = status.running;
-    const statusIcon = document.getElementById('serviceStatus');
-
-    statusIcon.innerHTML = running ?
-        '<i class="fas fa-check-circle"></i>' :
-        '<i class="fas fa-times-circle"></i>';
-
-    document.getElementById('startBtn').disabled = running;
-    document.getElementById('stopBtn').disabled = !running;
-
-    document.getElementById('activeCalls').textContent = status.active_calls || 0;
-    document.getElementById('totalCalls').textContent = status.total_calls_handled || 0;
-    document.getElementById('cachedPhrases').textContent = status.cache?.phrases_count || 0;
-
-    if (running && status.uptime_seconds !== null && status.uptime_seconds !== undefined) {
-        const hours = Math.floor(status.uptime_seconds / 3600);
-        const minutes = Math.floor((status.uptime_seconds % 3600) / 60);
-        const seconds = status.uptime_seconds % 60;
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
 
         if (hours > 0) {
-            document.getElementById('uptimeDisplay').textContent = `Uptime: ${hours}h ${minutes}m`;
+            return `${hours}h ${minutes}m`;
         } else if (minutes > 0) {
-            document.getElementById('uptimeDisplay').textContent = `Uptime: ${minutes}m ${seconds}s`;
+            return `${minutes}m ${secs}s`;
         } else {
-            document.getElementById('uptimeDisplay').textContent = `Uptime: ${seconds}s`;
+            return `${secs}s`;
         }
-    } else {
-        document.getElementById('uptimeDisplay').textContent = running ? 'Starting...' : 'Offline';
     }
 
-    updateConnection('azure-openai', status.connections?.azure_openai);
-    updateConnection('azure-speech', status.connections?.azure_speech);
-    updateConnection('ari', status.connections?.ari);
-    updateConnection('ssh', status.connections?.ssh);
-    updateConnection('dataverse', status.connections?.dataverse);
-    updateConnection('cache', status.cache?.loaded);
+    // Update status display
+    function updateStatusDisplay(data) {
+        const status = data.status;
+        const badge = document.getElementById('status-badge');
+        const statusText = document.getElementById('status-text');
+        const indicator = badge.querySelector('.status-indicator');
 
-    if (status.calls && status.calls.length > 0) {
-        document.getElementById('activeCallsSection').style.display = 'block';
-        const tbody = document.getElementById('activeCallsList');
-        tbody.innerHTML = status.calls.map(call => `
-            <tr>
-                <td><code>${call.channel_id}</code></td>
-                <td><strong>${call.caller_number}</strong></td>
-                <td><span class="badge bg-info">${call.duration}s</span></td>
-            </tr>
-        `).join('');
-    } else {
-        document.getElementById('activeCallsSection').style.display = 'none';
-    }
+        if (status.running) {
+            indicator.className = 'status-indicator running';
+            statusText.textContent = 'Running';
+            document.getElementById('uptime').textContent = formatUptime(status.uptime_seconds);
+            document.getElementById('pid').textContent = status.pid || '--';
 
-    if (status.last_error) {
-        document.getElementById('errorAlert').style.display = 'block';
-        document.getElementById('errorMessage').textContent = status.last_error;
-    } else {
-        document.getElementById('errorAlert').style.display = 'none';
-    }
-}
-
-function updateConnection(name, connected) {
-    const card = document.getElementById(`card-${name}`);
-    const badge = document.getElementById(`status-${name}`);
-
-    if (!card || !badge) return;
-
-    card.classList.remove('connected', 'disconnected');
-
-    if (connected === true) {
-        card.classList.add('connected');
-        badge.className = 'badge bg-success';
-        badge.innerHTML = '<i class="fas fa-check"></i> Connected';
-    } else if (connected === false) {
-        card.classList.add('disconnected');
-        badge.className = 'badge bg-danger';
-        badge.innerHTML = '<i class="fas fa-times"></i> Disconnected';
-    } else {
-        badge.className = 'badge bg-secondary';
-        badge.innerHTML = 'Unknown';
-    }
-}
-
-async function startService() {
-    const btn = document.getElementById('startBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
-
-    try {
-        const response = await fetch('/ai_agent/api/service/start', {method: 'POST'});
-        const data = await response.json();
-
-        if (data.success) {
-            alert('Service started successfully! Click Refresh to update status.');
-            // Automatically refresh once after starting
-            setTimeout(refreshStatus, 2000);
+            // Update buttons
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-stop').disabled = false;
+            document.getElementById('btn-restart').disabled = false;
         } else {
-            alert('Failed to start: ' + data.message);
-            btn.disabled = false;
+            indicator.className = 'status-indicator stopped';
+            statusText.textContent = 'Stopped';
+            document.getElementById('uptime').textContent = '--';
+            document.getElementById('pid').textContent = '--';
+
+            // Update buttons
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-stop').disabled = true;
+            document.getElementById('btn-restart').disabled = true;
         }
-    } catch (error) {
-        alert('Error starting service: ' + error);
-        btn.disabled = false;
-    } finally {
-        btn.innerHTML = '<i class="fas fa-play"></i> Start';
     }
-}
 
-async function stopService() {
-    const btn = document.getElementById('stopBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+    // Update environment display
+    function updateEnvironmentDisplay(config) {
+        const envList = document.getElementById('env-list');
+        const env = config.environment;
 
-    try {
-        const response = await fetch('/ai_agent/api/service/stop', {method: 'POST'});
-        const data = await response.json();
+        let html = '';
+        for (const [key, value] of Object.entries(env)) {
+            const isConfigured = value && value !== 'Not set' && value !== 'Not configured';
+            const displayValue = value || 'Not configured';
 
-        if (data.success) {
-            alert('Service stopped successfully! Click Refresh to update status.');
-            // Automatically refresh once after stopping
-            setTimeout(refreshStatus, 1000);
-        } else {
-            alert('Failed to stop: ' + data.message);
-            btn.disabled = false;
-        }
-    } catch (error) {
-        alert('Error stopping service: ' + error);
-        btn.disabled = false;
-    } finally {
-        btn.innerHTML = '<i class="fas fa-stop"></i> Stop';
-    }
-}
-
-async function loadDepartments() {
-    try {
-        const response = await fetch('/ai_agent/api/departments');
-        const data = await response.json();
-
-        const container = document.getElementById('departmentsList');
-
-        if (data.success && data.departments && data.departments.length > 0) {
-            container.innerHTML = data.departments.map(dept => `
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="mb-1">${dept.display_name}</h6>
-                                <small class="text-muted">
-                                    Extension: ${dept.extension} | Endpoint: ${dept.endpoint}
-                                </small>
-                                ${dept.description ? `<p class="mb-0 mt-2 small">${dept.description}</p>` : ''}
-                            </div>
-                            <span class="badge ${dept.enabled ? 'bg-success' : 'bg-secondary'}">
-                                ${dept.enabled ? 'Enabled' : 'Disabled'}
-                            </span>
+            html += `
+                <div class="env-item">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <span class="env-key">${key}</span>
+                        <div class="ms-auto d-flex align-items-center">
+                            <span class="env-value" title="${displayValue}">${displayValue}</span>
+                            <span class="env-status ${isConfigured ? 'configured' : 'not-configured'}"></span>
                         </div>
                     </div>
                 </div>
-            `).join('');
-        } else {
-            container.innerHTML = `
-                <div class="text-center py-4">
-                    <i class="fas fa-building fa-3x text-muted mb-3"></i>
-                    <p class="text-muted">No departments configured yet</p>
+            `;
+        }
+
+        envList.innerHTML = html;
+    }
+
+    // Fetch status
+    async function fetchStatus() {
+        try {
+            const response = await fetch('/ai_agent/api/status');
+            const data = await response.json();
+
+            if (data.success) {
+                updateStatusDisplay(data);
+            }
+        } catch (error) {
+            console.error('Error fetching status:', error);
+        }
+    }
+
+    // Fetch config
+    async function fetchConfig() {
+        try {
+            const response = await fetch('/ai_agent/api/config');
+            const data = await response.json();
+
+            if (data.success) {
+                const agentPath = data.config.agent_path;
+                const fileName = agentPath.split('/').pop();
+                document.getElementById('agent-path').textContent = fileName;
+                document.getElementById('agent-path').title = agentPath;
+                updateEnvironmentDisplay(data.config);
+            }
+        } catch (error) {
+            console.error('Error fetching config:', error);
+            document.getElementById('env-list').innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Failed to load configuration
                 </div>
             `;
         }
-    } catch (error) {
-        console.error('Failed to load departments:', error);
     }
-}
 
-async function loadCallHistory(page = 1) {
-    try {
-        const response = await fetch(`/ai_agent/api/calls?page=${page}&per_page=20`);
-        const data = await response.json();
+    // Start service
+    async function startService() {
+        const btn = document.getElementById('btn-start');
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner me-2"></div><span>Starting...</span>';
 
-        const tbody = document.getElementById('callHistoryBody');
+        try {
+            const response = await fetch('/ai_agent/api/start', { method: 'POST' });
+            const data = await response.json();
 
-        if (data.success && data.calls && data.calls.length > 0) {
-            tbody.innerHTML = data.calls.map(call => `
-                <tr class="call-log-row" onclick="viewCallDetail(${call.id})">
-                    <td>${new Date(call.created_at).toLocaleString()}</td>
-                    <td>
-                        <strong>${call.caller_name || 'Unknown'}</strong><br>
-                        <small class="text-muted">${call.caller_number}</small>
-                    </td>
-                    <td>${call.call_duration ? call.call_duration + 's' : '-'}</td>
-                    <td><span class="badge bg-info">${call.turns_count || 0}</span></td>
-                    <td>${call.transferred_to ? `<span class="badge bg-success">${call.transferred_to}</span>` : '-'}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewCallDetail(${call.id})">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-        } else {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center py-4">
-                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">No call history yet</p>
-                    </td>
-                </tr>
-            `;
+            if (data.success) {
+                showAlert('AI Agent service started successfully!', 'success');
+                await fetchStatus();
+            } else {
+                showAlert(`Failed to start: ${data.message}`, 'danger');
+                btn.disabled = false;
+            }
+        } catch (error) {
+            showAlert(`Error: ${error.message}`, 'danger');
+            btn.disabled = false;
+        } finally {
+            btn.innerHTML = originalContent;
         }
-    } catch (error) {
-        console.error('Failed to load call history:', error);
     }
-}
 
-function viewCallDetail(callId) {
-    alert('Call detail view - coming soon');
-}
+    // Stop service
+    async function stopService() {
+        const btn = document.getElementById('btn-stop');
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner me-2"></div><span>Stopping...</span>';
 
-function showAddDepartmentModal() {
-    alert('Add department modal - coming soon');
-}
+        try {
+            const response = await fetch('/ai_agent/api/stop', { method: 'POST' });
+            const data = await response.json();
 
-// Load initial data on page load - NO AUTO-REFRESH
-document.addEventListener('DOMContentLoaded', () => {
-    loadConfig();
-    refreshStatus(); // Initial load only
-});
+            if (data.success) {
+                showAlert('AI Agent service stopped successfully!', 'success');
+                await fetchStatus();
+            } else {
+                showAlert(`Failed to stop: ${data.message}`, 'danger');
+                btn.disabled = false;
+            }
+        } catch (error) {
+            showAlert(`Error: ${error.message}`, 'danger');
+            btn.disabled = false;
+        } finally {
+            btn.innerHTML = originalContent;
+        }
+    }
+
+    // Restart service
+    async function restartService() {
+        const btn = document.getElementById('btn-restart');
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner me-2"></div><span>Restarting...</span>';
+
+        try {
+            const response = await fetch('/ai_agent/api/restart', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.success) {
+                showAlert('AI Agent service restarted successfully!', 'success');
+                await fetchStatus();
+            } else {
+                showAlert(`Failed to restart: ${data.message}`, 'danger');
+                btn.disabled = false;
+            }
+        } catch (error) {
+            showAlert(`Error: ${error.message}`, 'danger');
+            btn.disabled = false;
+        } finally {
+            btn.innerHTML = originalContent;
+        }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchStatus();
+        fetchConfig();
+
+        // Poll status every 3 seconds
+        statusInterval = setInterval(fetchStatus, 3000);
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (statusInterval) {
+            clearInterval(statusInterval);
+        }
+    });
 </script>
 {% endblock %}
