@@ -1,4 +1,5 @@
 import asyncio, aioari, os, tempfile, time, requests, pyttsx3, logging, paramiko, hashlib, json, signal, sys
+import threading
 from pydub import AudioSegment
 from pydub.effects import normalize
 from pathlib import Path
@@ -10,12 +11,16 @@ from urllib.parse import quote
 
 load_dotenv()
 
+
 class ColoredFormatter(logging.Formatter):
-    COLORS = {'DEBUG': '\033[36m', 'INFO': '\033[32m', 'WARNING': '\033[33m', 'ERROR': '\033[31m', 'CRITICAL': '\033[35m', 'RESET': '\033[0m'}
+    COLORS = {'DEBUG': '\033[36m', 'INFO': '\033[32m', 'WARNING': '\033[33m', 'ERROR': '\033[31m',
+              'CRITICAL': '\033[35m', 'RESET': '\033[0m'}
+
     def format(self, record):
         log_color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
         record.levelname = f"{log_color}{record.levelname}{self.COLORS['RESET']}"
         return super().format(record)
+
 
 handler = logging.StreamHandler()
 handler.setFormatter(ColoredFormatter('%(asctime)s - %(levelname)s - %(message)s'))
@@ -51,11 +56,15 @@ CACHE_DIR.mkdir(exist_ok=True)
 CACHE_INDEX_FILE = CACHE_DIR / "cache_index.json"
 
 # OPTIMIZED TIMING CONSTANTS
-BEEP_DELAY_AFTER_SPEAK = 0.1  # Reduced from 0.2s - faster response time
-BEEP_PAUSE_AFTER = 0.15       # Reduced from 0.3s - quicker start
+BEEP_DELAY_AFTER_SPEAK = 0.1
+BEEP_PAUSE_AFTER = 0.15
 
+# Heartbeat configuration
+HEARTBEAT_FILE = os.environ.get('AI_AGENT_HEARTBEAT_FILE')
+heartbeat_stop_event = threading.Event()
 shutdown_flag = asyncio.Event()
 active_calls = set()
+total_calls_processed = 0
 dataverse_token = None
 dataverse_token_expiry = 0
 
@@ -81,11 +90,68 @@ COMPANY: Sibasi Limited - Business consulting, tech solutions
 HOURS: Mon-Fri 9 AM - 5 PM EAT"""
 
 AI_TOOLS = [
-    {"type": "function", "function": {"name": "end_call", "description": "End call when done", "parameters": {"type": "object", "properties": {"reason": {"type": "string"}}, "required": ["reason"]}}},
-    {"type": "function", "function": {"name": "transfer_to_agent", "description": "Transfer to human agent", "parameters": {"type": "object", "properties": {"department": {"type": "string", "enum": ["sales", "support", "billing", "technical"]}, "reason": {"type": "string"}}, "required": ["department", "reason"]}}},
-    {"type": "function", "function": {"name": "create_ticket", "description": "Create support ticket", "parameters": {"type": "object", "properties": {"subject": {"type": "string"}, "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"]}, "description": {"type": "string"}}, "required": ["subject", "priority", "description"]}}},
-    {"type": "function", "function": {"name": "schedule_callback", "description": "Schedule callback", "parameters": {"type": "object", "properties": {"preferred_time": {"type": "string"}, "reason": {"type": "string"}}, "required": ["preferred_time", "reason"]}}}
+    {"type": "function", "function": {"name": "end_call", "description": "End call when done",
+                                      "parameters": {"type": "object", "properties": {"reason": {"type": "string"}},
+                                                     "required": ["reason"]}}},
+    {"type": "function", "function": {"name": "transfer_to_agent", "description": "Transfer to human agent",
+                                      "parameters": {"type": "object", "properties": {"department": {"type": "string",
+                                                                                                     "enum": ["sales",
+                                                                                                              "support",
+                                                                                                              "billing",
+                                                                                                              "technical"]},
+                                                                                      "reason": {"type": "string"}},
+                                                     "required": ["department", "reason"]}}},
+    {"type": "function", "function": {"name": "create_ticket", "description": "Create support ticket",
+                                      "parameters": {"type": "object", "properties": {"subject": {"type": "string"},
+                                                                                      "priority": {"type": "string",
+                                                                                                   "enum": ["low",
+                                                                                                            "medium",
+                                                                                                            "high",
+                                                                                                            "urgent"]},
+                                                                                      "description": {
+                                                                                          "type": "string"}},
+                                                     "required": ["subject", "priority", "description"]}}},
+    {"type": "function", "function": {"name": "schedule_callback", "description": "Schedule callback",
+                                      "parameters": {"type": "object",
+                                                     "properties": {"preferred_time": {"type": "string"},
+                                                                    "reason": {"type": "string"}},
+                                                     "required": ["preferred_time", "reason"]}}}
 ]
+
+
+def heartbeat_writer():
+    """Write heartbeat file every 5 seconds to prove we're alive"""
+    if not HEARTBEAT_FILE:
+        logger.debug("No heartbeat file configured")
+        return
+
+    logger.info(f"💓 Heartbeat writer started: {HEARTBEAT_FILE}")
+
+    while not heartbeat_stop_event.is_set():
+        try:
+            heartbeat_data = {
+                'timestamp': time.time(),
+                'pid': os.getpid(),
+                'active_calls': len(active_calls),
+                'total_calls': total_calls_processed
+            }
+
+            # Write atomically
+            temp_file = f"{HEARTBEAT_FILE}.tmp"
+            with open(temp_file, 'w') as f:
+                json.dump(heartbeat_data, f)
+
+            # Atomic rename
+            os.replace(temp_file, HEARTBEAT_FILE)
+
+        except Exception as e:
+            logger.error(f"Heartbeat write failed: {e}")
+
+        # Sleep for 5 seconds
+        heartbeat_stop_event.wait(5)
+
+    logger.info("💓 Heartbeat writer stopped")
+
 
 def normalize_phone(phone):
     """Normalize Kenyan phone to +254 format"""
@@ -103,6 +169,7 @@ def normalize_phone(phone):
         return '+' + cleaned
     return phone
 
+
 async def get_dataverse_token():
     """Get Dataverse access token with caching"""
     global dataverse_token, dataverse_token_expiry
@@ -110,9 +177,11 @@ async def get_dataverse_token():
         return dataverse_token
 
     try:
-        app = ConfidentialClientApplication(CLIENT_ID, authority=f"https://login.microsoftonline.com/{TENANT_ID}", client_credential=CLIENT_SECRET)
+        app = ConfidentialClientApplication(CLIENT_ID, authority=f"https://login.microsoftonline.com/{TENANT_ID}",
+                                            client_credential=CLIENT_SECRET)
         loop = asyncio.get_running_loop()
-        token_response = await loop.run_in_executor(None, lambda: app.acquire_token_for_client(scopes=[f"{DATAVERSE_URL}/.default"]))
+        token_response = await loop.run_in_executor(None, lambda: app.acquire_token_for_client(
+            scopes=[f"{DATAVERSE_URL}/.default"]))
 
         if "access_token" not in token_response:
             logger.error(f"❌ Token failed: {token_response.get('error_description', 'Unknown')}")
@@ -124,6 +193,7 @@ async def get_dataverse_token():
     except Exception as e:
         logger.error(f"❌ Token error: {e}")
         return None
+
 
 async def fetch_customer_claims(phone):
     """Fetch claims from Dataverse - optimized query"""
@@ -139,10 +209,11 @@ async def fetch_customer_claims(phone):
 
     logger.info(f"📊 Searching: {normalized} with {len(variants)} variants")
 
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json", "Prefer": "odata.include-annotations=*"}
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json",
+               "Prefer": "odata.include-annotations=*"}
     columns = "cra47_testclaimid,cra47_claimnumber,cra47_claimstatus,cra47_estimatedresolution,cra47_amountapproved,cra47_useremail,cra47_username,cra47_newcolumn,cra47_userphone"
 
-    filter_parts = [f"cra47_userphone eq '{v.replace(chr(39), chr(39)+chr(39))}'" for v in variants]
+    filter_parts = [f"cra47_userphone eq '{v.replace(chr(39), chr(39) + chr(39))}'" for v in variants]
     filter_query = " or ".join(filter_parts)
     url = f"{DATAVERSE_URL}/api/data/v9.2/cra47_testclaims?$select={columns}&$filter={quote(filter_query)}"
 
@@ -194,6 +265,7 @@ async def fetch_customer_claims(phone):
         "last_contact": time.strftime("%Y-%m-%d")
     }
 
+
 async def store_function_call(function_name, parameters, result, phone, status="completed"):
     """Store function call in Dataverse"""
     token = await get_dataverse_token()
@@ -213,13 +285,15 @@ async def store_function_call(function_name, parameters, result, phone, status="
     url = f"{DATAVERSE_URL}/api/data/v9.2/cra47_testtickets"
 
     loop = asyncio.get_running_loop()
-    response = await loop.run_in_executor(None, lambda: requests.post(url, headers=headers, json=record_data, timeout=10))
+    response = await loop.run_in_executor(None,
+                                          lambda: requests.post(url, headers=headers, json=record_data, timeout=10))
 
     if response.ok:
         logger.info(f"✅ Stored: {function_name}")
         return True
     logger.error(f"❌ Store failed: {response.status_code}")
     return False
+
 
 async def fetch_customer_data(phone):
     """Fetch customer data - Dataverse first, fallback to defaults"""
@@ -239,6 +313,7 @@ async def fetch_customer_data(phone):
         "services": ["Business Consulting", "Cloud Solutions"],
         "last_contact": time.strftime("%Y-%m-%d")
     }
+
 
 def build_context(customer_data):
     """Build system context with customer data"""
@@ -260,20 +335,22 @@ CUSTOMER:
         context += "\nNO CLAIMS found. Offer to create ticket if asked about claims.\n"
     return context
 
+
 async def execute_action(fn, args, customer_data, call_channel, ari_client, call_instance):
     """Execute AI function"""
     phone = customer_data.get('phone') if customer_data else 'Unknown'
 
     if fn == "create_ticket":
         ticket_id = f"TKT-{int(time.time())}"
-        print(f"\n{'='*70}\n🎫 TICKET CREATED: {ticket_id}\n📌 {args.get('subject')}\n⚠️ {args.get('priority').upper()}\n📝 {args.get('description')}\n{'='*70}\n")
+        print(
+            f"\n{'=' * 70}\n🎫 TICKET CREATED: {ticket_id}\n📌 {args.get('subject')}\n⚠️ {args.get('priority').upper()}\n📝 {args.get('description')}\n{'=' * 70}\n")
         result = {"status": "success", "ticket_id": ticket_id, "estimated_response": "24 hours"}
         await store_function_call("create_ticket", args, result, phone, "completed")
         return result
 
     elif fn == "transfer_to_agent":
         dept = args.get('department')
-        print(f"\n{'='*70}\n📞 TRANSFER: {dept.upper()}\n📋 {args.get('reason')}\n{'='*70}\n")
+        print(f"\n{'=' * 70}\n📞 TRANSFER: {dept.upper()}\n📋 {args.get('reason')}\n{'=' * 70}\n")
 
         if not call_channel or dept not in TRANSFER_CONFIG:
             result = {"status": "failed", "success": False}
@@ -302,7 +379,8 @@ async def execute_action(fn, args, customer_data, call_channel, ari_client, call
 
     elif fn == "schedule_callback":
         cb_id = f"CB-{int(time.time())}"
-        print(f"\n{'='*70}\n📅 CALLBACK: {cb_id}\n⏰ {args.get('preferred_time')}\n📋 {args.get('reason')}\n{'='*70}\n")
+        print(
+            f"\n{'=' * 70}\n📅 CALLBACK: {cb_id}\n⏰ {args.get('preferred_time')}\n📋 {args.get('reason')}\n{'=' * 70}\n")
         result = {"status": "scheduled", "callback_id": cb_id}
         await store_function_call("schedule_callback", args, result, phone, "completed")
         return result
@@ -313,6 +391,7 @@ async def execute_action(fn, args, customer_data, call_channel, ari_client, call
         return result
 
     return {"status": "unknown"}
+
 
 class ConversationContext:
     def __init__(self, customer_data, call_channel, ari_client):
@@ -325,10 +404,13 @@ class ConversationContext:
 
     def add_user(self, t):
         self.messages.append({"role": "user", "content": t})
+
     def add_assistant(self, t):
         self.messages.append({"role": "assistant", "content": t})
+
     def add_tool_call(self, tool, args, result):
         self.action_log.append({"tool": tool, "args": args, "result": result, "time": time.time()})
+
 
 class AIAssistant:
     def __init__(self, client):
@@ -337,13 +419,16 @@ class AIAssistant:
     async def respond(self, ctx, confidence="high", call_instance=None):
         messages = ctx.messages.copy()
         if confidence == "low" and not ctx.last_was_clarification:
-            messages.append({"role": "system", "content": "Poor audio. Ask once for clarification, then offer callback."})
+            messages.append(
+                {"role": "system", "content": "Poor audio. Ask once for clarification, then offer callback."})
             ctx.last_was_clarification = True
         else:
             ctx.last_was_clarification = False
 
         try:
-            r = await self.client.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT, messages=messages, max_tokens=200, temperature=0.9, tools=AI_TOOLS, tool_choice="auto")
+            r = await self.client.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT, messages=messages,
+                                                          max_tokens=200, temperature=0.9, tools=AI_TOOLS,
+                                                          tool_choice="auto")
             msg = r.choices[0].message
 
             if msg.tool_calls:
@@ -351,13 +436,16 @@ class AIAssistant:
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
 
-                result = await execute_action(fn, args, ctx.customer_data, ctx.call_channel, ctx.ari_client, call_instance)
+                result = await execute_action(fn, args, ctx.customer_data, ctx.call_channel, ctx.ari_client,
+                                              call_instance)
                 ctx.add_tool_call(fn, args, result)
 
-                messages.append({"role": "assistant", "content": None, "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": fn, "arguments": tc.function.arguments}}]})
+                messages.append({"role": "assistant", "content": None, "tool_calls": [
+                    {"id": tc.id, "type": "function", "function": {"name": fn, "arguments": tc.function.arguments}}]})
                 messages.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": json.dumps(result)})
 
-                r2 = await self.client.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT, messages=messages, max_tokens=200, temperature=0.9)
+                r2 = await self.client.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT, messages=messages,
+                                                               max_tokens=200, temperature=0.9)
                 resp = r2.choices[0].message.content.strip()
 
                 if fn == "transfer_to_agent" and result.get('success'):
@@ -368,6 +456,7 @@ class AIAssistant:
         except Exception as e:
             logger.error(f"❌ AI error: {e}")
             return "Technical issue. Repeat that?", None
+
 
 class AzureSpeechTranscriber:
     def __init__(self):
@@ -390,7 +479,8 @@ class AzureSpeechTranscriber:
 
             try:
                 if processed != audio_file: os.unlink(processed)
-            except: pass
+            except:
+                pass
 
             return text, confidence
         except Exception as e:
@@ -407,20 +497,25 @@ class AzureSpeechTranscriber:
         except:
             return audio_file
 
+
 class SoundCache:
     def __init__(self):
         self.index = json.load(open(CACHE_INDEX_FILE)) if CACHE_INDEX_FILE.exists() else {}
 
     def _save(self):
-        try: json.dump(self.index, open(CACHE_INDEX_FILE, 'w'))
-        except: pass
+        try:
+            json.dump(self.index, open(CACHE_INDEX_FILE, 'w'))
+        except:
+            pass
 
     def _key(self, t):
         return hashlib.md5(t.encode()).hexdigest()
 
     def _duration(self, path):
-        try: return len(AudioSegment.from_file(path)) / 1000.0
-        except: return None
+        try:
+            return len(AudioSegment.from_file(path)) / 1000.0
+        except:
+            return None
 
     async def get(self, text, ssh):
         k = self._key(text)
@@ -446,15 +541,19 @@ class SoundCache:
 
             try:
                 from gtts import gTTS
-                await asyncio.get_running_loop().run_in_executor(None, lambda: gTTS(text=text, lang='en', slow=False).save(str(tmp)))
+                await asyncio.get_running_loop().run_in_executor(None,
+                                                                 lambda: gTTS(text=text, lang='en', slow=False).save(
+                                                                     str(tmp)))
             except:
                 await asyncio.get_running_loop().run_in_executor(None, self._pyttsx, text, str(tmp))
 
             audio = AudioSegment.from_file(str(tmp))
             audio = normalize(audio).set_frame_rate(8000).set_channels(1).set_sample_width(2)
             audio.export(str(f), format="wav")
-            try: tmp.unlink()
-            except: pass
+            try:
+                tmp.unlink()
+            except:
+                pass
             return str(f)
         except Exception as e:
             logger.error(f"❌ TTS failed: {e}")
@@ -467,7 +566,9 @@ class SoundCache:
             e.save_to_file(t, o)
             e.runAndWait()
             e.stop()
-        except: pass
+        except:
+            pass
+
 
 class SSH:
     def __init__(self):
@@ -478,7 +579,11 @@ class SSH:
         try:
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            await asyncio.get_running_loop().run_in_executor(None, lambda: self.client.connect(SSH_HOST, username=SSH_USER, password=SSH_PASSWORD, timeout=10, look_for_keys=False))
+            await asyncio.get_running_loop().run_in_executor(None,
+                                                             lambda: self.client.connect(SSH_HOST, username=SSH_USER,
+                                                                                         password=SSH_PASSWORD,
+                                                                                         timeout=10,
+                                                                                         look_for_keys=False))
             self.sftp = self.client.open_sftp()
             logger.info("✅ SSH connected")
             return True
@@ -490,7 +595,8 @@ class SSH:
         try:
             _, o, _ = await asyncio.get_running_loop().run_in_executor(None, lambda: self.client.exec_command(c))
             return o.channel.recv_exit_status() == 0
-        except: return False
+        except:
+            return False
 
     async def upload(self, local, fn):
         async with self._lock:
@@ -509,43 +615,9 @@ class SSH:
         try:
             if self.sftp: self.sftp.close()
             if self.client: self.client.close()
-        except: pass
+        except:
+            pass
 
-def detect_silence_in_audio(audio_file, threshold=300, silence_duration=1.5):
-    """
-    Detect if audio file ends with silence by analyzing audio energy levels.
-    Returns True if significant silence detected at the end.
-    """
-    try:
-        audio = AudioSegment.from_file(audio_file)
-
-        # Analyze last 2 seconds
-        analysis_window = min(2000, len(audio))
-        if analysis_window < 500:  # Too short to analyze
-            return False
-
-        recent_audio = audio[-analysis_window:]
-
-        # Calculate RMS (root mean square) energy in 100ms chunks
-        chunk_size = 100  # ms
-        chunks = [recent_audio[i:i+chunk_size] for i in range(0, len(recent_audio), chunk_size)]
-
-        silent_duration = 0
-        for chunk in reversed(chunks):
-            if chunk.rms < threshold:
-                silent_duration += len(chunk)
-            else:
-                break  # Found sound, stop counting
-
-        # If we have enough silence at the end, return True
-        if silent_duration >= (silence_duration * 1000):  # Convert to ms
-            logger.info(f"🔇 Silence detected: {silent_duration/1000:.1f}s")
-            return True
-
-        return False
-    except Exception as e:
-        logger.debug(f"Silence detection error: {e}")
-        return False
 
 class Call:
     def __init__(self, ch, cl, ai, cache, ssh, transcriber, customer_data, ari_client):
@@ -574,7 +646,7 @@ class Call:
             sound, duration = await self.cache.get(text, self.ssh)
             if not sound: return False
             await self.ch.play(media=f"sound:{sound}")
-            await asyncio.sleep((duration or len(text.split())*0.4) + 0.3)  # Slightly reduced padding
+            await asyncio.sleep((duration or len(text.split()) * 0.4) + 0.3)
             return True
         except Exception as e:
             if "404" not in str(e): logger.error(f"❌ Speak error: {e}")
@@ -583,12 +655,15 @@ class Call:
 
     async def record(self, dur=8, sil=2.0):
         if not await self.alive(): return None
-        n = f"r_{self.id}_{int(time.time()*1000)}"
+        n = f"r_{self.id}_{int(time.time() * 1000)}"
         try:
-            rec = await self.ch.record(name=n, format="wav", maxDurationSeconds=dur, maxSilenceSeconds=sil, ifExists="overwrite", terminateOn="none")
+            rec = await self.ch.record(name=n, format="wav", maxDurationSeconds=dur, maxSilenceSeconds=sil,
+                                       ifExists="overwrite", terminateOn="none")
             await asyncio.sleep(dur + 0.5)
-            try: await rec.stop()
-            except: pass
+            try:
+                await rec.stop()
+            except:
+                pass
             await asyncio.sleep(0.2)
             return await self._download(n)
         except Exception as e:
@@ -605,34 +680,43 @@ class Call:
                     f.close()
                     self.tmp.append(f.name)
                     return f.name
-            except: pass
+            except:
+                pass
             await asyncio.sleep(0.15)
         return None
 
     async def cleanup(self):
         for f in self.tmp:
-            try: os.unlink(f)
-            except: pass
+            try:
+                os.unlink(f)
+            except:
+                pass
         active_calls.discard(self)
 
     async def hangup(self):
         try:
             if self.active: await self.ch.hangup()
-        except: pass
+        except:
+            pass
         self.active = False
+
 
 async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
     """Main call handler with optimized timing"""
+    global total_calls_processed
+
     caller_id = ch.json.get('caller', {}).get('number', 'Unknown')
     customer_data = await fetch_customer_data(caller_id)
     c = Call(ch, cl, ai, cache, ssh, transcriber, customer_data, ari_client)
+
+    total_calls_processed += 1
 
     try:
         await ch.answer()
         await asyncio.sleep(0.2)
 
-        # Print customer context to terminal (don't say it)
-        print(f"\n{'='*60}")
+        # Print customer context to terminal
+        print(f"\n{'=' * 60}")
         print(f"📞 CALL FROM: {customer_data.get('name')} ({customer_data.get('phone')})")
         print(f"📋 Account: {customer_data.get('account_number')}")
         claims = customer_data.get('claims', [])
@@ -642,14 +726,13 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
                 print(f"   {i}. #{claim['claim_id']} - {claim['status']} - {claim['amount']}")
         else:
             print(f"🎫 Claims: None")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
-        # Get current time in East Africa Time (UTC+3)
+        # Time-appropriate greeting
         import datetime
         eat_time = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
         hour = eat_time.hour
 
-        # Time-appropriate greeting
         if hour < 12:
             time_greeting = 'Good morning'
         elif hour < 17:
@@ -663,7 +746,6 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
         if not await c.speak(generic): return
         c.conv.add_assistant(generic)
 
-        # OPTIMIZED BEEP TIMING - faster response
         await asyncio.sleep(BEEP_DELAY_AFTER_SPEAK)
         await c.ch.play(media="sound:beep")
         await asyncio.sleep(BEEP_PAUSE_AFTER)
@@ -674,10 +756,7 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
         for turn in range(6):
             if not await c.alive() or c.should_end: break
 
-            # Record user input
             rec = await c.record()
-
-            # BEEP after recording to acknowledge
             await c.ch.play(media="sound:beep")
             await asyncio.sleep(0.1)
 
@@ -708,12 +787,11 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
 
             consecutive_unclear = 0
 
-            # Check goodbye
-            if len(text.split()) <= 4 and any(p in text.lower() for p in ["bye", "goodbye", "thanks", "thank you", "that's all", "done"]):
+            if len(text.split()) <= 4 and any(
+                    p in text.lower() for p in ["bye", "goodbye", "thanks", "thank you", "that's all", "done"]):
                 await c.speak("Anytime! Bye!")
                 break
 
-            # Add personalized acknowledgment on first interaction
             if first_interaction and customer_data.get('name') and customer_data['name'] != "Valued Customer":
                 name_ack = f"Thanks, {customer_data['name'].split()[0]}."
                 c.conv.add_assistant(name_ack)
@@ -723,8 +801,9 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
             resp, fn = await ai.respond(c.conv, confidence, c)
             c.conv.add_assistant(resp)
 
-            if fn == "transfer_to_agent" and c.conv.action_log and c.conv.action_log[-1].get('result', {}).get('success'):
-                return  # Transfer succeeded, exit
+            if fn == "transfer_to_agent" and c.conv.action_log and c.conv.action_log[-1].get('result', {}).get(
+                    'success'):
+                return
 
             if fn == "end_call":
                 c.should_end = True
@@ -735,7 +814,6 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
             if c.should_end:
                 break
 
-            # OPTIMIZED BEEP TIMING - faster turn-around
             await asyncio.sleep(BEEP_DELAY_AFTER_SPEAK)
             await c.ch.play(media="sound:beep")
             await asyncio.sleep(BEEP_PAUSE_AFTER)
@@ -751,23 +829,39 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
     finally:
         await c.cleanup()
 
+
 async def shutdown_handler(ssh, ari_client=None):
     """Graceful shutdown"""
     shutdown_flag.set()
+    heartbeat_stop_event.set()
+
+    # Clean up heartbeat file
+    if HEARTBEAT_FILE and os.path.exists(HEARTBEAT_FILE):
+        try:
+            os.unlink(HEARTBEAT_FILE)
+            logger.info("💓 Heartbeat file removed")
+        except Exception as e:
+            logger.warning(f"Could not remove heartbeat file: {e}")
+
     for call in list(active_calls):
-        try: await call.hangup()
-        except: pass
+        try:
+            await call.hangup()
+        except:
+            pass
     if ari_client:
-        try: await ari_client.close()
-        except: pass
+        try:
+            await ari_client.close()
+        except:
+            pass
     ssh.close()
 
+
 async def main():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("   🤖 AI Voice Agent - Sibasi Limited")
-    print("   ⚡ Optimized with Silence Detection")
+    print("   💓 WITH HEARTBEAT MONITORING")
     print("   📞 Production Ready")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     if not all([AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_SPEECH_KEY]):
         logger.error("❌ Missing Azure credentials")
@@ -780,10 +874,12 @@ async def main():
         else:
             logger.warning("⚠️ Dataverse auth failed")
 
-    client = AsyncAzureOpenAI(api_key=AZURE_OPENAI_API_KEY, api_version="2024-08-01-preview", azure_endpoint=AZURE_OPENAI_ENDPOINT)
+    client = AsyncAzureOpenAI(api_key=AZURE_OPENAI_API_KEY, api_version="2024-08-01-preview",
+                              azure_endpoint=AZURE_OPENAI_ENDPOINT)
 
     try:
-        await client.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT, messages=[{"role":"user","content":"Hi"}], max_tokens=5)
+        await client.chat.completions.create(model=AZURE_OPENAI_DEPLOYMENT,
+                                             messages=[{"role": "user", "content": "Hi"}], max_tokens=5)
         logger.info("✅ AI ready")
     except Exception as e:
         logger.error(f"❌ AI failed: {e}")
@@ -794,7 +890,15 @@ async def main():
 
     if not await ssh.connect(): return
 
-    # Cache common phrases with optimized timing
+    # START HEARTBEAT WRITER
+    if HEARTBEAT_FILE:
+        heartbeat_thread = threading.Thread(target=heartbeat_writer, daemon=True)
+        heartbeat_thread.start()
+        logger.info(f"✅ Heartbeat thread started → {HEARTBEAT_FILE}")
+    else:
+        logger.warning("⚠️ No heartbeat file configured (AI_AGENT_HEARTBEAT_FILE not set)")
+
+    # Cache common phrases
     phrases = [
         "Good morning, thank you for calling Sibasi Limited. How can I help you today?",
         "Good afternoon, thank you for calling Sibasi Limited. How can I help you today?",
@@ -823,18 +927,21 @@ async def main():
     try:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, signal_handler)
-    except: pass
+    except:
+        pass
 
     try:
         ari_client = await aioari.connect(ARI_BASE, USERNAME, PASSWORD)
         logger.info("✅ ARI connected")
 
-        ari_client.on_event("StasisStart", lambda e: asyncio.create_task(wrap(e, ari_client, ai, cache, ssh, transcriber)))
+        ari_client.on_event("StasisStart",
+                            lambda e: asyncio.create_task(wrap(e, ari_client, ai, cache, ssh, transcriber)))
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("   🎙️ SYSTEM READY")
+        print("   💓 Heartbeat active")
         print("   Press Ctrl+C to shutdown")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         await ari_client.run(apps=APPLICATION)
 
@@ -846,6 +953,7 @@ async def main():
         await shutdown_handler(ssh, ari_client)
         os._exit(0)
 
+
 async def wrap(e, ari_cl, ai, cache, ssh, transcriber):
     """Call wrapper"""
     cid = e.get("channel", {}).get("id")
@@ -855,6 +963,7 @@ async def wrap(e, ari_cl, ai, cache, ssh, transcriber):
         await handle(ch, ari_cl, ai, cache, ssh, transcriber, ari_cl)
     except Exception as ex:
         logger.error(f"❌ Wrapper error: {ex}")
+
 
 if __name__ == "__main__":
     try:
