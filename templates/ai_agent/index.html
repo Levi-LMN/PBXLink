@@ -5,272 +5,38 @@
 
 {% block extra_css %}
 <style>
-    .status-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        border: 1px solid #e2e8f0;
-        height: 100%;
-    }
-
-    .status-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.875rem;
-    }
-
-    .status-badge.running {
-        background: rgba(25,135,84,0.1);
-        color: #198754;
-    }
-
-    .status-badge.stopped {
-        background: rgba(220,53,69,0.1);
-        color: #dc3545;
-    }
-
-    .status-badge .pulse {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        animation: pulse 2s infinite;
-    }
-
-    .status-badge.running .pulse {
-        background: #198754;
-    }
-
-    .status-badge.stopped .pulse {
-        background: #dc3545;
-    }
-
     @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
     }
-
-    .metric {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.75rem 0;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .metric:last-child {
-        border-bottom: none;
-    }
-
-    .metric-label {
-        color: #64748b;
-        font-size: 0.875rem;
-        font-weight: 500;
-    }
-
-    .metric-value {
-        color: #1e293b;
-        font-weight: 600;
-        font-size: 0.875rem;
-    }
-
-    .control-btn {
-        padding: 0.75rem 1.5rem;
-        border-radius: 6px;
-        border: none;
-        font-weight: 600;
-        font-size: 0.875rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .control-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .btn-start {
-        background: #198754;
-        color: white;
-    }
-
-    .btn-start:hover:not(:disabled) {
-        background: #157347;
-    }
-
-    .btn-stop {
-        background: #dc3545;
-        color: white;
-    }
-
-    .btn-stop:hover:not(:disabled) {
-        background: #bb2d3b;
-    }
-
-    .btn-restart {
-        background: #ffc107;
-        color: #000;
-    }
-
-    .btn-restart:hover:not(:disabled) {
-        background: #ffca2c;
-    }
-
-    .log-viewer {
-        background: #1e293b;
-        color: #e2e8f0;
-        border-radius: 6px;
-        padding: 1rem;
-        font-family: 'Courier New', monospace;
-        font-size: 0.75rem;
-        height: 400px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-    }
-
-    .log-viewer::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    .log-viewer::-webkit-scrollbar-track {
-        background: #0f172a;
-        border-radius: 4px;
-    }
-
-    .log-viewer::-webkit-scrollbar-thumb {
-        background: #475569;
-        border-radius: 4px;
-    }
-
-    .log-line {
-        padding: 0.25rem 0;
-        line-height: 1.5;
-    }
-
-    .log-line.error {
-        color: #fca5a5;
-    }
-
-    .log-line.warning {
-        color: #fcd34d;
-    }
-
-    .log-line.info {
-        color: #93c5fd;
-    }
-
-    .log-line.success {
-        color: #86efac;
-    }
-
-    .config-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.75rem;
-        background: #f8fafc;
-        border-radius: 6px;
-        margin-bottom: 0.5rem;
-    }
-
-    .config-label {
-        font-weight: 500;
-        color: #475569;
-        font-size: 0.875rem;
-    }
-
-    .config-value {
-        font-family: 'Courier New', monospace;
-        color: #1e293b;
-        font-size: 0.8rem;
-        background: white;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        border: 1px solid #e2e8f0;
-    }
-
-    .config-value.masked {
-        color: #94a3b8;
-    }
-
-    .heartbeat-indicator {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 0.75rem;
-        background: #f0fdf4;
-        border: 1px solid #86efac;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        color: #166534;
-        font-weight: 500;
-    }
-
-    .heartbeat-icon {
-        color: #16a34a;
-        animation: heartbeat 1.5s infinite;
-    }
+    .pulse { animation: pulse 2s infinite; }
 
     @keyframes heartbeat {
         0%, 100% { transform: scale(1); }
         10%, 30% { transform: scale(1.2); }
         20%, 40% { transform: scale(1); }
     }
+    .heartbeat-icon { animation: heartbeat 1.5s infinite; }
 
-    .alert-box {
+    .log-viewer {
+        background: #1e293b;
+        color: #e2e8f0;
+        font-family: 'Courier New', monospace;
+        font-size: 0.75rem;
+        height: 400px;
+        overflow-y: auto;
+        white-space: pre-wrap;
         padding: 1rem;
-        border-radius: 6px;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: start;
-        gap: 0.75rem;
     }
 
-    .alert-box.warning {
-        background: #fffbeb;
-        border: 1px solid #fcd34d;
-        color: #92400e;
-    }
+    .log-line.error { color: #fca5a5; }
+    .log-line.warning { color: #fcd34d; }
+    .log-line.info { color: #93c5fd; }
 
-    .alert-box.error {
-        background: #fef2f2;
-        border: 1px solid #fca5a5;
-        color: #991b1b;
-    }
-
-    .alert-box.info {
-        background: #eff6ff;
-        border: 1px solid #93c5fd;
-        color: #1e40af;
-    }
-
-    .loading-spinner {
-        display: inline-block;
-        width: 16px;
-        height: 16px;
-        border: 2px solid rgba(255,255,255,0.3);
-        border-radius: 50%;
-        border-top-color: white;
-        animation: spin 0.6s linear infinite;
-    }
-
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
+    .transcript-line { padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 6px; }
+    .transcript-line.user { background: #eff6ff; border-left: 3px solid #0d6efd; }
+    .transcript-line.ai { background: #f0fdf4; border-left: 3px solid #198754; }
+    .speaker-label { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 0.25rem; }
 </style>
 {% endblock %}
 
@@ -278,140 +44,153 @@
 <div class="row g-4">
     <!-- Status Overview -->
     <div class="col-lg-8">
-        <div class="status-card">
-            <div class="status-header">
-                <div>
-                    <h5 class="mb-1">
-                        <i class="fas fa-robot text-primary me-2"></i>
-                        Service Status
-                    </h5>
-                    <p class="text-muted small mb-0">Real-time AI Agent monitoring</p>
-                </div>
-                <div id="status-badge-container">
-                    <span class="status-badge stopped">
-                        <span class="pulse"></span>
-                        Checking...
-                    </span>
-                </div>
-            </div>
-
-            <div id="alert-container"></div>
-
-            <div class="row g-3 mt-2">
-                <div class="col-md-6">
-                    <div class="metric">
-                        <span class="metric-label">
-                            <i class="fas fa-clock me-2"></i>Uptime
-                        </span>
-                        <span class="metric-value" id="uptime">-</span>
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="mb-1"><i class="fas fa-robot text-primary me-2"></i>Service Status</h5>
+                        <small class="text-muted">Real-time AI Agent monitoring</small>
+                    </div>
+                    <div id="status-badge-container">
+                        <span class="badge bg-secondary"><span class="pulse">●</span> Checking...</span>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="metric">
-                        <span class="metric-label">
-                            <i class="fas fa-hashtag me-2"></i>Process ID
-                        </span>
-                        <span class="metric-value" id="pid">-</span>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="metric">
-                        <span class="metric-label">
-                            <i class="fas fa-phone-alt me-2"></i>Active Calls
-                        </span>
-                        <span class="metric-value" id="active-calls">-</span>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="metric">
-                        <span class="metric-label">
-                            <i class="fas fa-chart-line me-2"></i>Total Calls
-                        </span>
-                        <span class="metric-value" id="total-calls">-</span>
-                    </div>
-                </div>
-            </div>
 
-            <div id="heartbeat-container" class="mt-3" style="display: none;">
-                <div class="heartbeat-indicator">
-                    <i class="fas fa-heartbeat heartbeat-icon"></i>
-                    <span>Last heartbeat: <strong id="heartbeat-time">-</strong></span>
-                </div>
-            </div>
+                <div id="alert-container"></div>
 
-            <div class="mt-4 d-flex gap-2">
-                <button class="control-btn btn-start" id="btn-start" onclick="startService()">
-                    <i class="fas fa-play"></i>
-                    <span>Start Service</span>
-                </button>
-                <button class="control-btn btn-stop" id="btn-stop" onclick="stopService()" disabled>
-                    <i class="fas fa-stop"></i>
-                    <span>Stop Service</span>
-                </button>
-                <button class="control-btn btn-restart" id="btn-restart" onclick="restartService()" disabled>
-                    <i class="fas fa-redo"></i>
-                    <span>Restart Service</span>
-                </button>
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-clock text-primary mb-2"></i>
+                            <div class="fw-bold" id="uptime">-</div>
+                            <small class="text-muted">Uptime</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-hashtag text-primary mb-2"></i>
+                            <div class="fw-bold" id="pid">-</div>
+                            <small class="text-muted">Process ID</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-phone-alt text-primary mb-2"></i>
+                            <div class="fw-bold" id="active-calls">-</div>
+                            <small class="text-muted">Active Calls</small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <i class="fas fa-chart-line text-primary mb-2"></i>
+                            <div class="fw-bold" id="total-calls">-</div>
+                            <small class="text-muted">Total Calls</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="heartbeat-container" class="mt-3 d-none">
+                    <div class="alert alert-success d-flex align-items-center">
+                        <i class="fas fa-heartbeat heartbeat-icon me-2"></i>
+                        <span>Last heartbeat: <strong id="heartbeat-time">-</strong></span>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex flex-wrap gap-2">
+                    <button class="btn btn-success" id="btn-start" onclick="startService()">
+                        <i class="fas fa-play me-2"></i>Start
+                    </button>
+                    <button class="btn btn-danger" id="btn-stop" onclick="stopService()" disabled>
+                        <i class="fas fa-stop me-2"></i>Stop
+                    </button>
+                    <button class="btn btn-warning" id="btn-restart" onclick="restartService()" disabled>
+                        <i class="fas fa-redo me-2"></i>Restart
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Quick Info -->
+    <!-- Configuration -->
     <div class="col-lg-4">
-        <div class="status-card">
-            <h6 class="mb-3">
-                <i class="fas fa-info-circle text-primary me-2"></i>
-                Configuration
-            </h6>
-
-            <div class="config-item">
-                <span class="config-label">Azure OpenAI</span>
-                <span class="config-value" id="azure-status">
-                    <i class="fas fa-circle-notch fa-spin"></i>
-                </span>
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-cog text-primary me-2"></i>Configuration
             </div>
-
-            <div class="config-item">
-                <span class="config-label">Azure Speech</span>
-                <span class="config-value" id="speech-status">
-                    <i class="fas fa-circle-notch fa-spin"></i>
-                </span>
-            </div>
-
-            <div class="config-item">
-                <span class="config-label">Dataverse</span>
-                <span class="config-value" id="dataverse-status">
-                    <i class="fas fa-circle-notch fa-spin"></i>
-                </span>
-            </div>
-
-            <div class="config-item">
-                <span class="config-label">Log File</span>
-                <span class="config-value" id="log-file" style="font-size: 0.7rem;">-</span>
-            </div>
-
-            <div class="config-item">
-                <span class="config-label">Heartbeat File</span>
-                <span class="config-value" id="heartbeat-file" style="font-size: 0.7rem;">-</span>
-            </div>
-
-            <div class="mt-3">
-                <button class="btn btn-outline-primary btn-sm w-100" onclick="refreshStatus()">
-                    <i class="fas fa-sync-alt me-2"></i>
-                    Refresh Status
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Azure OpenAI</span>
+                        <span id="azure-status" class="badge bg-secondary">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                        </span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Azure Speech</span>
+                        <span id="speech-status" class="badge bg-secondary">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                        </span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <span>Dataverse</span>
+                        <span id="dataverse-status" class="badge bg-secondary">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                        </span>
+                    </div>
+                </div>
+                <button class="btn btn-outline-primary btn-sm w-100 mt-3" onclick="refreshStatus()">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh Status
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Live Logs -->
+    <!-- Recent Conversations -->
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span>
-                    <i class="fas fa-terminal text-primary me-2"></i>
-                    Live Logs
-                </span>
+                <span><i class="fas fa-history text-primary me-2"></i>Recent Conversations</span>
+                <button class="btn btn-sm btn-outline-primary" onclick="loadCalls()">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- Filters -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control form-control-sm" id="filter-caller" placeholder="Caller Number">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select form-select-sm" id="filter-limit">
+                            <option value="10">10 calls</option>
+                            <option value="25" selected>25 calls</option>
+                            <option value="50">50 calls</option>
+                            <option value="100">100 calls</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-sm btn-primary w-100" onclick="loadCalls()">
+                            <i class="fas fa-filter me-2"></i>Apply
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Calls List -->
+                <div id="calls-container">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="text-muted mt-2">Loading conversations...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Logs -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-terminal text-primary me-2"></i>System Logs</span>
                 <div class="btn-group btn-group-sm">
                     <button class="btn btn-outline-secondary" onclick="refreshLogs()">
                         <i class="fas fa-sync-alt"></i>
@@ -422,13 +201,28 @@
                 </div>
             </div>
             <div class="card-body p-0">
-                <div class="log-viewer" id="log-viewer">
+                <div class="log-viewer rounded" id="log-viewer">
                     <div class="text-center py-5">
-                        <i class="fas fa-circle-notch fa-spin fa-2x mb-3 opacity-50"></i>
-                        <p class="mb-0 opacity-75">Loading logs...</p>
+                        <div class="spinner-border text-light" role="status"></div>
+                        <p class="mt-2 opacity-75">Loading logs...</p>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Call Details Modal -->
+<div class="modal fade" id="callModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-comments text-primary me-2"></i>Call Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modal-content"></div>
         </div>
     </div>
 </div>
@@ -438,221 +232,321 @@
 <script>
 let autoScroll = true;
 let statusCheckInterval;
+let callsModal;
 
-// Format uptime
+document.addEventListener('DOMContentLoaded', function() {
+    callsModal = new bootstrap.Modal(document.getElementById('callModal'));
+    updateStatus();
+    updateLogs();
+    loadCalls();
+    statusCheckInterval = setInterval(updateStatus, 5000);
+    setInterval(updateLogs, 10000);
+    setInterval(loadCalls, 30000);
+});
+
 function formatUptime(seconds) {
     if (!seconds) return '-';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    if (minutes > 0) return `${minutes}m ${secs}s`;
-    return `${secs}s`;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
 }
 
-// Format timestamp
 function formatTimestamp(timestamp) {
     if (!timestamp) return '-';
-    const now = Date.now() / 1000;
-    const diff = now - timestamp;
-
-    if (diff < 1) return 'Just now';
+    const diff = Date.now() / 1000 - timestamp;
     if (diff < 60) return `${Math.floor(diff)}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     return new Date(timestamp * 1000).toLocaleTimeString();
 }
 
-// Update status display
+function formatDuration(seconds) {
+    if (!seconds) return '0s';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
 async function updateStatus() {
     try {
         const response = await fetch('/ai_agent/api/status');
         const data = await response.json();
-
-        if (!data.success) {
-            showAlert('error', 'Failed to get status: ' + (data.error || 'Unknown error'));
-            return;
-        }
+        if (!data.success) return;
 
         const status = data.status;
         const env = data.environment;
         const isRunning = status.running;
 
-        // Update status badge
-        const badgeContainer = document.getElementById('status-badge-container');
-        badgeContainer.innerHTML = `
-            <span class="status-badge ${isRunning ? 'running' : 'stopped'}">
-                <span class="pulse"></span>
-                ${isRunning ? 'Running' : 'Stopped'}
-            </span>
-        `;
+        document.getElementById('status-badge-container').innerHTML = isRunning ?
+            '<span class="badge bg-success"><span class="pulse">●</span> Running</span>' :
+            '<span class="badge bg-danger"><span class="pulse">●</span> Stopped</span>';
 
-        // Update metrics
         document.getElementById('uptime').textContent = formatUptime(status.uptime_seconds);
         document.getElementById('pid').textContent = status.pid || '-';
         document.getElementById('active-calls').textContent = status.active_calls || 0;
         document.getElementById('total-calls').textContent = status.total_calls || 0;
 
-        // Update heartbeat
         if (isRunning && status.last_heartbeat) {
-            document.getElementById('heartbeat-container').style.display = 'block';
+            document.getElementById('heartbeat-container').classList.remove('d-none');
             document.getElementById('heartbeat-time').textContent = formatTimestamp(status.last_heartbeat);
         } else {
-            document.getElementById('heartbeat-container').style.display = 'none';
+            document.getElementById('heartbeat-container').classList.add('d-none');
         }
 
-        // Update buttons
         document.getElementById('btn-start').disabled = isRunning;
         document.getElementById('btn-stop').disabled = !isRunning;
         document.getElementById('btn-restart').disabled = !isRunning;
 
-        // Update config status
         document.getElementById('azure-status').innerHTML = env.azure_openai_configured ?
-            '<i class="fas fa-check-circle text-success"></i> Configured' :
-            '<i class="fas fa-times-circle text-danger"></i> Not Set';
+            '<i class="fas fa-check-circle"></i> OK' : '<i class="fas fa-times-circle"></i> Missing';
+        document.getElementById('azure-status').className = env.azure_openai_configured ? 'badge bg-success' : 'badge bg-danger';
 
         document.getElementById('speech-status').innerHTML = env.azure_speech_configured ?
-            '<i class="fas fa-check-circle text-success"></i> Configured' :
-            '<i class="fas fa-times-circle text-danger"></i> Not Set';
+            '<i class="fas fa-check-circle"></i> OK' : '<i class="fas fa-times-circle"></i> Missing';
+        document.getElementById('speech-status').className = env.azure_speech_configured ? 'badge bg-success' : 'badge bg-danger';
 
         document.getElementById('dataverse-status').innerHTML = env.dataverse_configured ?
-            '<i class="fas fa-check-circle text-success"></i> Configured' :
-            '<i class="fas fa-info-circle text-muted"></i> Optional';
+            '<i class="fas fa-check-circle"></i> OK' : '<i class="fas fa-info-circle"></i> Optional';
+        document.getElementById('dataverse-status').className = env.dataverse_configured ? 'badge bg-success' : 'badge bg-secondary';
 
-        document.getElementById('log-file').textContent = status.log_file || '-';
-        document.getElementById('heartbeat-file').textContent = status.heartbeat_file || '-';
-
-        // Show warnings if not configured
         if (!env.azure_openai_configured || !env.azure_speech_configured) {
-            showAlert('warning', 'Azure credentials not configured. Service cannot start until configured.');
+            document.getElementById('alert-container').innerHTML = `
+                <div class="alert alert-warning alert-dismissible fade show">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Azure credentials not configured. Service cannot start.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
         } else {
-            clearAlert();
+            document.getElementById('alert-container').innerHTML = '';
         }
-
     } catch (error) {
         console.error('Status update failed:', error);
-        showAlert('error', 'Failed to communicate with service: ' + error.message);
     }
 }
 
-// Show alert
-function showAlert(type, message) {
-    const container = document.getElementById('alert-container');
-    const iconMap = {
-        'warning': 'exclamation-triangle',
-        'error': 'exclamation-circle',
-        'info': 'info-circle'
-    };
+async function loadCalls() {
+    try {
+        const caller = document.getElementById('filter-caller')?.value || '';
+        const limit = document.getElementById('filter-limit')?.value || '25';
+        let url = `/admin/api/ai-agent-calls?limit=${limit}`;
+        if (caller) url += `&caller_number=${encodeURIComponent(caller)}`;
 
-    container.innerHTML = `
-        <div class="alert-box ${type}">
-            <i class="fas fa-${iconMap[type]}"></i>
-            <div>${message}</div>
-        </div>
-    `;
+        const response = await fetch(url);
+        const data = await response.json();
+        const container = document.getElementById('calls-container');
+
+        if (!data.success || !data.calls || data.calls.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-phone-slash fa-3x mb-3 opacity-25"></i>
+                    <p>No conversations found</p>
+                </div>`;
+            return;
+        }
+
+        let html = '<div class="list-group">';
+        data.calls.forEach(call => {
+            const intentClass = call.intent === 'transfer_requested' ? 'warning' :
+                               call.intent === 'ticket_created' ? 'info' : 'success';
+            html += `
+                <a href="#" class="list-group-item list-group-item-action" onclick="showCallDetails('${call.call_id}'); return false;">
+                    <div class="d-flex w-100 justify-content-between">
+                        <div>
+                            <h6 class="mb-1">
+                                <i class="fas fa-user me-2"></i>${call.caller_name || 'Unknown Caller'}
+                            </h6>
+                            <small class="text-muted">${call.caller_number || 'No number'}</small>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">${new Date(call.call_start).toLocaleString()}</small>
+                            <br><strong>${formatDuration(call.call_duration)}</strong>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        ${call.intent ? `<span class="badge bg-${intentClass} me-1">${call.intent.replace('_', ' ')}</span>` : ''}
+                        ${call.transferred_to ? '<span class="badge bg-warning me-1"><i class="fas fa-exchange-alt me-1"></i>Transferred</span>' : ''}
+                        ${call.turns_count ? `<span class="badge bg-info me-1">${call.turns_count} turns</span>` : ''}
+                        ${call.avg_confidence ? `<span class="badge bg-secondary me-1">${Math.round(call.avg_confidence * 100)}% confidence</span>` : ''}
+                    </div>
+                    ${call.summary ? `<p class="mb-1 mt-2 small">${call.summary}</p>` : ''}
+                </a>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Failed to load calls:', error);
+        document.getElementById('calls-container').innerHTML = `
+            <div class="text-center py-5 text-danger">
+                <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                <p>Failed to load conversations</p>
+            </div>`;
+    }
 }
 
-// Clear alert
-function clearAlert() {
-    document.getElementById('alert-container').innerHTML = '';
+async function showCallDetails(callId) {
+    try {
+        const response = await fetch(`/admin/api/ai-agent-calls/${callId}`);
+        const data = await response.json();
+        if (!data.success) {
+            showToast('Failed to load call details', 'danger');
+            return;
+        }
+
+        const call = data.call;
+        let html = `
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <small class="text-muted d-block mb-1">Caller</small>
+                            <strong>${call.caller_name || 'Unknown'}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <small class="text-muted d-block mb-1">Number</small>
+                            <strong>${call.caller_number || '-'}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <small class="text-muted d-block mb-1">Duration</small>
+                            <strong>${formatDuration(call.call_duration)}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            ${call.summary ? `
+            <div class="mb-4">
+                <h6><i class="fas fa-file-alt text-primary me-2"></i>Summary</h6>
+                <div class="alert alert-info">${call.summary}</div>
+            </div>` : ''}
+
+            ${call.transcript ? `
+            <div class="mb-4">
+                <h6><i class="fas fa-comments text-primary me-2"></i>Full Transcript</h6>
+                <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
+                    ${parseTranscript(call.transcript)}
+                </div>
+            </div>` : ''}
+
+            ${call.functions_called && call.functions_called.length > 0 ? `
+            <div class="mb-4">
+                <h6><i class="fas fa-cogs text-primary me-2"></i>Functions Called</h6>
+                <div class="list-group">
+                    ${call.functions_called.map(fn => `
+                        <div class="list-group-item">
+                            <strong>${fn.function}</strong>
+                            ${fn.args ? `<div class="small text-muted mt-1">Args: ${JSON.stringify(fn.args)}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>` : ''}
+        `;
+
+        document.getElementById('modal-content').innerHTML = html;
+        callsModal.show();
+    } catch (error) {
+        console.error('Failed to load call details:', error);
+        showToast('Failed to load call details', 'danger');
+    }
 }
 
-// Refresh status
+function parseTranscript(transcript) {
+    if (!transcript) return '<p class="text-muted">No transcript available</p>';
+    const lines = transcript.split('\n').filter(line => line.trim());
+    let html = '';
+    lines.forEach(line => {
+        if (line.startsWith('USER:')) {
+            html += `<div class="transcript-line user mb-2">
+                <div class="speaker-label text-primary">User</div>
+                <div>${line.replace('USER:', '').trim()}</div>
+            </div>`;
+        } else if (line.startsWith('AI:')) {
+            html += `<div class="transcript-line ai mb-2">
+                <div class="speaker-label text-success">AI Assistant</div>
+                <div>${line.replace('AI:', '').trim()}</div>
+            </div>`;
+        }
+    });
+    return html || '<p class="text-muted">No transcript available</p>';
+}
+
+async function startService() {
+    const btn = document.getElementById('btn-start');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
+    try {
+        const response = await fetch('/ai_agent/api/start', { method: 'POST' });
+        const data = await response.json();
+        showToast(data.success ? 'AI Agent started' : 'Failed to start: ' + data.message,
+                 data.success ? 'success' : 'danger');
+        if (data.success) setTimeout(updateStatus, 2000);
+    } catch (error) {
+        showToast('Error: ' + error.message, 'danger');
+    } finally {
+        btn.innerHTML = '<i class="fas fa-play me-2"></i>Start';
+        btn.disabled = false;
+    }
+}
+
+async function stopService() {
+    if (!confirm('Stop AI Agent service?')) return;
+    const btn = document.getElementById('btn-stop');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Stopping...';
+    try {
+        const response = await fetch('/ai_agent/api/stop', { method: 'POST' });
+        const data = await response.json();
+        showToast(data.success ? 'AI Agent stopped' : 'Failed to stop: ' + data.message,
+                 data.success ? 'success' : 'danger');
+        if (data.success) setTimeout(updateStatus, 1000);
+    } catch (error) {
+        showToast('Error: ' + error.message, 'danger');
+    } finally {
+        btn.innerHTML = '<i class="fas fa-stop me-2"></i>Stop';
+        btn.disabled = false;
+    }
+}
+
+async function restartService() {
+    if (!confirm('Restart AI Agent service?')) return;
+    const btn = document.getElementById('btn-restart');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Restarting...';
+    try {
+        const response = await fetch('/ai_agent/api/restart', { method: 'POST' });
+        const data = await response.json();
+        showToast(data.success ? 'AI Agent restarted' : 'Failed to restart: ' + data.message,
+                 data.success ? 'success' : 'danger');
+        if (data.success) setTimeout(updateStatus, 3000);
+    } catch (error) {
+        showToast('Error: ' + error.message, 'danger');
+    } finally {
+        btn.innerHTML = '<i class="fas fa-redo me-2"></i>Restart';
+        btn.disabled = false;
+    }
+}
+
 function refreshStatus() {
     updateStatus();
     updateLogs();
 }
 
-// Start service
-async function startService() {
-    const btn = document.getElementById('btn-start');
-    const originalContent = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner"></span> Starting...';
-
-    try {
-        const response = await fetch('/ai_agent/api/start', { method: 'POST' });
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('AI Agent started successfully', 'success');
-            setTimeout(updateStatus, 2000);
-        } else {
-            showToast('Failed to start: ' + data.message, 'danger');
-        }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'danger');
-    } finally {
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-    }
-}
-
-// Stop service
-async function stopService() {
-    if (!confirm('Stop AI Agent service?')) return;
-
-    const btn = document.getElementById('btn-stop');
-    const originalContent = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner"></span> Stopping...';
-
-    try {
-        const response = await fetch('/ai_agent/api/stop', { method: 'POST' });
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('AI Agent stopped', 'success');
-            setTimeout(updateStatus, 1000);
-        } else {
-            showToast('Failed to stop: ' + data.message, 'danger');
-        }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'danger');
-    } finally {
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-    }
-}
-
-// Restart service
-async function restartService() {
-    if (!confirm('Restart AI Agent service?')) return;
-
-    const btn = document.getElementById('btn-restart');
-    const originalContent = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner"></span> Restarting...';
-
-    try {
-        const response = await fetch('/ai_agent/api/restart', { method: 'POST' });
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('AI Agent restarted', 'success');
-            setTimeout(updateStatus, 3000);
-        } else {
-            showToast('Failed to restart: ' + data.message, 'danger');
-        }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'danger');
-    } finally {
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-    }
-}
-
-// Update logs
 async function updateLogs() {
     try {
         const response = await fetch('/ai_agent/api/logs?lines=100');
         const data = await response.json();
-
-        if (!data.success) return;
-
         const viewer = document.getElementById('log-viewer');
 
-        if (!data.logs || data.logs.length === 0) {
+        if (!data.success || !data.logs || data.logs.length === 0) {
             viewer.innerHTML = '<div class="text-center py-5 opacity-75">No logs available</div>';
             return;
         }
@@ -662,40 +556,31 @@ async function updateLogs() {
             if (line.includes('ERROR') || line.includes('❌')) className += ' error';
             else if (line.includes('WARNING') || line.includes('⚠️')) className += ' warning';
             else if (line.includes('INFO') || line.includes('✅')) className += ' info';
-
             return `<div class="${className}">${escapeHtml(line)}</div>`;
         }).join('');
 
         viewer.innerHTML = html;
-
-        if (autoScroll) {
-            viewer.scrollTop = viewer.scrollHeight;
-        }
+        if (autoScroll) viewer.scrollTop = viewer.scrollHeight;
     } catch (error) {
         console.error('Failed to load logs:', error);
     }
 }
 
-// Refresh logs
 function refreshLogs() {
     updateLogs();
 }
 
-// Toggle auto-scroll
 function toggleAutoScroll() {
     autoScroll = !autoScroll;
-    const icon = document.getElementById('autoscroll-icon');
-    icon.className = autoScroll ? 'fas fa-arrow-down' : 'fas fa-pause';
+    document.getElementById('autoscroll-icon').className = autoScroll ? 'fas fa-arrow-down' : 'fas fa-pause';
 }
 
-// Escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-// Toast notification
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `alert alert-${type} position-fixed top-0 end-0 m-3`;
@@ -705,24 +590,8 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 4000);
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    // Initial load
-    updateStatus();
-    updateLogs();
-
-    // Auto-refresh status every 5 seconds
-    statusCheckInterval = setInterval(updateStatus, 5000);
-
-    // Auto-refresh logs every 10 seconds
-    setInterval(updateLogs, 10000);
-});
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', function() {
-    if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-    }
+window.addEventListener('beforeunload', () => {
+    if (statusCheckInterval) clearInterval(statusCheckInterval);
 });
 </script>
 {% endblock %}
