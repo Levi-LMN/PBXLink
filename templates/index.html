@@ -5,7 +5,6 @@
 
 {% block content %}
 <style>
-    /* Subtle card styling */
     .stat-card {
         background: white;
         border-radius: 8px;
@@ -44,7 +43,6 @@
         letter-spacing: 0.5px;
     }
 
-    /* Service status */
     .service-status {
         display: inline-flex;
         align-items: center;
@@ -79,7 +77,6 @@
         background: #dc3545;
     }
 
-    /* Activity items */
     .activity-item {
         padding: 1rem;
         border-left: 2px solid #e2e8f0;
@@ -93,7 +90,6 @@
         background: #f1f5f9;
     }
 
-    /* Quick action buttons */
     .quick-action-btn {
         background: #0d6efd;
         border: none;
@@ -109,7 +105,6 @@
         color: white;
     }
 
-    /* Feature cards */
     .feature-card {
         background: white;
         border-radius: 8px;
@@ -129,7 +124,6 @@
         margin-bottom: 1rem;
     }
 
-    /* Progress bars */
     .progress {
         height: 6px;
         border-radius: 4px;
@@ -140,7 +134,6 @@
         border-radius: 4px;
     }
 
-    /* Service status grid */
     .service-item {
         background: white;
         border: 1px solid #e2e8f0;
@@ -614,49 +607,23 @@
         }
     }
 
-    // FIXED: New AI Agent status check using service/status endpoint
+    // AI Agent status check
     async function testAIAgent() {
         updateServiceStatus('ai-agent-status', false, 'Checking...');
         try {
-            const response = await fetch('/ai_agent/api/service/status');
+            const response = await fetch('/ai_agent/api/status');
             const data = await response.json();
 
             if (data.success && data.status) {
-                const status = data.status;
-                const isRunning = status.running;
+                const isRunning = data.status.running;
 
                 if (isRunning) {
-                    // Check critical connections
-                    const connections = status.connections || {};
-                    const criticalConnections = [
-                        connections.azure_openai,
-                        connections.azure_speech,
-                        connections.ari
-                    ];
-
-                    const connectedCount = criticalConnections.filter(c => c === true).length;
-
-                    if (connectedCount === 3) {
-                        // All critical services connected
-                        const activeCalls = status.active_calls || 0;
-                        if (activeCalls > 0) {
-                            updateServiceStatus('ai-agent-status', true, `Online (${activeCalls} call${activeCalls > 1 ? 's' : ''})`);
-                        } else {
-                            updateServiceStatus('ai-agent-status', true, 'Online');
-                        }
-                    } else if (connectedCount > 0) {
-                        // Partially connected - still starting up
-                        updateServiceStatus('ai-agent-status', true, 'Starting...');
-                    } else {
-                        // Service running but no connections
-                        updateServiceStatus('ai-agent-status', false, 'Error');
-                    }
+                    updateServiceStatus('ai-agent-status', true, 'Online');
                 } else {
-                    // Service not running
                     updateServiceStatus('ai-agent-status', false, 'Offline');
                 }
             } else {
-                updateServiceStatus('ai-agent-status', false, 'Offline');
+                updateServiceStatus('ai-agent-status', false, 'Error');
             }
         } catch (error) {
             updateServiceStatus('ai-agent-status', false, 'Error');
@@ -690,7 +657,6 @@
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
-        // Load all stats and test connections
         loadStats();
         loadExtensionStats();
         loadVPNStats();
