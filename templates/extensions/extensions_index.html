@@ -1,481 +1,423 @@
 {% extends "base.html" %}
 
-{% block title %}Extensions - FreePBX Dashboard{% endblock %}
+{% block title %}Extensions - Sibasi PBX{% endblock %}
 {% block page_title %}Extensions Management{% endblock %}
-
-{% block extra_css %}
-<style>
-    .stat-card {
-        background: white;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 1.25rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        transition: all 0.2s ease;
-    }
-
-    .stat-card:hover {
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
-    }
-
-    .stat-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-    }
-
-    .stat-value {
-        font-size: 1.75rem;
-        font-weight: 600;
-        margin: 0.5rem 0;
-        color: var(--text-primary);
-    }
-
-    .stat-label {
-        font-size: 0.875rem;
-        color: var(--text-secondary);
-        margin: 0;
-        font-weight: 500;
-    }
-
-    .btn-icon {
-        width: 32px;
-        height: 32px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .action-buttons .btn-group-sm .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-</style>
-{% endblock %}
+{% block page_subtitle %}Manage your phone system extensions and SIP accounts{% endblock %}
 
 {% block content %}
-<div class="row g-4 mb-4">
-    <!-- Stats Cards -->
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(25,135,84,0.1); color: #198754;">
-                <i class="fas fa-check-circle"></i>
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+    <!-- Online Extensions -->
+    <div class="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between mb-3">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-check-circle text-green-600 text-xl"></i>
             </div>
-            <h3 class="stat-value" id="online-count">-</h3>
-            <p class="stat-label">Online</p>
+            <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Active</span>
         </div>
+        <h3 class="text-3xl font-bold text-gray-900 mb-1" id="online-count">-</h3>
+        <p class="text-xs text-gray-500 font-medium">Online Extensions</p>
     </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(220,53,69,0.1); color: #dc3545;">
-                <i class="fas fa-times-circle"></i>
+    <!-- Offline Extensions -->
+    <div class="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between mb-3">
+            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-times-circle text-red-600 text-xl"></i>
             </div>
-            <h3 class="stat-value" id="offline-count">-</h3>
-            <p class="stat-label">Offline</p>
+            <span class="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded">Inactive</span>
         </div>
+        <h3 class="text-3xl font-bold text-gray-900 mb-1" id="offline-count">-</h3>
+        <p class="text-xs text-gray-500 font-medium">Offline Extensions</p>
     </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(13,110,253,0.1); color: #0d6efd;">
-                <i class="fas fa-phone-alt"></i>
+    <!-- Total Extensions -->
+    <div class="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between mb-3">
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-phone-alt text-blue-600 text-xl"></i>
             </div>
-            <h3 class="stat-value" id="total-count">-</h3>
-            <p class="stat-label">Total Extensions</p>
+            <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">Total</span>
         </div>
+        <h3 class="text-3xl font-bold text-gray-900 mb-1" id="total-count">-</h3>
+        <p class="text-xs text-gray-500 font-medium">Total Extensions</p>
     </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(255,193,7,0.1); color: #ffc107;">
-                <i class="fas fa-sync-alt"></i>
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between mb-3">
+            <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-bolt text-yellow-600 text-xl"></i>
             </div>
-            <p class="stat-label mb-3">Quick Actions</p>
-            <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-warning" onclick="refreshStatus()" title="Refresh Status Cache">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="reloadAsterisk()" title="Apply Config (Reload Asterisk)">
-                    <i class="fas fa-redo"></i> Reload
-                </button>
-            </div>
+        </div>
+        <p class="text-xs text-gray-500 font-medium mb-3">Quick Actions</p>
+        <div class="flex gap-2">
+            <button onclick="refreshStatus()" class="flex-1 px-3 py-2 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-medium hover:bg-yellow-100 transition-colors" title="Refresh Status Cache">
+                <i class="fas fa-sync-alt text-[10px]"></i>
+            </button>
+            <button onclick="reloadAsterisk()" class="flex-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-medium hover:bg-red-100 transition-colors" title="Reload Asterisk">
+                <i class="fas fa-redo text-[10px]"></i>
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Actions Bar -->
-<div class="card mb-4">
-    <div class="card-body">
-        <div class="row align-items-center">
-            <div class="col-md-6 mb-2 mb-md-0">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                    <input type="text" class="form-control" id="search-input" placeholder="Search extensions...">
-                </div>
+<div class="bg-white rounded-xl border border-gray-100 p-4 mb-5">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div class="flex-1 max-w-md">
+            <div class="relative">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                <input
+                    type="text"
+                    id="search-input"
+                    placeholder="Search extensions..."
+                    class="w-full pl-9 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
             </div>
-            <div class="col-md-6 text-end">
-                <button class="btn btn-primary" onclick="showCreateModal()">
-                    <i class="fas fa-plus"></i> Add Extension
-                </button>
-                <button class="btn btn-outline-primary" onclick="showBulkCreateModal()">
-                    <i class="fas fa-plus-square"></i> Bulk Create
-                </button>
-            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="showCreateModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus text-[10px] mr-1.5"></i>Add Extension
+            </button>
+            <button onclick="showBulkCreateModal()" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                <i class="fas fa-plus-square text-[10px] mr-1.5"></i>Bulk Create
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Extensions Table -->
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fas fa-list"></i> Extensions</span>
-        <span class="badge bg-secondary" id="filtered-count">0</span>
+<div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+    <div class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-gray-900">
+            <i class="fas fa-list text-xs text-gray-400 mr-2"></i>Extensions
+        </h3>
+        <span class="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium" id="filtered-count">0</span>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0" id="extensions-table">
-                <thead>
-                    <tr>
-                        <th>Extension</th>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Caller ID</th>
-                        <th>Tech</th>
-                        <th>Device Type</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="extensions-tbody">
-                    <tr>
-                        <td colspan="7" class="text-center py-4">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-100">
+                <tr>
+                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600">Extension</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600">Name</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600">Status</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600">Caller ID</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600">Tech</th>
+                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600">Device Type</th>
+                    <th class="px-5 py-3 text-right text-xs font-semibold text-gray-600">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="extensions-tbody" class="divide-y divide-gray-100">
+                <tr>
+                    <td colspan="7" class="px-5 py-8 text-center">
+                        <div class="flex items-center justify-center">
+                            <div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
 <!-- Create Extension Modal -->
-<div class="modal fade" id="createModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Extension</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="create-form">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Extension Number *</label>
-                            <input type="text" class="form-control" name="extensionId" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Display Name *</label>
-                            <input type="text" class="form-control" name="name" required>
-                        </div>
+<div id="createModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-base font-bold text-gray-900">Add New Extension</h3>
+            <button onclick="closeModal('createModal')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <form id="create-form">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Extension Number *</label>
+                        <input type="text" name="extensionId" required class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Technology</label>
-                            <select class="form-select" name="tech">
-                                <option value="pjsip" selected>PJSIP</option>
-                                <option value="sip">SIP</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" class="form-control" name="email">
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Display Name *</label>
+                        <input type="text" name="name" required class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Outbound CID</label>
-                            <input type="text" class="form-control" name="outboundCid">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Emergency CID</label>
-                            <input type="text" class="form-control" name="emergencyCid">
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Technology</label>
+                        <select name="tech" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="pjsip" selected>PJSIP</option>
+                            <option value="sip">SIP</option>
+                        </select>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Caller ID</label>
-                            <input type="text" class="form-control" name="callerId">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">SIP Password</label>
-                            <input type="text" class="form-control" name="extPassword" placeholder="Auto-generated if empty">
-                            <small class="text-muted">Leave empty to auto-generate</small>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Email</label>
+                        <input type="email" name="email" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Max Contacts</label>
-                            <input type="number" class="form-control" name="maxContacts" value="1" min="1">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">VM Password</label>
-                            <input type="text" class="form-control" name="vmPassword">
-                            <small class="text-muted">Voicemail PIN</small>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Outbound CID</label>
+                        <input type="text" name="outboundCid" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="vmEnable" checked>
-                                <label class="form-check-label">Enable Voicemail</label>
-                            </div>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Emergency CID</label>
+                        <input type="text" name="emergencyCid" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="createExtension()">
-                    <i class="fas fa-save"></i> Create Extension
-                </button>
-            </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Caller ID</label>
+                        <input type="text" name="callerId" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">SIP Password</label>
+                        <input type="text" name="extPassword" placeholder="Auto-generated if empty" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-[10px] text-gray-500 mt-1">Leave empty to auto-generate</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Max Contacts</label>
+                        <input type="number" name="maxContacts" value="1" min="1" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">VM Password</label>
+                        <input type="text" name="vmPassword" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-[10px] text-gray-500 mt-1">Voicemail PIN</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="vmEnable" checked class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                            <span class="text-xs font-medium text-gray-700">Enable Voicemail</span>
+                        </label>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+            <button onclick="closeModal('createModal')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                Cancel
+            </button>
+            <button onclick="createExtension()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+                <i class="fas fa-save text-[10px] mr-1.5"></i>Create Extension
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Bulk Create Modal -->
-<div class="modal fade" id="bulkCreateModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Bulk Create Extensions</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="bulk-create-form">
-                    <div class="mb-3">
-                        <label class="form-label">Start Extension *</label>
-                        <input type="number" class="form-control" name="startExtension" required>
-                        <small class="text-muted">Starting extension number</small>
+<div id="bulkCreateModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-md w-full">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-base font-bold text-gray-900">Bulk Create Extensions</h3>
+            <button onclick="closeModal('bulkCreateModal')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <form id="bulk-create-form">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Start Extension *</label>
+                        <input type="number" name="startExtension" required class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-[10px] text-gray-500 mt-1">Starting extension number</p>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Number of Extensions *</label>
-                        <input type="number" class="form-control" name="numberOfExtensions" required min="1">
-                        <small class="text-muted">How many extensions to create</small>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Number of Extensions *</label>
+                        <input type="number" name="numberOfExtensions" required min="1" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-[10px] text-gray-500 mt-1">How many extensions to create</p>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Name Template</label>
-                        <input type="text" class="form-control" name="name" placeholder="Extension">
-                        <small class="text-muted">Names will be: "Extension 1000", "Extension 1001", etc.</small>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Name Template</label>
+                        <input type="text" name="name" placeholder="Extension" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-[10px] text-gray-500 mt-1">Names will be: "Extension 1000", "Extension 1001", etc.</p>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Technology</label>
-                        <select class="form-select" name="tech">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Technology</label>
+                        <select name="tech" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="pjsip" selected>PJSIP</option>
                             <option value="sip">SIP</option>
                         </select>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="bulkCreateExtensions()">
-                    <i class="fas fa-plus-square"></i> Create Extensions
-                </button>
-            </div>
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+            <button onclick="closeModal('bulkCreateModal')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                Cancel
+            </button>
+            <button onclick="bulkCreateExtensions()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus-square text-[10px] mr-1.5"></i>Create Extensions
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Edit Extension Modal -->
-<div class="modal fade" id="editModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Extension</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="edit-form">
-                    <input type="hidden" id="edit-extension-id">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Extension Number</label>
-                            <input type="text" class="form-control" id="edit-ext-number" disabled>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Display Name *</label>
-                            <input type="text" class="form-control" name="name" id="edit-name" required>
-                        </div>
+<div id="editModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-base font-bold text-gray-900">Edit Extension</h3>
+            <button onclick="closeModal('editModal')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <form id="edit-form">
+                <input type="hidden" id="edit-extension-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Extension Number</label>
+                        <input type="text" id="edit-ext-number" disabled class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-500">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Technology</label>
-                            <select class="form-select" name="tech" id="edit-tech">
-                                <option value="pjsip">PJSIP</option>
-                                <option value="sip">SIP</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Email</label>
-                            <input type="email" class="form-control" name="email" id="edit-email">
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Display Name *</label>
+                        <input type="text" name="name" id="edit-name" required class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Outbound CID</label>
-                            <input type="text" class="form-control" name="outboundCid" id="edit-outbound-cid">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Emergency CID</label>
-                            <input type="text" class="form-control" name="emergencyCid" id="edit-emergency-cid">
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Technology</label>
+                        <select name="tech" id="edit-tech" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="pjsip">PJSIP</option>
+                            <option value="sip">SIP</option>
+                        </select>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">SIP Password</label>
-                            <input type="text" class="form-control" name="extPassword" id="edit-ext-password" placeholder="Leave empty to keep current">
-                            <small class="text-muted">Leave empty to keep existing password</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Caller ID</label>
-                            <input type="text" class="form-control" name="callerId" id="edit-caller-id">
-                        </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Email</label>
+                        <input type="email" name="email" id="edit-email" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="updateExtension()">
-                    <i class="fas fa-save"></i> Save Changes
-                </button>
-            </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Outbound CID</label>
+                        <input type="text" name="outboundCid" id="edit-outbound-cid" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Emergency CID</label>
+                        <input type="text" name="emergencyCid" id="edit-emergency-cid" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">SIP Password</label>
+                        <input type="text" name="extPassword" id="edit-ext-password" placeholder="Leave empty to keep current" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-[10px] text-gray-500 mt-1">Leave empty to keep existing password</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Caller ID</label>
+                        <input type="text" name="callerId" id="edit-caller-id" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+            <button onclick="closeModal('editModal')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                Cancel
+            </button>
+            <button onclick="updateExtension()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+                <i class="fas fa-save text-[10px] mr-1.5"></i>Save Changes
+            </button>
         </div>
     </div>
 </div>
 
 <!-- View Details Modal -->
-<div class="modal fade" id="viewModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Extension Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<div id="viewModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-base font-bold text-gray-900">Extension Details</h3>
+            <button onclick="closeModal('viewModal')" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Extension Number</label>
+                    <p class="text-sm font-bold text-gray-900" id="view-ext-number">-</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Display Name</label>
+                    <p class="text-sm text-gray-900" id="view-name">-</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Technology</label>
+                    <p class="text-sm text-gray-900" id="view-tech">-</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</label>
+                    <div id="view-status">-</div>
+                </div>
             </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Extension Number</label>
-                        <p class="form-control-plaintext fw-bold" id="view-ext-number">-</p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Display Name</label>
-                        <p class="form-control-plaintext" id="view-name">-</p>
-                    </div>
+
+            <!-- SIP Credentials -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fas fa-key text-blue-600"></i>
+                    <h4 class="text-sm font-bold text-blue-900">SIP Credentials</h4>
                 </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Technology</label>
-                        <p class="form-control-plaintext" id="view-tech">-</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-blue-700 uppercase tracking-wide mb-1">Username</label>
+                        <p class="text-sm font-mono text-blue-900" id="view-username">-</p>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Status</label>
-                        <p class="form-control-plaintext" id="view-status">-</p>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-12 mb-3">
-                        <div class="alert alert-info">
-                            <strong><i class="fas fa-key"></i> SIP Credentials</strong>
-                            <hr>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <small class="text-muted d-block">Username</small>
-                                    <strong id="view-username">-</strong>
-                                </div>
-                                <div class="col-md-4">
-                                    <small class="text-muted d-block">Password</small>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <code id="view-password" style="font-size: 1rem;">••••••••</code>
-                                        <button class="btn btn-sm btn-outline-secondary" onclick="togglePassword()" id="toggle-password-btn">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-secondary" onclick="copyPassword()" title="Copy to clipboard">
-                                            <i class="fas fa-copy"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <small class="text-muted d-block">Server</small>
-                                    <strong id="view-server">-</strong>
-                                </div>
-                            </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-blue-700 uppercase tracking-wide mb-1">Password</label>
+                        <div class="flex items-center gap-2">
+                            <code class="text-sm font-mono text-blue-900" id="view-password">••••••••</code>
+                            <button onclick="togglePassword()" id="toggle-password-btn" class="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 transition-colors">
+                                <i class="fas fa-eye text-xs"></i>
+                            </button>
+                            <button onclick="copyPassword()" class="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-700 transition-colors" title="Copy to clipboard">
+                                <i class="fas fa-copy text-xs"></i>
+                            </button>
                         </div>
                     </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Caller ID</label>
-                        <p class="form-control-plaintext" id="view-caller-id">-</p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Outbound CID</label>
-                        <p class="form-control-plaintext" id="view-outbound-cid">-</p>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Emergency CID</label>
-                        <p class="form-control-plaintext" id="view-emergency-cid">-</p>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label text-muted">Email</label>
-                        <p class="form-control-plaintext" id="view-email">-</p>
-                    </div>
-                </div>
-                <div class="row" id="view-contacts-section" style="display: none;">
-                    <div class="col-12">
-                        <label class="form-label text-muted">Registered Contacts</label>
-                        <div id="view-contacts" class="border rounded p-2 bg-light">
-                            <code style="font-size: 0.85rem; white-space: pre-wrap;"></code>
-                        </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-blue-700 uppercase tracking-wide mb-1">Server</label>
+                        <p class="text-sm font-mono text-blue-900" id="view-server">-</p>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="editFromView()">
-                    <i class="fas fa-edit"></i> Edit Extension
-                </button>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Caller ID</label>
+                    <p class="text-sm text-gray-900" id="view-caller-id">-</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Outbound CID</label>
+                    <p class="text-sm text-gray-900" id="view-outbound-cid">-</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Emergency CID</label>
+                    <p class="text-sm text-gray-900" id="view-emergency-cid">-</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Email</label>
+                    <p class="text-sm text-gray-900" id="view-email">-</p>
+                </div>
             </div>
+
+            <!-- Registered Contacts -->
+            <div id="view-contacts-section" class="hidden mt-4">
+                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Registered Contacts</label>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <code class="text-xs text-gray-900 whitespace-pre-wrap" id="view-contacts"></code>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2">
+            <button onclick="closeModal('viewModal')" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                Close
+            </button>
+            <button onclick="editFromView()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+                <i class="fas fa-edit text-[10px] mr-1.5"></i>Edit Extension
+            </button>
         </div>
     </div>
 </div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 let allExtensions = [];
-let createModalInstance, bulkCreateModalInstance, editModalInstance, viewModalInstance;
 let currentExtensionData = null;
 let passwordVisible = false;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    createModalInstance = new bootstrap.Modal(document.getElementById('createModal'));
-    bulkCreateModalInstance = new bootstrap.Modal(document.getElementById('bulkCreateModal'));
-    editModalInstance = new bootstrap.Modal(document.getElementById('editModal'));
-    viewModalInstance = new bootstrap.Modal(document.getElementById('viewModal'));
-
     loadExtensions();
     loadStatus();
 
@@ -484,6 +426,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Auto-refresh status every 30 seconds
     setInterval(loadStatus, 30000);
+
+    // Close modals on outside click
+    ['createModal', 'bulkCreateModal', 'editModal', 'viewModal'].forEach(modalId => {
+        document.getElementById(modalId).addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal(modalId);
+            }
+        });
+    });
 });
 
 // Load extensions list
@@ -501,7 +452,7 @@ async function loadExtensions() {
         }
     } catch (error) {
         console.error('Error loading extensions:', error);
-        showToast('Failed to load extensions', 'danger');
+        showToast('Failed to load extensions', 'error');
     }
 }
 
@@ -526,34 +477,38 @@ function renderExtensions(extensions) {
     document.getElementById('filtered-count').textContent = extensions.length;
 
     if (extensions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No extensions found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-8 text-center text-xs text-gray-500">No extensions found</td></tr>';
         return;
     }
 
     tbody.innerHTML = extensions.map(ext => `
-        <tr>
-            <td><strong>${ext.extension_id}</strong></td>
-            <td>${ext.name}</td>
-            <td>
+        <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-5 py-3"><span class="text-xs font-bold text-gray-900">${ext.extension_id}</span></td>
+            <td class="px-5 py-3"><span class="text-xs text-gray-900">${ext.name}</span></td>
+            <td class="px-5 py-3">
                 ${ext.registered
-                    ? '<span class="badge bg-success"><i class="fas fa-check-circle"></i> ' + ext.status + '</span>'
-                    : '<span class="badge bg-secondary"><i class="fas fa-times-circle"></i> Offline</span>'
+                    ? `<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium">
+                        <i class="fas fa-check-circle"></i>${ext.status}
+                       </span>`
+                    : `<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-medium">
+                        <i class="fas fa-times-circle"></i>Offline
+                       </span>`
                 }
-                ${ext.contact_count > 0 ? `<small class="text-muted ms-1">(${ext.contact_count})</small>` : ''}
+                ${ext.contact_count > 0 ? `<span class="text-[10px] text-gray-500 ml-1">(${ext.contact_count})</span>` : ''}
             </td>
-            <td>${ext.caller_id || '-'}</td>
-            <td><span class="badge bg-info">${ext.tech.toUpperCase()}</span></td>
-            <td>${ext.device_type || '-'}</td>
-            <td class="action-buttons">
-                <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-info" onclick="viewExtension('${ext.extension_id}')" title="View Details & Password">
-                        <i class="fas fa-eye"></i>
+            <td class="px-5 py-3"><span class="text-xs text-gray-900">${ext.caller_id || '-'}</span></td>
+            <td class="px-5 py-3"><span class="inline-flex px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-medium">${ext.tech.toUpperCase()}</span></td>
+            <td class="px-5 py-3"><span class="text-xs text-gray-900">${ext.device_type || '-'}</span></td>
+            <td class="px-5 py-3">
+                <div class="flex items-center justify-end gap-1">
+                    <button onclick="viewExtension('${ext.extension_id}')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" title="View Details">
+                        <i class="fas fa-eye text-xs"></i>
                     </button>
-                    <button class="btn btn-outline-primary" onclick="editExtension('${ext.extension_id}')" title="Edit">
-                        <i class="fas fa-edit"></i>
+                    <button onclick="editExtension('${ext.extension_id}')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors" title="Edit">
+                        <i class="fas fa-edit text-xs"></i>
                     </button>
-                    <button class="btn btn-outline-danger" onclick="confirmDelete('${ext.extension_id}')" title="Delete">
-                        <i class="fas fa-trash"></i>
+                    <button onclick="confirmDelete('${ext.extension_id}')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors" title="Delete">
+                        <i class="fas fa-trash text-xs"></i>
                     </button>
                 </div>
             </td>
@@ -588,7 +543,7 @@ async function refreshStatus() {
         }
     } catch (error) {
         console.error('Error refreshing status:', error);
-        showToast('Failed to refresh status', 'danger');
+        showToast('Failed to refresh status', 'error');
     }
 }
 
@@ -614,14 +569,23 @@ async function reloadAsterisk() {
         }
     } catch (error) {
         console.error('Error reloading Asterisk:', error);
-        showToast('Failed to reload Asterisk', 'danger');
+        showToast('Failed to reload Asterisk', 'error');
     }
 }
 
-// Show create modal
+// Modal functions
 function showCreateModal() {
     document.getElementById('create-form').reset();
-    createModalInstance.show();
+    document.getElementById('createModal').classList.remove('hidden');
+}
+
+function showBulkCreateModal() {
+    document.getElementById('bulk-create-form').reset();
+    document.getElementById('bulkCreateModal').classList.remove('hidden');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
 }
 
 // Create extension
@@ -629,8 +593,6 @@ async function createExtension() {
     const form = document.getElementById('create-form');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
-
-    // Convert checkbox
     data.vmEnable = form.querySelector('[name="vmEnable"]').checked;
 
     try {
@@ -644,16 +606,8 @@ async function createExtension() {
         const result = await response.json();
 
         if (result.status === 'success') {
-            createModalInstance.hide();
-
-            // Show message based on reload status
-            if (result.reloaded) {
-                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
-            } else {
-                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
-            }
-
-            // Refresh data after a short delay to allow Asterisk to process
+            closeModal('createModal');
+            showToast(result.reloaded ? `${result.message} - Asterisk reloaded successfully!` : `${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, result.reloaded ? 'success' : 'warning');
             setTimeout(() => {
                 loadExtensions();
                 loadStatus();
@@ -663,14 +617,8 @@ async function createExtension() {
         }
     } catch (error) {
         console.error('Error creating extension:', error);
-        showToast('Failed to create extension: ' + error.message, 'danger');
+        showToast('Failed to create extension: ' + error.message, 'error');
     }
-}
-
-// Show bulk create modal
-function showBulkCreateModal() {
-    document.getElementById('bulk-create-form').reset();
-    bulkCreateModalInstance.show();
 }
 
 // Bulk create extensions
@@ -690,16 +638,8 @@ async function bulkCreateExtensions() {
         const result = await response.json();
 
         if (result.status === 'success') {
-            bulkCreateModalInstance.hide();
-
-            // Show message based on reload status
-            if (result.reloaded) {
-                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
-            } else {
-                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
-            }
-
-            // Refresh data after a short delay
+            closeModal('bulkCreateModal');
+            showToast(result.reloaded ? `${result.message} - Asterisk reloaded successfully!` : `${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, result.reloaded ? 'success' : 'warning');
             setTimeout(() => {
                 loadExtensions();
                 loadStatus();
@@ -709,7 +649,7 @@ async function bulkCreateExtensions() {
         }
     } catch (error) {
         console.error('Error bulk creating extensions:', error);
-        showToast('Failed to bulk create extensions: ' + error.message, 'danger');
+        showToast('Failed to bulk create extensions: ' + error.message, 'error');
     }
 }
 
@@ -728,14 +668,13 @@ async function editExtension(extensionId) {
             document.getElementById('edit-email').value = ext.email || '';
             document.getElementById('edit-outbound-cid').value = ext.outbound_cid || '';
             document.getElementById('edit-emergency-cid').value = ext.emergency_cid || '';
-
-            editModalInstance.show();
+            document.getElementById('editModal').classList.remove('hidden');
         } else {
             throw new Error(data.message);
         }
     } catch (error) {
         console.error('Error loading extension:', error);
-        showToast('Failed to load extension details', 'danger');
+        showToast('Failed to load extension details', 'error');
     }
 }
 
@@ -757,25 +696,15 @@ async function updateExtension() {
         const result = await response.json();
 
         if (result.status === 'success') {
-            editModalInstance.hide();
-
-            // Show message based on reload status
-            if (result.reloaded) {
-                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
-            } else {
-                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
-            }
-
-            // Refresh data
-            setTimeout(() => {
-                loadExtensions();
-            }, 2000);
+            closeModal('editModal');
+            showToast(result.reloaded ? `${result.message} - Asterisk reloaded successfully!` : `${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, result.reloaded ? 'success' : 'warning');
+            setTimeout(() => loadExtensions(), 2000);
         } else {
             throw new Error(result.message);
         }
     } catch (error) {
         console.error('Error updating extension:', error);
-        showToast('Failed to update extension: ' + error.message, 'danger');
+        showToast('Failed to update extension: ' + error.message, 'error');
     }
 }
 
@@ -797,14 +726,7 @@ async function deleteExtension(extensionId) {
         const result = await response.json();
 
         if (result.status === 'success') {
-            // Show message based on reload status
-            if (result.reloaded) {
-                showToast(`${result.message} - Asterisk reloaded successfully!`, 'success');
-            } else {
-                showToast(`${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, 'warning');
-            }
-
-            // Refresh data
+            showToast(result.reloaded ? `${result.message} - Asterisk reloaded successfully!` : `${result.message} - Note: Asterisk reload failed, you may need to manually reload.`, result.reloaded ? 'success' : 'warning');
             setTimeout(() => {
                 loadExtensions();
                 loadStatus();
@@ -814,11 +736,11 @@ async function deleteExtension(extensionId) {
         }
     } catch (error) {
         console.error('Error deleting extension:', error);
-        showToast('Failed to delete extension: ' + error.message, 'danger');
+        showToast('Failed to delete extension: ' + error.message, 'error');
     }
 }
 
-// View extension details with password
+// View extension details
 async function viewExtension(extensionId) {
     try {
         const response = await fetch(`/extensions/api/get/${extensionId}`);
@@ -833,8 +755,8 @@ async function viewExtension(extensionId) {
             document.getElementById('view-name').textContent = ext.name || '-';
             document.getElementById('view-tech').textContent = ext.tech ? ext.tech.toUpperCase() : '-';
             document.getElementById('view-status').innerHTML = ext.registered
-                ? '<span class="badge bg-success">Online</span>'
-                : '<span class="badge bg-secondary">Offline</span>';
+                ? '<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-700 rounded-lg text-[10px] font-medium"><i class="fas fa-check-circle"></i>Online</span>'
+                : '<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-[10px] font-medium"><i class="fas fa-times-circle"></i>Offline</span>';
 
             // SIP Credentials
             document.getElementById('view-username').textContent = ext.extension_id;
@@ -849,20 +771,21 @@ async function viewExtension(extensionId) {
             document.getElementById('view-email').textContent = ext.email || '-';
 
             // Show registered contacts if available
+            const contactsSection = document.getElementById('view-contacts-section');
             if (ext.contacts && ext.contacts.length > 0) {
-                document.getElementById('view-contacts-section').style.display = 'block';
-                document.getElementById('view-contacts').querySelector('code').textContent = ext.contacts.join('\n');
+                contactsSection.classList.remove('hidden');
+                document.getElementById('view-contacts').textContent = ext.contacts.join('\n');
             } else {
-                document.getElementById('view-contacts-section').style.display = 'none';
+                contactsSection.classList.add('hidden');
             }
 
-            viewModalInstance.show();
+            document.getElementById('viewModal').classList.remove('hidden');
         } else {
             throw new Error(data.message);
         }
     } catch (error) {
         console.error('Error loading extension:', error);
-        showToast('Failed to load extension details', 'danger');
+        showToast('Failed to load extension details', 'error');
     }
 }
 
@@ -876,10 +799,10 @@ function togglePassword() {
 
     if (passwordVisible) {
         passwordEl.textContent = actualPassword;
-        toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+        toggleBtn.innerHTML = '<i class="fas fa-eye-slash text-xs"></i>';
     } else {
         passwordEl.textContent = '••••••••';
-        toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+        toggleBtn.innerHTML = '<i class="fas fa-eye text-xs"></i>';
     }
 }
 
@@ -892,18 +815,54 @@ function copyPassword() {
         showToast('Password copied to clipboard!', 'success');
     }).catch(err => {
         console.error('Failed to copy:', err);
-        showToast('Failed to copy password', 'danger');
+        showToast('Failed to copy password', 'error');
     });
 }
 
 // Edit from view modal
 function editFromView() {
     if (currentExtensionData) {
-        viewModalInstance.hide();
+        closeModal('viewModal');
         setTimeout(() => {
             editExtension(currentExtensionData.extension_id);
         }, 300);
     }
+}
+
+// Toast notification system
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+
+    const colors = {
+        success: 'bg-green-50 border-green-200 text-green-800',
+        error: 'bg-red-50 border-red-200 text-red-800',
+        warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+        info: 'bg-blue-50 border-blue-200 text-blue-800'
+    };
+
+    const icons = {
+        success: 'fa-check-circle',
+        error: 'fa-exclamation-circle',
+        warning: 'fa-exclamation-triangle',
+        info: 'fa-info-circle'
+    };
+
+    toast.className = `${colors[type]} border rounded-lg px-4 py-3 flex items-center gap-2 shadow-lg transition-all duration-300 min-w-[300px]`;
+    toast.innerHTML = `
+        <i class="fas ${icons[type]} text-sm"></i>
+        <span class="text-xs font-medium flex-1">${message}</span>
+        <button onclick="this.parentElement.remove()" class="text-current hover:opacity-70 transition-opacity">
+            <i class="fas fa-times text-xs"></i>
+        </button>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
 }
 </script>
 {% endblock %}

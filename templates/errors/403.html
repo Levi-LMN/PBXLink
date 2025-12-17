@@ -1,33 +1,62 @@
+
+
+
+<!-- ============================================ -->
 <!-- 403.html - Forbidden Error -->
+<!-- Save this as templates/403.html -->
+<!-- ============================================ -->
+
 {% extends "base.html" %}
 
 {% block title %}403 - Forbidden{% endblock %}
 {% block page_title %}Access Denied{% endblock %}
+{% block page_subtitle %}You don't have permission to access this resource{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card text-center">
-            <div class="card-body py-5">
-                <i class="fas fa-ban fa-5x text-danger mb-4"></i>
-                <h1 class="display-4">403</h1>
-                <h4 class="mb-3">Access Forbidden</h4>
-                <p class="text-muted mb-4">
+<div class="flex items-center justify-center min-h-[60vh]">
+    <div class="max-w-md w-full">
+        <div class="bg-white rounded-xl border border-gray-100 p-8 text-center">
+            <!-- Icon -->
+            <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-ban text-red-600 text-3xl"></i>
+            </div>
+
+            <!-- Error Code -->
+            <h1 class="text-6xl font-bold text-gray-900 mb-3">403</h1>
+
+            <!-- Title -->
+            <h2 class="text-xl font-bold text-gray-900 mb-2">Access Forbidden</h2>
+
+            <!-- Message -->
+            <div class="mb-6">
+                <p class="text-sm text-gray-600 mb-2">
                     You don't have permission to access this resource.
-                    {% if session.user %}
-                    Your current role is <strong>{{ session.user.role|capitalize }}</strong>.
-                    {% endif %}
                 </p>
-                <div class="d-flex gap-2 justify-content-center">
-                    <a href="/" class="btn btn-primary">
-                        <i class="fas fa-home me-2"></i>Go to Dashboard
-                    </a>
-                    <button onclick="history.back()" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>Go Back
-                    </button>
+                {% if session.user %}
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg mt-2">
+                    <span class="text-xs text-gray-600">Your current role:</span>
+                    <span class="text-xs font-semibold text-gray-900">{{ session.user.role|capitalize }}</span>
                 </div>
+                {% endif %}
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                <a href="/" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors inline-flex items-center justify-center gap-2">
+                    <i class="fas fa-home text-[10px]"></i>
+                    <span>Go to Dashboard</span>
+                </a>
+                <button onclick="history.back()" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors inline-flex items-center justify-center gap-2">
+                    <i class="fas fa-arrow-left text-[10px]"></i>
+                    <span>Go Back</span>
+                </button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+
+
+
+
+

@@ -1,196 +1,110 @@
 {% extends "base.html" %}
 
-{% block title %}Call Detail Records - FreePBX{% endblock %}
+{% block title %}Call Detail Records - Sibasi PBX{% endblock %}
 {% block page_title %}Call Detail Records{% endblock %}
-
-{% block extra_css %}
-<style>
-    .chart-container {
-        position: relative;
-        height: 300px;
-    }
-
-    .filter-section {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        margin-bottom: 1.5rem;
-    }
-
-    .stat-card {
-        background: white;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 1.25rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        transition: all 0.2s ease;
-    }
-
-    .stat-card:hover {
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
-    }
-
-    .stat-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-    }
-
-    .stat-value {
-        font-size: 1.75rem;
-        font-weight: 600;
-        margin: 0.5rem 0;
-        color: var(--text-primary);
-    }
-
-    .stat-label {
-        font-size: 0.875rem;
-        color: var(--text-secondary);
-        margin: 0;
-        font-weight: 500;
-    }
-
-    .disposition-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-
-    .disposition-ANSWERED {
-        background: rgba(25,135,84,0.1);
-        color: #198754;
-    }
-
-    .disposition-NO_ANSWER,
-    .disposition-BUSY,
-    .disposition-FAILED {
-        background: rgba(220,53,69,0.1);
-        color: #dc3545;
-    }
-
-    .pagination-info {
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-    }
-</style>
-{% endblock %}
+{% block page_subtitle %}Detailed call analytics and statistics{% endblock %}
 
 {% block content %}
-<div class="row g-4">
+<div class="space-y-4">
     <!-- Filters -->
-    <div class="col-12">
-        <div class="filter-section">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">Time Period</label>
-                    <select class="form-select" id="days-filter">
-                        <option value="1">Last 24 Hours</option>
-                        <option value="7" selected>Last 7 Days</option>
-                        <option value="30">Last 30 Days</option>
-                        <option value="90">Last 90 Days</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-bold">Records per Page</label>
-                    <select class="form-select" id="per-page-filter">
-                        <option value="25">25</option>
-                        <option value="50" selected>50</option>
-                        <option value="100">100</option>
-                    </select>
-                </div>
-                <div class="col-md-6 text-end">
-                    <button class="btn btn-primary" onclick="loadAllData()">
-                        <i class="fas fa-sync-alt"></i> Refresh Data
-                    </button>
-                </div>
+    <div class="bg-white rounded-xl border border-gray-100 p-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Time Period</label>
+                <select class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" id="days-filter">
+                    <option value="1">Last 24 Hours</option>
+                    <option value="7" selected>Last 7 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Records per Page</label>
+                <select class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" id="per-page-filter">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <div class="md:text-right">
+                <button class="w-full md:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="loadAllData()">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh Data
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Statistics Cards -->
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(13,110,253,0.1); color: #0d6efd;">
-                <i class="fas fa-phone-volume"></i>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-3">
+                <i class="fas fa-phone-volume text-blue-600"></i>
             </div>
-            <h3 class="stat-value" id="total-calls">0</h3>
-            <p class="stat-label">Total Calls</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="total-calls">0</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Calls</p>
         </div>
-    </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(25,135,84,0.1); color: #198754;">
-                <i class="fas fa-check-circle"></i>
+        <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3">
+                <i class="fas fa-check-circle text-green-600"></i>
             </div>
-            <h3 class="stat-value" id="answered-calls">0</h3>
-            <p class="stat-label">Answered</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="answered-calls">0</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Answered</p>
         </div>
-    </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(220,53,69,0.1); color: #dc3545;">
-                <i class="fas fa-phone-slash"></i>
+        <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center mb-3">
+                <i class="fas fa-phone-slash text-red-600"></i>
             </div>
-            <h3 class="stat-value" id="missed-calls">0</h3>
-            <p class="stat-label">Missed</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="missed-calls">0</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Missed</p>
         </div>
-    </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(255,193,7,0.1); color: #ffc107;">
-                <i class="fas fa-clock"></i>
+        <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <div class="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center mb-3">
+                <i class="fas fa-clock text-yellow-600"></i>
             </div>
-            <h3 class="stat-value" id="avg-duration">0m</h3>
-            <p class="stat-label">Avg Duration</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="avg-duration">0m</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Avg Duration</p>
         </div>
     </div>
 
     <!-- Charts -->
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-chart-pie"></i> Call Disposition
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-chart-pie text-blue-600"></i>Call Disposition
+                </h6>
             </div>
-            <div class="card-body">
-                <div class="chart-container">
+            <div class="p-4">
+                <div style="height: 250px">
                     <canvas id="disposition-chart"></canvas>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-chart-bar"></i> Hourly Distribution
+        <div class="bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-chart-bar text-blue-600"></i>Hourly Distribution
+                </h6>
             </div>
-            <div class="card-body">
-                <div class="chart-container">
+            <div class="p-4">
+                <div style="height: 250px">
                     <canvas id="hourly-chart"></canvas>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-chart-line"></i> Daily Trends
+        <div class="bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-chart-line text-blue-600"></i>Daily Trends
+                </h6>
             </div>
-            <div class="card-body">
-                <div class="chart-container">
+            <div class="p-4">
+                <div style="height: 250px">
                     <canvas id="daily-chart"></canvas>
                 </div>
             </div>
@@ -198,98 +112,94 @@
     </div>
 
     <!-- Top Callers & Destinations -->
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-user-friends"></i> Top Callers
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-user-friends text-blue-600"></i>Top Callers
+                </h6>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Number</th>
-                                <th class="text-end">Calls</th>
-                                <th class="text-end">Answered</th>
-                                <th class="text-end">Duration</th>
-                            </tr>
-                        </thead>
-                        <tbody id="top-callers-table">
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-gray-50">
+                        <tr class="border-b border-gray-100">
+                            <th class="px-4 py-2 text-left font-semibold text-gray-600">Number</th>
+                            <th class="px-4 py-2 text-right font-semibold text-gray-600">Calls</th>
+                            <th class="px-4 py-2 text-right font-semibold text-gray-600">Answered</th>
+                            <th class="px-4 py-2 text-right font-semibold text-gray-600">Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="top-callers-table" class="divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-    </div>
 
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-phone-square"></i> Top Destinations
+        <div class="bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-phone-square text-blue-600"></i>Top Destinations
+                </h6>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Number</th>
-                                <th class="text-end">Calls</th>
-                                <th class="text-end">Answered</th>
-                                <th class="text-end">Duration</th>
-                            </tr>
-                        </thead>
-                        <tbody id="top-destinations-table">
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-gray-50">
+                        <tr class="border-b border-gray-100">
+                            <th class="px-4 py-2 text-left font-semibold text-gray-600">Number</th>
+                            <th class="px-4 py-2 text-right font-semibold text-gray-600">Calls</th>
+                            <th class="px-4 py-2 text-right font-semibold text-gray-600">Answered</th>
+                            <th class="px-4 py-2 text-right font-semibold text-gray-600">Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="top-destinations-table" class="divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="4" class="px-4 py-8 text-center text-gray-500">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <!-- Call Records Table -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-list"></i> Call Records</span>
-                <span class="pagination-info" id="pagination-info">-</span>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Date/Time</th>
-                                <th>Caller ID</th>
-                                <th>Source</th>
-                                <th>Destination</th>
-                                <th>Duration</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="calls-table">
-                            <tr>
-                                <td colspan="6" class="text-center py-4">
-                                    <div class="spinner-border text-primary" role="status">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="card-footer bg-white">
-                <nav>
-                    <ul class="pagination mb-0 justify-content-center" id="pagination">
-                    </ul>
-                </nav>
-            </div>
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-list text-blue-600"></i>Call Records
+            </h6>
+            <span class="text-xs text-gray-500" id="pagination-info">-</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-50">
+                    <tr class="border-b border-gray-100">
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Date/Time</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Caller ID</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Source</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Destination</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Duration</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="calls-table" class="divide-y divide-gray-100">
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+                                <span class="text-gray-500">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="px-4 py-3 border-t border-gray-100">
+            <nav>
+                <ul class="flex items-center justify-center gap-1" id="pagination"></ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -300,7 +210,6 @@
 let currentPage = 1;
 let hourlyChart, dailyChart, dispositionChart;
 
-// Load statistics
 async function loadStats() {
     try {
         const days = document.getElementById('days-filter').value;
@@ -312,22 +221,17 @@ async function loadStats() {
         document.getElementById('missed-calls').textContent = data.missed_calls || 0;
         document.getElementById('avg-duration').textContent = data.avg_duration_formatted || '0s';
 
-        // Load disposition chart with stats data
         loadDispositionChart(data);
     } catch (error) {
         console.error('Error loading stats:', error);
-        showToast('Failed to load statistics', 'danger');
     }
 }
 
-// Load disposition pie chart
 function loadDispositionChart(stats) {
     try {
         const ctx = document.getElementById('disposition-chart').getContext('2d');
 
-        if (dispositionChart) {
-            dispositionChart.destroy();
-        }
+        if (dispositionChart) dispositionChart.destroy();
 
         const answered = stats.answered_calls || 0;
         const missed = stats.missed_calls || 0;
@@ -338,14 +242,8 @@ function loadDispositionChart(stats) {
                 labels: ['Answered', 'Missed'],
                 datasets: [{
                     data: [answered, missed],
-                    backgroundColor: [
-                        'rgba(25, 135, 84, 0.8)',
-                        'rgba(220, 53, 69, 0.8)'
-                    ],
-                    borderColor: [
-                        'rgb(25, 135, 84)',
-                        'rgb(220, 53, 69)'
-                    ],
+                    backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)'],
+                    borderColor: ['rgb(34, 197, 94)', 'rgb(239, 68, 68)'],
                     borderWidth: 2
                 }]
             },
@@ -353,27 +251,7 @@ function loadDispositionChart(stats) {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            font: {
-                                size: 12,
-                                family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                            }
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed || 0;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                                return `${label}: ${value} (${percentage}%)`;
-                            }
-                        }
-                    }
+                    legend: { position: 'bottom', labels: { padding: 15, font: { size: 11 } } }
                 }
             }
         });
@@ -382,7 +260,6 @@ function loadDispositionChart(stats) {
     }
 }
 
-// Load call records
 async function loadCalls(page = 1) {
     try {
         const days = document.getElementById('days-filter').value;
@@ -395,20 +272,28 @@ async function loadCalls(page = 1) {
         tbody.innerHTML = '';
 
         if (data.calls.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No call records found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No call records found</td></tr>';
             return;
         }
 
         data.calls.forEach(call => {
+            const statusColors = {
+                'ANSWERED': 'bg-green-50 text-green-600',
+                'NO ANSWER': 'bg-red-50 text-red-600',
+                'BUSY': 'bg-yellow-50 text-yellow-600',
+                'FAILED': 'bg-red-50 text-red-600'
+            };
+            const statusClass = statusColors[call.disposition] || 'bg-gray-100 text-gray-600';
+
             const row = `
-                <tr>
-                    <td>${call.calldate}</td>
-                    <td>${call.caller_id}</td>
-                    <td>${call.source}</td>
-                    <td>${call.destination}</td>
-                    <td>${call.duration_formatted}</td>
-                    <td>
-                        <span class="disposition-badge disposition-${call.disposition.replace(' ', '_')}">
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">${call.calldate}</td>
+                    <td class="px-4 py-3">${call.caller_id}</td>
+                    <td class="px-4 py-3">${call.source}</td>
+                    <td class="px-4 py-3">${call.destination}</td>
+                    <td class="px-4 py-3">${call.duration_formatted}</td>
+                    <td class="px-4 py-3">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${statusClass}">
                             ${call.disposition}
                         </span>
                     </td>
@@ -417,16 +302,13 @@ async function loadCalls(page = 1) {
             tbody.insertAdjacentHTML('beforeend', row);
         });
 
-        // Update pagination
         updatePagination(data.pagination);
         currentPage = page;
     } catch (error) {
         console.error('Error loading calls:', error);
-        showToast('Failed to load call records', 'danger');
     }
 }
 
-// Update pagination
 function updatePagination(pagination) {
     const info = document.getElementById('pagination-info');
     const start = ((pagination.page - 1) * pagination.per_page) + 1;
@@ -436,38 +318,43 @@ function updatePagination(pagination) {
     const paginationEl = document.getElementById('pagination');
     paginationEl.innerHTML = '';
 
-    // Previous button
-    const prevDisabled = pagination.page === 1 ? 'disabled' : '';
+    const prevDisabled = pagination.page === 1;
     paginationEl.insertAdjacentHTML('beforeend', `
-        <li class="page-item ${prevDisabled}">
-            <a class="page-link" href="#" onclick="loadCalls(${pagination.page - 1}); return false;">Previous</a>
+        <li>
+            <button class="px-3 py-1.5 text-xs font-medium ${prevDisabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'} rounded"
+                    onclick="${prevDisabled ? '' : `loadCalls(${pagination.page - 1})`}" ${prevDisabled ? 'disabled' : ''}>
+                Previous
+            </button>
         </li>
     `);
 
-    // Page numbers
     const maxPages = 5;
     let startPage = Math.max(1, pagination.page - 2);
     let endPage = Math.min(pagination.total_pages, startPage + maxPages - 1);
 
     for (let i = startPage; i <= endPage; i++) {
-        const active = i === pagination.page ? 'active' : '';
+        const active = i === pagination.page;
         paginationEl.insertAdjacentHTML('beforeend', `
-            <li class="page-item ${active}">
-                <a class="page-link" href="#" onclick="loadCalls(${i}); return false;">${i}</a>
+            <li>
+                <button class="px-3 py-1.5 text-xs font-medium rounded ${active ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'}"
+                        onclick="loadCalls(${i})">
+                    ${i}
+                </button>
             </li>
         `);
     }
 
-    // Next button
-    const nextDisabled = pagination.page === pagination.total_pages ? 'disabled' : '';
+    const nextDisabled = pagination.page === pagination.total_pages;
     paginationEl.insertAdjacentHTML('beforeend', `
-        <li class="page-item ${nextDisabled}">
-            <a class="page-link" href="#" onclick="loadCalls(${pagination.page + 1}); return false;">Next</a>
+        <li>
+            <button class="px-3 py-1.5 text-xs font-medium ${nextDisabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'} rounded"
+                    onclick="${nextDisabled ? '' : `loadCalls(${pagination.page + 1})`}" ${nextDisabled ? 'disabled' : ''}>
+                Next
+            </button>
         </li>
     `);
 }
 
-// Load hourly stats
 async function loadHourlyStats() {
     try {
         const days = document.getElementById('days-filter').value;
@@ -476,9 +363,7 @@ async function loadHourlyStats() {
 
         const ctx = document.getElementById('hourly-chart').getContext('2d');
 
-        if (hourlyChart) {
-            hourlyChart.destroy();
-        }
+        if (hourlyChart) hourlyChart.destroy();
 
         hourlyChart = new Chart(ctx, {
             type: 'bar',
@@ -487,8 +372,8 @@ async function loadHourlyStats() {
                 datasets: [{
                     label: 'Calls',
                     data: result.data.map(d => d.calls),
-                    backgroundColor: 'rgba(13, 110, 253, 0.5)',
-                    borderColor: 'rgb(13, 110, 253)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgb(59, 130, 246)',
                     borderWidth: 1,
                     borderRadius: 4
                 }]
@@ -496,54 +381,18 @@ async function loadHourlyStats() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        padding: 12,
-                        titleFont: {
-                            size: 13
-                        },
-                        bodyFont: {
-                            size: 12
-                        }
-                    }
-                },
+                plugins: { legend: { display: false } },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0,
-                            font: {
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            font: {
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    }
+                    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+                    x: { ticks: { font: { size: 10 } } }
                 }
             }
         });
     } catch (error) {
         console.error('Error loading hourly stats:', error);
-        showToast('Failed to load hourly statistics', 'danger');
     }
 }
 
-// Load daily stats
 async function loadDailyStats() {
     try {
         const days = document.getElementById('days-filter').value;
@@ -552,9 +401,7 @@ async function loadDailyStats() {
 
         const ctx = document.getElementById('daily-chart').getContext('2d');
 
-        if (dailyChart) {
-            dailyChart.destroy();
-        }
+        if (dailyChart) dailyChart.destroy();
 
         dailyChart = new Chart(ctx, {
             type: 'line',
@@ -564,94 +411,35 @@ async function loadDailyStats() {
                     {
                         label: 'Total',
                         data: result.data.map(d => d.total),
-                        borderColor: 'rgb(13, 110, 253)',
-                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         tension: 0.3,
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
+                        borderWidth: 2
                     },
                     {
                         label: 'Answered',
                         data: result.data.map(d => d.answered),
-                        borderColor: 'rgb(25, 135, 84)',
-                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        borderColor: 'rgb(34, 197, 94)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
                         tension: 0.3,
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
-                    },
-                    {
-                        label: 'Missed',
-                        data: result.data.map(d => d.missed),
-                        borderColor: 'rgb(220, 53, 69)',
-                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                        tension: 0.3,
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
+                        borderWidth: 2
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 15,
-                            font: {
-                                size: 12
-                            },
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        padding: 12,
-                        titleFont: {
-                            size: 13
-                        },
-                        bodyFont: {
-                            size: 12
-                        }
-                    }
-                },
+                plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0,
-                            font: {
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            font: {
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    }
+                    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } }
                 }
             }
         });
     } catch (error) {
         console.error('Error loading daily stats:', error);
-        showToast('Failed to load daily statistics', 'danger');
     }
 }
 
-// Load top callers
 async function loadTopCallers() {
     try {
         const days = document.getElementById('days-filter').value;
@@ -662,28 +450,25 @@ async function loadTopCallers() {
         tbody.innerHTML = '';
 
         if (result.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No data available</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">No data available</td></tr>';
             return;
         }
 
         result.data.forEach(caller => {
-            const row = `
-                <tr>
-                    <td>${caller.number}</td>
-                    <td class="text-end">${caller.total_calls}</td>
-                    <td class="text-end">${caller.answered_calls}</td>
-                    <td class="text-end">${caller.total_duration_formatted}</td>
+            tbody.insertAdjacentHTML('beforeend', `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2">${caller.number}</td>
+                    <td class="px-4 py-2 text-right">${caller.total_calls}</td>
+                    <td class="px-4 py-2 text-right">${caller.answered_calls}</td>
+                    <td class="px-4 py-2 text-right">${caller.total_duration_formatted}</td>
                 </tr>
-            `;
-            tbody.insertAdjacentHTML('beforeend', row);
+            `);
         });
     } catch (error) {
         console.error('Error loading top callers:', error);
-        showToast('Failed to load top callers', 'danger');
     }
 }
 
-// Load top destinations
 async function loadTopDestinations() {
     try {
         const days = document.getElementById('days-filter').value;
@@ -694,28 +479,25 @@ async function loadTopDestinations() {
         tbody.innerHTML = '';
 
         if (result.data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No data available</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">No data available</td></tr>';
             return;
         }
 
         result.data.forEach(dest => {
-            const row = `
-                <tr>
-                    <td>${dest.number}</td>
-                    <td class="text-end">${dest.total_calls}</td>
-                    <td class="text-end">${dest.answered_calls}</td>
-                    <td class="text-end">${dest.total_duration_formatted}</td>
+            tbody.insertAdjacentHTML('beforeend', `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2">${dest.number}</td>
+                    <td class="px-4 py-2 text-right">${dest.total_calls}</td>
+                    <td class="px-4 py-2 text-right">${dest.answered_calls}</td>
+                    <td class="px-4 py-2 text-right">${dest.total_duration_formatted}</td>
                 </tr>
-            `;
-            tbody.insertAdjacentHTML('beforeend', row);
+            `);
         });
     } catch (error) {
         console.error('Error loading top destinations:', error);
-        showToast('Failed to load top destinations', 'danger');
     }
 }
 
-// Load all data
 function loadAllData() {
     loadStats();
     loadCalls(1);
@@ -725,11 +507,8 @@ function loadAllData() {
     loadTopDestinations();
 }
 
-// Initialize
 document.addEventListener('DOMContentLoaded', function() {
     loadAllData();
-
-    // Add event listeners to filters
     document.getElementById('days-filter').addEventListener('change', loadAllData);
     document.getElementById('per-page-filter').addEventListener('change', () => loadCalls(1));
 });

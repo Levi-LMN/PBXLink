@@ -1,244 +1,266 @@
 {% extends "base.html" %}
 
-{% block title %}WireGuard VPN - FreePBX Dashboard{% endblock %}
+{% block title %}WireGuard VPN - Sibasi PBX{% endblock %}
 {% block page_title %}WireGuard VPN Management{% endblock %}
 
-{% block extra_css %}
+{% block content %}
+<div class="space-y-4">
+    <!-- Server Status -->
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="flex justify-between items-center px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-server text-blue-600"></i>Server Status
+            </h6>
+            <div class="flex gap-2">
+                <button class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors" onclick="refreshStatus()">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="restartWireGuard()">
+                    <i class="fas fa-redo mr-1"></i>Restart
+                </button>
+                <button class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="initializeUsersDirectory()">
+                    <i class="fas fa-folder-plus mr-1"></i>Init
+                </button>
+            </div>
+        </div>
+        <div class="p-4">
+            <div id="enhancedStatus" style="display: none;">
+                <!-- Status Overview -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" id="statusOverview"></div>
+
+                <!-- Interface Info -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs" id="interfaceInfo"></div>
+
+                <!-- Connected Peers -->
+                <h6 class="text-sm font-semibold text-gray-900 mb-3">Connected Peers</h6>
+                <div id="peersList" class="space-y-2"></div>
+            </div>
+
+            <!-- Loading/Fallback -->
+            <div id="statusLoading" class="text-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                <p class="text-xs text-gray-500">Loading status...</p>
+            </div>
+            <pre id="serverStatus" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto" style="display: none;"></pre>
+        </div>
+    </div>
+
+    <!-- VPN Users -->
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="flex justify-between items-center px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-users text-blue-600"></i>VPN Users
+            </h6>
+            <button class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="showAddUserModal()">
+                <i class="fas fa-user-plus mr-2"></i>Add User
+            </button>
+        </div>
+        <div class="p-4">
+            <div id="usersLoading" class="text-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                <p class="text-xs text-gray-500">Loading users...</p>
+            </div>
+
+            <div id="usersTableContainer" style="display: none;">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-50">
+                            <tr class="border-b border-gray-100">
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Username</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">IP</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Public Key</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-600" style="width: 200px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="noUsers" class="text-center py-8 text-gray-500" style="display: none;">
+                <i class="fas fa-user-slash text-4xl mb-3"></i>
+                <p>No users found.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Server Config -->
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="flex justify-between items-center px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-cog text-blue-600"></i>Server Configuration
+            </h6>
+            <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="showEditConfigModal()">
+                <i class="fas fa-edit mr-2"></i>Edit
+            </button>
+        </div>
+        <div class="p-4">
+            <div id="configLoading" class="text-center py-8">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                <p class="text-xs text-gray-500">Loading config...</p>
+            </div>
+            <pre id="serverConfig" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto" style="display: none;"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div id="addUserModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+            <h5 class="text-base font-semibold flex items-center gap-2">
+                <i class="fas fa-user-plus text-green-600"></i>Add User
+            </h5>
+            <button onclick="closeModal('addUserModal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="mb-4">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Username *</label>
+                <input type="text" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" id="newUsername" required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                <input type="text" class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg" id="newDescription">
+            </div>
+            <div class="flex items-center mb-4">
+                <input type="checkbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded" id="useExistingKeys" onchange="toggleKeyFields()">
+                <label class="ml-2 text-xs font-medium text-gray-700">Use Existing Keys</label>
+            </div>
+            <div id="keyFields" style="display: none;">
+                <div class="mb-4">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Private Key</label>
+                    <textarea class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg font-mono" id="newPrivateKey" rows="2"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Public Key</label>
+                    <textarea class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg font-mono" id="newPublicKey" rows="2"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+            <button onclick="closeModal('addUserModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">Cancel</button>
+            <button onclick="createUser()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- View User Modal -->
+<div id="viewUserModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+            <h5 class="text-base font-semibold flex items-center gap-2">
+                <i class="fas fa-user text-blue-600"></i>User Config
+            </h5>
+            <button onclick="closeModal('viewUserModal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <small class="text-xs text-gray-500 block mb-1">Username</small>
+                    <strong class="text-sm" id="viewUsername">-</strong>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <small class="text-xs text-gray-500 block mb-1">IP Address</small>
+                    <strong class="text-sm" id="viewUserIP">-</strong>
+                </div>
+            </div>
+            <pre id="viewUserConfig" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto">Loading...</pre>
+        </div>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+            <button onclick="closeModal('viewUserModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">Close</button>
+            <button onclick="downloadConfigFromModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors">Download</button>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal -->
+<div id="qrModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-md">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-100">
+            <h5 class="text-base font-semibold flex items-center gap-2">
+                <i class="fas fa-qrcode text-blue-600"></i>QR Code
+            </h5>
+            <button onclick="closeModal('qrModal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6 text-center">
+            <img id="qrImage" src="" class="w-full max-w-xs mx-auto rounded-lg" />
+            <p class="text-xs text-gray-500 mt-3">Scan with WireGuard app</p>
+        </div>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+            <button onclick="closeModal('qrModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Config Modal -->
+<div id="editConfigModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+            <h5 class="text-base font-semibold flex items-center gap-2">
+                <i class="fas fa-edit text-blue-600"></i>Edit Config
+            </h5>
+            <button onclick="closeModal('editConfigModal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <textarea class="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg font-mono" id="configEditor" rows="15"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+            <button onclick="closeModal('editConfigModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">Cancel</button>
+            <button onclick="saveConfig()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Peer Detail Modal -->
+<div id="peerDetailModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+            <h5 class="text-base font-semibold flex items-center gap-2">
+                <i class="fas fa-network-wired text-blue-600"></i>Peer Details
+            </h5>
+            <button onclick="closeModal('peerDetailModal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4" id="peerDetailsFull"></div>
+            <div class="grid grid-cols-3 gap-2 mb-4" id="peerTransferStatsFull"></div>
+            <div class="flex gap-2" id="peerActions"></div>
+        </div>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+            <button onclick="closeModal('peerDetailModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">Close</button>
+        </div>
+    </div>
+</div>
+
 <style>
 .peer-card { cursor: pointer; transition: all 0.2s ease; }
 .peer-card:hover { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="container-fluid">
-    <!-- Server Status -->
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="fas fa-server text-primary"></i> Server Status</h6>
-            <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-secondary" onclick="refreshStatus()"><i class="fas fa-sync-alt"></i></button>
-                <button class="btn btn-outline-primary" onclick="restartWireGuard()"><i class="fas fa-redo"></i> Restart</button>
-                <button class="btn btn-outline-success" onclick="initializeUsersDirectory()"><i class="fas fa-folder-plus"></i> Init</button>
-            </div>
-        </div>
-        <div class="card-body">
-            <div id="enhancedStatus" style="display: none;">
-                <!-- Status Overview -->
-                <div class="row g-2 mb-3" id="statusOverview"></div>
-
-                <!-- Interface Info -->
-                <div class="alert alert-light mb-3" id="interfaceInfo"></div>
-
-                <!-- Connected Peers -->
-                <h6 class="mb-2">Connected Peers</h6>
-                <div id="peersList"></div>
-            </div>
-
-            <!-- Loading/Fallback -->
-            <div id="statusLoading" class="text-center py-4">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="text-muted mt-2">Loading status...</p>
-            </div>
-            <pre id="serverStatus" class="bg-dark text-light p-3 rounded" style="display: none;"></pre>
-        </div>
-    </div>
-
-    <!-- VPN Users -->
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="fas fa-users text-primary"></i> VPN Users</h6>
-            <button class="btn btn-success btn-sm" onclick="showAddUserModal()"><i class="fas fa-user-plus"></i> Add User</button>
-        </div>
-        <div class="card-body">
-            <div id="usersLoading" class="text-center py-4">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="text-muted mt-2">Loading users...</p>
-            </div>
-
-            <div id="usersTableContainer" style="display: none;">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Username</th>
-                                <th>IP</th>
-                                <th>Public Key</th>
-                                <th>Status</th>
-                                <th style="width: 200px;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="usersTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="noUsers" class="text-center py-4 text-muted" style="display: none;">
-                <i class="fas fa-user-slash fa-2x mb-2"></i>
-                <p class="mb-0">No users found.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Server Config -->
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0"><i class="fas fa-cog text-primary"></i> Server Configuration</h6>
-            <button class="btn btn-primary btn-sm" onclick="showEditConfigModal()"><i class="fas fa-edit"></i> Edit</button>
-        </div>
-        <div class="card-body">
-            <div id="configLoading" class="text-center py-4">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="text-muted mt-2">Loading config...</p>
-            </div>
-            <pre id="serverConfig" class="bg-dark text-light p-3 rounded" style="display: none;"></pre>
-        </div>
-    </div>
-</div>
-
-<!-- Add User Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-user-plus text-success"></i> Add User</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Username *</label>
-                    <input type="text" class="form-control" id="newUsername" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <input type="text" class="form-control" id="newDescription">
-                </div>
-                <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" id="useExistingKeys" onchange="toggleKeyFields()">
-                    <label class="form-check-label">Use Existing Keys</label>
-                </div>
-                <div id="keyFields" style="display: none;">
-                    <div class="mb-3">
-                        <label class="form-label">Private Key</label>
-                        <textarea class="form-control font-monospace" id="newPrivateKey" rows="2"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Public Key</label>
-                        <textarea class="form-control font-monospace" id="newPublicKey" rows="2"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="createUser()">Create</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- View User Modal -->
-<div class="modal fade" id="viewUserModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-user text-primary"></i> User Config</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row g-3 mb-3">
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded">
-                            <small class="text-muted d-block">Username</small>
-                            <strong id="viewUsername">-</strong>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded">
-                            <small class="text-muted d-block">IP Address</small>
-                            <strong id="viewUserIP">-</strong>
-                        </div>
-                    </div>
-                </div>
-                <pre id="viewUserConfig" class="bg-dark text-light p-3 rounded">Loading...</pre>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="downloadConfigFromModal()">Download</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- QR Code Modal -->
-<div class="modal fade" id="qrModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-qrcode text-primary"></i> QR Code</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center">
-                <img id="qrImage" src="" class="img-fluid" />
-                <p class="text-muted mt-2 mb-0 small">Scan with WireGuard app</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Edit Config Modal -->
-<div class="modal fade" id="editConfigModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-edit text-primary"></i> Edit Config</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <textarea class="form-control font-monospace" id="configEditor" rows="15" style="font-size: 0.85rem;"></textarea>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveConfig()">Save</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Peer Detail Modal -->
-<div class="modal fade" id="peerDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-network-wired text-primary"></i> Peer Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="row g-3 mb-3" id="peerDetailsFull"></div>
-                <div class="row g-2 mb-3" id="peerTransferStatsFull"></div>
-                <div class="d-flex gap-2" id="peerActions"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
 {% block extra_js %}
 <script>
 let currentUser = null, currentPeer = null, statusData = null, usersData = [];
-let addUserModal, viewUserModal, qrModal, editConfigModal, peerDetailModal;
+
+function showModal(modalId) {
+    document.getElementById(modalId).classList.remove('hidden');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+}
 
 document.addEventListener('DOMContentLoaded', function() {
-    addUserModal = new bootstrap.Modal(document.getElementById('addUserModal'));
-    viewUserModal = new bootstrap.Modal(document.getElementById('viewUserModal'));
-    qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
-    editConfigModal = new bootstrap.Modal(document.getElementById('editConfigModal'));
-    peerDetailModal = new bootstrap.Modal(document.getElementById('peerDetailModal'));
     loadEnhancedStatus(); loadServerConfig(); loadUsers();
 });
 
@@ -252,7 +274,6 @@ function toggleKeyFields() {
 }
 
 function getUsernameByIP(ip) {
-    // Extract IP without CIDR notation
     const cleanIP = ip.replace('/32', '');
     const user = usersData.find(u => u.ip.replace('/32', '') === cleanIP);
     return user ? user.username : null;
@@ -281,49 +302,33 @@ function displayEnhancedStatus(status) {
     const stalePeers = totalPeers - onlinePeers - offlinePeers;
 
     document.getElementById('statusOverview').innerHTML = `
-        <div class="col-6 col-md-3">
-            <div class="card text-center">
-                <div class="card-body py-2">
-                    <h4 class="mb-0">${totalPeers}</h4>
-                    <small class="text-muted text-uppercase">Total</small>
-                </div>
-            </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3 text-center">
+            <h4 class="text-2xl font-bold text-gray-900 mb-1">${totalPeers}</h4>
+            <small class="text-xs text-gray-500 uppercase font-medium">Total</small>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center border-success">
-                <div class="card-body py-2">
-                    <h4 class="mb-0 text-success">${onlinePeers}</h4>
-                    <small class="text-muted text-uppercase">Online</small>
-                </div>
-            </div>
+        <div class="bg-white rounded-xl border border-green-200 p-3 text-center">
+            <h4 class="text-2xl font-bold text-green-600 mb-1">${onlinePeers}</h4>
+            <small class="text-xs text-gray-500 uppercase font-medium">Online</small>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center border-warning">
-                <div class="card-body py-2">
-                    <h4 class="mb-0 text-warning">${stalePeers}</h4>
-                    <small class="text-muted text-uppercase">Stale</small>
-                </div>
-            </div>
+        <div class="bg-white rounded-xl border border-yellow-200 p-3 text-center">
+            <h4 class="text-2xl font-bold text-yellow-600 mb-1">${stalePeers}</h4>
+            <small class="text-xs text-gray-500 uppercase font-medium">Stale</small>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center border-danger">
-                <div class="card-body py-2">
-                    <h4 class="mb-0 text-danger">${offlinePeers}</h4>
-                    <small class="text-muted text-uppercase">Offline</small>
-                </div>
-            </div>
+        <div class="bg-white rounded-xl border border-red-200 p-3 text-center">
+            <h4 class="text-2xl font-bold text-red-600 mb-1">${offlinePeers}</h4>
+            <small class="text-xs text-gray-500 uppercase font-medium">Offline</small>
         </div>
     `;
 
     document.getElementById('interfaceInfo').innerHTML = `
-        <div class="row">
-            <div class="col-md-6 mb-2 mb-md-0">
-                <small class="text-muted d-block">Interface</small>
-                <strong>${status.interface.name || 'wg0'}</strong>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                <small class="text-blue-700 block font-medium">Interface</small>
+                <strong class="text-blue-900">${status.interface.name || 'wg0'}</strong>
             </div>
-            <div class="col-md-6">
-                <small class="text-muted d-block">Public Key</small>
-                <code class="small">${status.interface.public_key || 'N/A'}</code>
+            <div>
+                <small class="text-blue-700 block font-medium">Public Key</small>
+                <code class="text-blue-900">${status.interface.public_key || 'N/A'}</code>
             </div>
         </div>
     `;
@@ -332,45 +337,47 @@ function displayEnhancedStatus(status) {
         document.getElementById('peersList').innerHTML = status.peers.map((peer, index) => {
             const clientIp = peer.client_ip || 'Unknown';
             const username = getUsernameByIP(peer.allowed_ips || clientIp);
-            const displayName = username || clientIp;
             const peerStatus = peer.status || 'offline';
-            const statusColor = peerStatus === 'online' ? 'success' : peerStatus === 'stale' ? 'warning' : 'danger';
+            const statusColors = {
+                'online': 'bg-green-50 text-green-600',
+                'stale': 'bg-yellow-50 text-yellow-600',
+                'offline': 'bg-red-50 text-red-600'
+            };
+            const statusClass = statusColors[peerStatus] || 'bg-gray-50 text-gray-600';
             const publicKey = peer.public_key_short || peer.public_key || '';
             const endpoint = peer.endpoint || 'N/A';
             const latestHandshake = peer.latest_handshake || 'Never';
 
             return `
-            <div class="card peer-card mb-2" onclick="showPeerDetails(${index})">
-                <div class="card-body py-2">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="mb-0">
-                            ${username ? `<i class="fas fa-user me-1"></i>${username}` : clientIp}
-                            ${username ? `<small class="text-muted ms-2">${clientIp}</small>` : ''}
-                        </h6>
-                        <span class="badge bg-${statusColor} text-uppercase">${peerStatus}</span>
+            <div class="peer-card bg-white rounded-lg border border-gray-100 p-3" onclick="showPeerDetails(${index})">
+                <div class="flex justify-between items-center mb-2">
+                    <h6 class="text-sm font-semibold text-gray-900">
+                        ${username ? `<i class="fas fa-user mr-1"></i>${username}` : clientIp}
+                        ${username ? `<span class="text-xs text-gray-500 ml-2">${clientIp}</span>` : ''}
+                    </h6>
+                    <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase ${statusClass}">${peerStatus}</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                    <div>
+                        <div class="text-gray-500">Public Key</div>
+                        <code class="text-gray-700">${publicKey.substring(0,20)}...</code>
                     </div>
-                    <div class="row g-2 small">
-                        <div class="col-md-4">
-                            <div class="text-muted">Public Key</div>
-                            <code class="small">${publicKey.substring(0,20)}...</code>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted">Endpoint</div>
-                            <div>${endpoint.split(':')[0]}</div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-muted">Last Handshake</div>
-                            <div>${latestHandshake}</div>
-                        </div>
+                    <div>
+                        <div class="text-gray-500">Endpoint</div>
+                        <div class="text-gray-700">${endpoint.split(':')[0]}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-500">Last Handshake</div>
+                        <div class="text-gray-700">${latestHandshake}</div>
                     </div>
                 </div>
             </div>
         `}).join('');
     } else {
         document.getElementById('peersList').innerHTML = `
-            <div class="text-center py-4 text-muted">
-                <i class="fas fa-plug fa-2x mb-2"></i>
-                <p class="mb-0">No peers connected</p>
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-plug text-4xl mb-3"></i>
+                <p class="text-xs">No peers connected</p>
             </div>`;
     }
 }
@@ -391,97 +398,76 @@ function showPeerDetails(peerIndex) {
 
 function displayPeerDetails(peer) {
     const username = getUsernameByIP(peer.allowed_ips || peer.client_ip);
-    const statusColor = peer.status === 'online' ? 'success' : peer.status === 'stale' ? 'warning' : 'danger';
+    const statusColors = {
+        'online': 'bg-green-50 text-green-600',
+        'stale': 'bg-yellow-50 text-yellow-600',
+        'offline': 'bg-red-50 text-red-600'
+    };
+    const statusClass = statusColors[peer.status] || 'bg-gray-50 text-gray-600';
 
     document.getElementById('peerDetailsFull').innerHTML = `
         ${username ? `
-        <div class="col-md-6">
-            <div class="p-3 bg-light rounded">
-                <small class="text-muted d-block">Username</small>
-                <strong><i class="fas fa-user me-1"></i>${username}</strong>
-            </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+            <small class="text-xs text-gray-500 block mb-1">Username</small>
+            <strong class="text-sm"><i class="fas fa-user mr-1"></i>${username}</strong>
         </div>` : ''}
-        <div class="col-md-6">
-            <div class="p-3 bg-light rounded">
-                <small class="text-muted d-block">Client IP</small>
-                <strong>${peer.client_ip || 'N/A'}</strong>
-            </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+            <small class="text-xs text-gray-500 block mb-1">Client IP</small>
+            <strong class="text-sm">${peer.client_ip || 'N/A'}</strong>
         </div>
-        <div class="col-md-12">
-            <div class="p-3 bg-light rounded">
-                <small class="text-muted d-block">Public Key</small>
-                <code class="small">${peer.public_key_full || peer.public_key || 'N/A'}</code>
-            </div>
+        <div class="bg-gray-50 rounded-lg p-3 md:col-span-2">
+            <small class="text-xs text-gray-500 block mb-1">Public Key</small>
+            <code class="text-xs">${peer.public_key_full || peer.public_key || 'N/A'}</code>
         </div>
-        <div class="col-md-6">
-            <div class="p-3 bg-light rounded">
-                <small class="text-muted d-block">Endpoint</small>
-                <strong>${peer.endpoint || 'N/A'}</strong>
-            </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+            <small class="text-xs text-gray-500 block mb-1">Endpoint</small>
+            <strong class="text-sm">${peer.endpoint || 'N/A'}</strong>
         </div>
-        <div class="col-md-6">
-            <div class="p-3 bg-light rounded">
-                <small class="text-muted d-block">Allowed IPs</small>
-                <code class="small">${peer.allowed_ips || 'N/A'}</code>
-            </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+            <small class="text-xs text-gray-500 block mb-1">Allowed IPs</small>
+            <code class="text-xs">${peer.allowed_ips || 'N/A'}</code>
         </div>
-        <div class="col-md-6">
-            <div class="p-3 bg-light rounded">
-                <small class="text-muted d-block">Last Handshake</small>
-                <strong>${peer.latest_handshake || 'Never'}</strong>
-            </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+            <small class="text-xs text-gray-500 block mb-1">Last Handshake</small>
+            <strong class="text-sm">${peer.latest_handshake || 'Never'}</strong>
         </div>
-        <div class="col-md-6">
-            <div class="p-3 bg-light rounded">
-                <small class="text-muted d-block">Status</small>
-                <span class="badge bg-${statusColor} text-uppercase">${peer.status || 'offline'}</span>
-            </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+            <small class="text-xs text-gray-500 block mb-1">Status</small>
+            <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase ${statusClass}">${peer.status || 'offline'}</span>
         </div>
     `;
 
     const hasTransferData = peer.transfer_received || peer.transfer_sent || peer.transfer_total;
     document.getElementById('peerTransferStatsFull').innerHTML = hasTransferData ? `
-        <div class="col-4">
-            <div class="card text-center">
-                <div class="card-body py-2">
-                    <small class="text-muted d-block">Received</small>
-                    <strong>${peer.transfer_received || '0 B'}</strong>
-                </div>
-            </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3 text-center">
+            <small class="text-xs text-gray-500 block mb-1">Received</small>
+            <strong class="text-sm">${peer.transfer_received || '0 B'}</strong>
         </div>
-        <div class="col-4">
-            <div class="card text-center">
-                <div class="card-body py-2">
-                    <small class="text-muted d-block">Sent</small>
-                    <strong>${peer.transfer_sent || '0 B'}</strong>
-                </div>
-            </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3 text-center">
+            <small class="text-xs text-gray-500 block mb-1">Sent</small>
+            <strong class="text-sm">${peer.transfer_sent || '0 B'}</strong>
         </div>
-        <div class="col-4">
-            <div class="card text-center">
-                <div class="card-body py-2">
-                    <small class="text-muted d-block">Total</small>
-                    <strong>${peer.transfer_total || '0 B'}</strong>
-                </div>
-            </div>
+        <div class="bg-white rounded-lg border border-gray-100 p-3 text-center">
+            <small class="text-xs text-gray-500 block mb-1">Total</small>
+            <strong class="text-sm">${peer.transfer_total || '0 B'}</strong>
         </div>
-    ` : '<p class="text-muted small">No transfer data available</p>';
+    ` : '<p class="text-xs text-gray-500">No transfer data available</p>';
 
     document.getElementById('peerActions').innerHTML = `
-        <button class="btn btn-outline-primary btn-sm" onclick="refreshPeerStatus()">
-            <i class="fas fa-sync-alt"></i> Refresh
+        <button class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold transition-colors" onclick="refreshPeerStatus()">
+            <i class="fas fa-sync-alt mr-1"></i>Refresh
         </button>
         ${username ? `
-        <button class="btn btn-outline-info btn-sm" onclick="viewUserFromPeer('${username}')">
-            <i class="fas fa-eye"></i> View Config
+        <button class="px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 rounded-lg text-xs font-semibold transition-colors" onclick="viewUserFromPeer('${username}')">
+            <i class="fas fa-eye mr-1"></i>View Config
         </button>` : ''}
     `;
 
-    peerDetailModal.show();
+    showModal('peerDetailModal');
 }
 
 function viewUserFromPeer(username) {
-    peerDetailModal.hide();
+    closeModal('peerDetailModal');
     setTimeout(() => viewUser(username), 300);
 }
 
@@ -519,25 +505,36 @@ async function loadUsers() {
         const data = await response.json();
         document.getElementById('usersLoading').style.display = 'none';
         if (data.success && data.users.length > 0) {
-            usersData = data.users; // Store for IP matching
+            usersData = data.users;
             document.getElementById('usersTableContainer').style.display = 'block';
             document.getElementById('usersTableBody').innerHTML = data.users.map(user => `
-                <tr>
-                    <td><strong>${user.username}</strong></td>
-                    <td><code>${user.ip}</code></td>
-                    <td><small><code>${user.public_key.substring(0, 30)}...</code></small></td>
-                    <td>${user.config_exists ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-warning">No Config</span>'}</td>
-                    <td>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="viewUser('${user.username}')" title="View"><i class="fas fa-eye"></i></button>
-                            <button class="btn btn-outline-secondary" onclick="showQRCode('${user.username}')" title="QR Code"><i class="fas fa-qrcode"></i></button>
-                            <button class="btn btn-outline-info" onclick="downloadUserConfig('${user.username}')" title="Download"><i class="fas fa-download"></i></button>
-                            <button class="btn btn-outline-danger" onclick="deleteUser('${user.username}')" title="Delete"><i class="fas fa-trash"></i></button>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3"><strong class="text-sm">${user.username}</strong></td>
+                    <td class="px-4 py-3"><code class="text-xs">${user.ip}</code></td>
+                    <td class="px-4 py-3"><code class="text-xs">${user.public_key.substring(0, 30)}...</code></td>
+                    <td class="px-4 py-3">
+                        ${user.config_exists ?
+                            '<span class="px-2 py-0.5 bg-green-50 text-green-600 rounded text-xs font-semibold">Active</span>' :
+                            '<span class="px-2 py-0.5 bg-yellow-50 text-yellow-600 rounded text-xs font-semibold">No Config</span>'}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex gap-1">
+                            <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors" onclick="viewUser('${user.username}')" title="View">
+                                <i class="fas fa-eye text-xs"></i>
+                            </button>
+                            <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors" onclick="showQRCode('${user.username}')" title="QR Code">
+                                <i class="fas fa-qrcode text-xs"></i>
+                            </button>
+                            <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-600 transition-colors" onclick="downloadUserConfig('${user.username}')" title="Download">
+                                <i class="fas fa-download text-xs"></i>
+                            </button>
+                            <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors" onclick="deleteUser('${user.username}')" title="Delete">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
                         </div>
                     </td>
                 </tr>
             `).join('');
-            // Refresh status to match usernames with peers
             if (statusData) displayEnhancedStatus(statusData);
         } else {
             document.getElementById('noUsers').style.display = 'block';
@@ -555,7 +552,7 @@ function showAddUserModal() {
     document.getElementById('newPublicKey').value = '';
     document.getElementById('useExistingKeys').checked = false;
     document.getElementById('keyFields').style.display = 'none';
-    addUserModal.show();
+    showModal('addUserModal');
 }
 
 async function createUser() {
@@ -571,8 +568,13 @@ async function createUser() {
     try {
         const response = await fetch('/wireguard/api/users', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
         const data = await response.json();
-        if (data.success) { showToast(`User ${username} created!`, 'success'); addUserModal.hide(); loadUsers(); loadServerConfig(); loadEnhancedStatus(); }
-        else showToast(data.error || 'Failed', 'danger');
+        if (data.success) {
+            showToast(`User ${username} created!`, 'success');
+            closeModal('addUserModal');
+            loadUsers();
+            loadServerConfig();
+            loadEnhancedStatus();
+        } else showToast(data.error || 'Failed', 'danger');
     } catch (error) { showToast('Error creating user', 'danger'); }
 }
 
@@ -586,22 +588,26 @@ async function viewUser(username) {
             document.getElementById('viewUserConfig').textContent = data.config;
             const ipMatch = data.config.match(/Address\s*=\s*([^\n]+)/);
             document.getElementById('viewUserIP').textContent = ipMatch ? ipMatch[1].trim() : '-';
-            viewUserModal.show();
+            showModal('viewUserModal');
         } else showToast('Failed to load config', 'danger');
     } catch (error) { showToast('Error loading user', 'danger'); }
 }
 
 function downloadConfigFromModal() { if (currentUser) downloadUserConfig(currentUser); }
 function downloadUserConfig(username) { window.location.href = `/wireguard/api/users/${username}/download`; }
-function showQRCode(username) { document.getElementById('qrImage').src = `/wireguard/api/users/${username}/qr?t=${Date.now()}`; qrModal.show(); }
+function showQRCode(username) { document.getElementById('qrImage').src = `/wireguard/api/users/${username}/qr?t=${Date.now()}`; showModal('qrModal'); }
 
 async function deleteUser(username) {
     if (!confirm(`Delete user "${username}"?`)) return;
     try {
         const response = await fetch(`/wireguard/api/users/${username}`, {method: 'DELETE'});
         const data = await response.json();
-        if (data.success) { showToast(`User ${username} deleted`, 'success'); loadUsers(); loadServerConfig(); loadEnhancedStatus(); }
-        else showToast(data.error || 'Failed', 'danger');
+        if (data.success) {
+            showToast(`User ${username} deleted`, 'success');
+            loadUsers();
+            loadServerConfig();
+            loadEnhancedStatus();
+        } else showToast(data.error || 'Failed', 'danger');
     } catch (error) { showToast('Error deleting user', 'danger'); }
 }
 
@@ -609,8 +615,10 @@ async function showEditConfigModal() {
     try {
         const response = await fetch('/wireguard/api/config');
         const data = await response.json();
-        if (data.success) { document.getElementById('configEditor').value = data.config; editConfigModal.show(); }
-        else showToast('Failed to load config', 'danger');
+        if (data.success) {
+            document.getElementById('configEditor').value = data.config;
+            showModal('editConfigModal');
+        } else showToast('Failed to load config', 'danger');
     } catch (error) { showToast('Error loading config', 'danger'); }
 }
 
@@ -620,8 +628,12 @@ async function saveConfig() {
     try {
         const response = await fetch('/wireguard/api/config', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({config})});
         const data = await response.json();
-        if (data.success) { showToast('Config updated', 'success'); editConfigModal.hide(); loadServerConfig(); loadEnhancedStatus(); }
-        else showToast(data.error || 'Failed', 'danger');
+        if (data.success) {
+            showToast('Config updated', 'success');
+            closeModal('editConfigModal');
+            loadServerConfig();
+            loadEnhancedStatus();
+        } else showToast(data.error || 'Failed', 'danger');
     } catch (error) { showToast('Error saving config', 'danger'); }
 }
 
@@ -649,31 +661,30 @@ async function initializeUsersDirectory() {
 function refreshPeerStatus() { showToast('Refreshing peer...', 'info'); loadEnhancedStatus(); }
 
 function showToast(message, type = 'info') {
-    const toastContainer = document.getElementById('toastContainer') || (() => {
-        const container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'toast-container position-fixed top-0 end-0 p-3';
-        container.style.zIndex = '9999';
-        document.body.appendChild(container);
-        return container;
-    })();
+    const alertColors = {
+        'success': 'bg-green-50 border-green-200 text-green-800',
+        'danger': 'bg-red-50 border-red-200 text-red-800',
+        'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
+        'info': 'bg-blue-50 border-blue-200 text-blue-800'
+    };
+    const alertClass = alertColors[type] || alertColors.info;
 
-    const toastId = 'toast-' + Date.now();
-    const bgClass = type === 'success' ? 'bg-success' : type === 'danger' ? 'bg-danger' : type === 'warning' ? 'bg-warning' : 'bg-info';
-
-    toastContainer.innerHTML += `
-        <div id="${toastId}" class="toast align-items-center text-white ${bgClass} border-0" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    const alertHtml = `
+        <div class="fixed top-4 right-4 z-50 ${alertClass} border rounded-lg p-4 shadow-lg max-w-md animate-slide-in">
+            <div class="flex items-start gap-3">
+                <div class="flex-1 text-sm font-medium">${message}</div>
+                <button onclick="this.parentElement.parentElement.remove()" class="text-current opacity-50 hover:opacity-100">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-        </div>`;
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
 
-    const toastEl = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastEl);
-    toast.show();
-
-    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    setTimeout(() => {
+        const alert = document.querySelector('.animate-slide-in');
+        if (alert) alert.remove();
+    }, 5000);
 }
 </script>
 {% endblock %}

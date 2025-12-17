@@ -1,175 +1,42 @@
 {% extends "base.html" %}
 
-{% block title %}TG100 Gateway Monitor - FreePBX Dashboard{% endblock %}
-
+{% block title %}TG100 Gateway Monitor - Sibasi PBX{% endblock %}
 {% block page_title %}TG100 Gateway Monitor{% endblock %}
 
-{% block extra_css %}
-<style>
-    .device-status-card {
-        border-left: 4px solid #6c757d;
-        transition: all 0.3s;
-        min-height: 200px;
-    }
-
-    .device-status-card.status-online {
-        border-left-color: #198754;
-        background: linear-gradient(135deg, #ffffff 0%, #f0fff4 100%);
-    }
-
-    .device-status-card.status-offline {
-        border-left-color: #dc3545;
-        background: linear-gradient(135deg, #ffffff 0%, #fff0f0 100%);
-    }
-
-    .status-indicator {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.5rem;
-        margin: 0 auto 1rem;
-        animation: pulse 2s ease-in-out infinite;
-    }
-
-    .status-indicator.online {
-        background: linear-gradient(135deg, #198754 0%, #20c997 100%);
-        color: white;
-        box-shadow: 0 0 20px rgba(25, 135, 84, 0.4);
-    }
-
-    .status-indicator.offline {
-        background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
-        color: white;
-        box-shadow: 0 0 20px rgba(220, 53, 69, 0.4);
-    }
-
-    .status-indicator.checking {
-        background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
-        color: white;
-        animation: spin 1s linear infinite;
-    }
-
-    @keyframes pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    .metric-box {
-        text-align: center;
-        padding: 1rem;
-        background: white;
-        border-radius: 8px;
-        border: 1px solid #e9ecef;
-    }
-
-    .metric-value {
-        font-size: 1.75rem;
-        font-weight: 600;
-        margin: 0;
-        color: #0d6efd;
-    }
-
-    .metric-label {
-        color: #6c757d;
-        font-size: 0.875rem;
-        margin: 0.5rem 0 0 0;
-    }
-
-    .ping-history-chart {
-        height: 200px;
-    }
-
-    .history-table {
-        max-height: 400px;
-        overflow-y: auto;
-    }
-
-    .status-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 0.5rem;
-    }
-
-    .status-dot.online {
-        background: #198754;
-        box-shadow: 0 0 8px rgba(25, 135, 84, 0.6);
-    }
-
-    .status-dot.offline {
-        background: #dc3545;
-        box-shadow: 0 0 8px rgba(220, 53, 69, 0.6);
-    }
-
-    .device-info {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-    }
-
-    .device-info h6 {
-        margin: 0;
-        color: #495057;
-        font-size: 0.875rem;
-    }
-
-    .device-info p {
-        margin: 0.25rem 0 0 0;
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #212529;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="container-fluid">
+<div class="space-y-4">
     <!-- Device Status Card -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card device-status-card" id="statusCard">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4 text-center">
-                            <div class="status-indicator checking" id="statusIndicator">
-                                <i class="fas fa-circle-notch fa-spin"></i>
-                            </div>
-                            <h4 id="statusText">Checking...</h4>
-                            <p class="text-muted" id="statusTime">-</p>
+    <div class="bg-white rounded-xl border border-gray-100 transition-all duration-300" id="statusCard">
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div class="md:col-span-2 text-center">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center" id="statusIndicator">
+                        <i class="fas fa-circle-notch fa-spin text-3xl text-gray-400"></i>
+                    </div>
+                    <h4 class="text-xl font-bold text-gray-900 mb-1" id="statusText">Checking...</h4>
+                    <p class="text-sm text-gray-500" id="statusTime">-</p>
+                </div>
+                <div class="md:col-span-3 space-y-3">
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <h6 class="text-xs font-semibold text-gray-500 mb-1">Device Name</h6>
+                        <p class="text-sm font-semibold text-gray-900">
+                            <i class="fas fa-network-wired mr-2 text-blue-600"></i>{{ device_name }}
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <h6 class="text-xs font-semibold text-gray-500 mb-1">IP Address</h6>
+                        <p class="text-sm font-semibold text-gray-900">
+                            <i class="fas fa-globe mr-2 text-blue-600"></i>{{ device_ip }}
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white rounded-lg p-3 border border-gray-200 text-center">
+                            <p class="text-2xl font-bold text-blue-600 mb-1" id="responseTime">-</p>
+                            <p class="text-xs text-gray-500">Response Time (ms)</p>
                         </div>
-                        <div class="col-md-8">
-                            <div class="device-info">
-                                <h6>Device Name</h6>
-                                <p><i class="fas fa-network-wired"></i> {{ device_name }}</p>
-                            </div>
-                            <div class="device-info">
-                                <h6>IP Address</h6>
-                                <p><i class="fas fa-globe"></i> {{ device_ip }}</p>
-                            </div>
-                            <div class="row mt-3">
-                                <div class="col-6">
-                                    <div class="metric-box">
-                                        <p class="metric-value" id="responseTime">-</p>
-                                        <p class="metric-label">Response Time (ms)</p>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="metric-box">
-                                        <p class="metric-value" id="packetLoss">-</p>
-                                        <p class="metric-label">Packet Loss (%)</p>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="bg-white rounded-lg p-3 border border-gray-200 text-center">
+                            <p class="text-2xl font-bold text-blue-600 mb-1" id="packetLoss">-</p>
+                            <p class="text-xs text-gray-500">Packet Loss (%)</p>
                         </div>
                     </div>
                 </div>
@@ -178,363 +45,406 @@
     </div>
 
     <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body text-center">
-                    <h6 class="text-muted mb-2">Total Checks</h6>
-                    <h3 class="mb-0" id="totalChecks">0</h3>
-                </div>
-            </div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl border border-gray-100 p-4">
+            <h6 class="text-xs text-gray-500 font-medium mb-2">Total Checks</h6>
+            <h3 class="text-2xl font-bold text-gray-900" id="totalChecks">0</h3>
         </div>
-        <div class="col-md-3">
-            <div class="card border-success">
-                <div class="card-body text-center">
-                    <h6 class="text-muted mb-2">Online Count</h6>
-                    <h3 class="mb-0 text-success" id="onlineCount">0</h3>
-                </div>
-            </div>
+        <div class="bg-white rounded-xl border border-green-200 p-4">
+            <h6 class="text-xs text-gray-500 font-medium mb-2">Online Count</h6>
+            <h3 class="text-2xl font-bold text-green-600" id="onlineCount">0</h3>
         </div>
-        <div class="col-md-3">
-            <div class="card border-danger">
-                <div class="card-body text-center">
-                    <h6 class="text-muted mb-2">Offline Count</h6>
-                    <h3 class="mb-0 text-danger" id="offlineCount">0</h3>
-                </div>
-            </div>
+        <div class="bg-white rounded-xl border border-red-200 p-4">
+            <h6 class="text-xs text-gray-500 font-medium mb-2">Offline Count</h6>
+            <h3 class="text-2xl font-bold text-red-600" id="offlineCount">0</h3>
         </div>
-        <div class="col-md-3">
-            <div class="card border-primary">
-                <div class="card-body text-center">
-                    <h6 class="text-muted mb-2">Uptime</h6>
-                    <h3 class="mb-0 text-primary" id="uptimePercent">0%</h3>
-                </div>
-            </div>
+        <div class="bg-white rounded-xl border border-blue-200 p-4">
+            <h6 class="text-xs text-gray-500 font-medium mb-2">Uptime</h6>
+            <h3 class="text-2xl font-bold text-blue-600" id="uptimePercent">0%</h3>
         </div>
     </div>
 
     <!-- Control Buttons -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-sliders-h"></i> Controls
-                </div>
-                <div class="card-body">
-                    <button class="btn btn-primary me-2" onclick="pingDevice()">
-                        <i class="fas fa-satellite-dish"></i> Ping Now
-                    </button>
-                    <button class="btn btn-success me-2" onclick="quickPing()">
-                        <i class="fas fa-bolt"></i> Quick Check
-                    </button>
-                    <button class="btn btn-info me-2" onclick="toggleAutoRefresh()">
-                        <i class="fas fa-sync-alt"></i> <span id="autoRefreshText">Auto: ON</span>
-                    </button>
-                    <button class="btn btn-danger" onclick="clearHistory()">
-                        <i class="fas fa-trash"></i> Clear History
-                    </button>
-                </div>
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-sliders-h text-blue-600"></i>Controls
+            </h6>
+        </div>
+        <div class="p-4">
+            <div class="flex flex-wrap gap-2">
+                <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="pingDevice()">
+                    <i class="fas fa-satellite-dish mr-2"></i>Ping Now
+                </button>
+                <button class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="quickPing()">
+                    <i class="fas fa-bolt mr-2"></i>Quick Check
+                </button>
+                <button class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="toggleAutoRefresh()">
+                    <i class="fas fa-sync-alt mr-2"></i><span id="autoRefreshText">Auto: ON</span>
+                </button>
+                <button class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="clearHistory()">
+                    <i class="fas fa-trash mr-2"></i>Clear History
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Ping History Chart -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-chart-line"></i> Response Time History
-                </div>
-                <div class="card-body">
-                    <canvas id="pingChart"></canvas>
-                </div>
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-chart-line text-blue-600"></i>Response Time History
+            </h6>
+        </div>
+        <div class="p-4">
+            <div style="height: 250px">
+                <canvas id="pingChart"></canvas>
             </div>
         </div>
     </div>
 
     <!-- Recent Pings Table -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-history"></i> Recent Pings
-                </div>
-                <div class="card-body p-0">
-                    <div class="history-table">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light sticky-top">
-                                <tr>
-                                    <th>Status</th>
-                                    <th>Timestamp</th>
-                                    <th>Response Time</th>
-                                    <th>Packet Loss</th>
-                                </tr>
-                            </thead>
-                            <tbody id="historyTableBody">
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted">No data yet</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-history text-blue-600"></i>Recent Pings
+            </h6>
+        </div>
+        <div class="overflow-x-auto" style="max-height: 400px; overflow-y: auto;">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-50 sticky top-0">
+                    <tr class="border-b border-gray-100">
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Timestamp</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Response Time</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Packet Loss</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody" class="divide-y divide-gray-100">
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-500">No data yet</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+
+<style>
+@keyframes pulse-scale {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#statusIndicator {
+    animation: pulse-scale 2s ease-in-out infinite;
+}
+
+#statusIndicator.checking {
+    animation: spin 1s linear infinite;
+}
+
+#statusIndicator.online {
+    background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+    color: white;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+#statusIndicator.offline {
+    background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    color: white;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+#statusCard.status-online {
+    border-left: 4px solid #10b981;
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+}
+
+#statusCard.status-offline {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+}
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let autoRefresh = true;
-    let refreshInterval;
-    let pingChart;
+let autoRefresh = true;
+let refreshInterval;
+let pingChart;
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-        initChart();
-        quickPing();
-        startAutoRefresh();
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    initChart();
+    quickPing();
+    startAutoRefresh();
+});
 
-    function initChart() {
-        const ctx = document.getElementById('pingChart').getContext('2d');
-        pingChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Response Time (ms)',
-                    data: [],
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
+function initChart() {
+    const ctx = document.getElementById('pingChart').getContext('2d');
+    pingChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Response Time (ms)',
+                data: [],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Response Time (ms)' }
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Response Time (ms)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    }
+                x: {
+                    title: { display: true, text: 'Time' }
                 }
             }
-        });
-    }
-
-    function startAutoRefresh() {
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
         }
-        refreshInterval = setInterval(() => {
-            if (autoRefresh) {
-                quickPing();
-            }
-        }, 150000); // Check every 2.5 minutes
+    });
+}
+
+function startAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
     }
-
-    function toggleAutoRefresh() {
-        autoRefresh = !autoRefresh;
-        const text = document.getElementById('autoRefreshText');
-        const btn = event.target.closest('button');
-
+    refreshInterval = setInterval(() => {
         if (autoRefresh) {
-            text.textContent = 'Auto: ON';
-            btn.classList.remove('btn-secondary');
-            btn.classList.add('btn-info');
-            showToast('Auto-refresh enabled', 'success');
-        } else {
-            text.textContent = 'Auto: OFF';
-            btn.classList.remove('btn-info');
-            btn.classList.add('btn-secondary');
-            showToast('Auto-refresh disabled', 'info');
+            quickPing();
         }
+    }, 150000); // Check every 2.5 minutes
+}
+
+function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    const text = document.getElementById('autoRefreshText');
+    const btn = event.target.closest('button');
+
+    if (autoRefresh) {
+        text.textContent = 'Auto: ON';
+        btn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+        btn.classList.add('bg-cyan-600', 'hover:bg-cyan-700');
+        showToast('Auto-refresh enabled', 'success');
+    } else {
+        text.textContent = 'Auto: OFF';
+        btn.classList.remove('bg-cyan-600', 'hover:bg-cyan-700');
+        btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+        showToast('Auto-refresh disabled', 'info');
+    }
+}
+
+async function pingDevice() {
+    updateStatusIndicator('checking');
+    try {
+        const response = await fetch('/tg100/api/ping');
+        const data = await response.json();
+
+        if (data.success) {
+            updateStatusDisplay(data.ping);
+            updateStatistics();
+            updateHistory();
+            showToast('Ping completed', 'success');
+        }
+    } catch (error) {
+        console.error('Error pinging device:', error);
+        showToast('Error pinging device', 'danger');
+    }
+}
+
+async function quickPing() {
+    updateStatusIndicator('checking');
+    try {
+        const response = await fetch('/tg100/api/quick-ping');
+        const data = await response.json();
+
+        if (data.success) {
+            updateStatusDisplay(data.ping);
+            updateStatistics();
+            updateHistory();
+        }
+    } catch (error) {
+        console.error('Error pinging device:', error);
+    }
+}
+
+function updateStatusIndicator(status) {
+    const indicator = document.getElementById('statusIndicator');
+    const card = document.getElementById('statusCard');
+
+    indicator.className = 'w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center ' + status;
+
+    if (status === 'checking') {
+        indicator.innerHTML = '<i class="fas fa-circle-notch fa-spin text-3xl text-gray-400"></i>';
+    }
+}
+
+function updateStatusDisplay(ping) {
+    const indicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+    const statusTime = document.getElementById('statusTime');
+    const responseTime = document.getElementById('responseTime');
+    const packetLoss = document.getElementById('packetLoss');
+    const card = document.getElementById('statusCard');
+
+    if (ping.online) {
+        indicator.className = 'w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center online';
+        indicator.innerHTML = '<i class="fas fa-check text-3xl"></i>';
+        statusText.textContent = 'Online';
+        statusText.className = 'text-xl font-bold text-green-600 mb-1';
+        card.className = 'bg-white rounded-xl border border-gray-100 transition-all duration-300 status-online';
+
+        responseTime.textContent = ping.avg_rtt ? ping.avg_rtt.toFixed(2) : '-';
+        packetLoss.textContent = ping.packet_loss !== undefined ? ping.packet_loss.toFixed(1) : '-';
+    } else {
+        indicator.className = 'w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center offline';
+        indicator.innerHTML = '<i class="fas fa-times text-3xl"></i>';
+        statusText.textContent = 'Offline';
+        statusText.className = 'text-xl font-bold text-red-600 mb-1';
+        card.className = 'bg-white rounded-xl border border-gray-100 transition-all duration-300 status-offline';
+
+        responseTime.textContent = '-';
+        packetLoss.textContent = '100';
     }
 
-    async function pingDevice() {
-        updateStatusIndicator('checking');
-        try {
-            const response = await fetch('/tg100/api/ping');
-            const data = await response.json();
+    statusTime.textContent = 'Last checked: ' + ping.timestamp;
+}
 
-            if (data.success) {
-                updateStatusDisplay(data.ping);
-                updateStatistics();
-                updateHistory();
-                showToast('Ping completed', 'success');
-            }
-        } catch (error) {
-            console.error('Error pinging device:', error);
-            showToast('Error pinging device', 'danger');
+async function updateStatistics() {
+    try {
+        const response = await fetch('/tg100/api/statistics');
+        const data = await response.json();
+
+        if (data.success) {
+            const stats = data.statistics;
+            document.getElementById('totalChecks').textContent = stats.total_checks;
+            document.getElementById('onlineCount').textContent = stats.online_count;
+            document.getElementById('offlineCount').textContent = stats.offline_count;
+            document.getElementById('uptimePercent').textContent = stats.uptime_percentage + '%';
         }
+    } catch (error) {
+        console.error('Error fetching statistics:', error);
+    }
+}
+
+async function updateHistory() {
+    try {
+        const response = await fetch('/tg100/api/history');
+        const data = await response.json();
+
+        if (data.success) {
+            updateHistoryTable(data.history);
+            updateChart(data.history);
+        }
+    } catch (error) {
+        console.error('Error fetching history:', error);
+    }
+}
+
+function updateHistoryTable(history) {
+    const tbody = document.getElementById('historyTableBody');
+
+    if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">No data yet</td></tr>';
+        return;
     }
 
-    async function quickPing() {
-        updateStatusIndicator('checking');
-        try {
-            const response = await fetch('/tg100/api/quick-ping');
-            const data = await response.json();
+    const recentHistory = history.slice(-20).reverse();
 
-            if (data.success) {
-                updateStatusDisplay(data.ping);
-                updateStatistics();
-                updateHistory();
-            }
-        } catch (error) {
-            console.error('Error pinging device:', error);
-        }
+    tbody.innerHTML = recentHistory.map(entry => `
+        <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full ${entry.online ? 'bg-green-500' : 'bg-red-500'}"></span>
+                    <span class="${entry.online ? 'text-green-600' : 'text-red-600'} font-semibold">
+                        ${entry.online ? 'Online' : 'Offline'}
+                    </span>
+                </span>
+            </td>
+            <td class="px-4 py-3">${entry.timestamp}</td>
+            <td class="px-4 py-3">${entry.avg_rtt ? entry.avg_rtt.toFixed(2) + ' ms' : '-'}</td>
+            <td class="px-4 py-3">${entry.packet_loss !== undefined ? entry.packet_loss.toFixed(1) + '%' : '-'}</td>
+        </tr>
+    `).join('');
+}
+
+function updateChart(history) {
+    if (!pingChart) return;
+
+    const recentHistory = history.slice(-30);
+
+    const labels = recentHistory.map(h => {
+        const time = h.timestamp.split(' ')[1];
+        return time;
+    });
+
+    const data = recentHistory.map(h => h.avg_rtt || null);
+
+    pingChart.data.labels = labels;
+    pingChart.data.datasets[0].data = data;
+    pingChart.update();
+}
+
+async function clearHistory() {
+    if (!confirm('Are you sure you want to clear ping history?')) {
+        return;
     }
 
-    function updateStatusIndicator(status) {
-        const indicator = document.getElementById('statusIndicator');
-        const card = document.getElementById('statusCard');
+    try {
+        const response = await fetch('/tg100/api/clear-history', { method: 'POST' });
+        const data = await response.json();
 
-        indicator.className = 'status-indicator ' + status;
-
-        if (status === 'checking') {
-            indicator.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+        if (data.success) {
+            showToast('History cleared', 'success');
+            updateStatistics();
+            updateHistory();
         }
+    } catch (error) {
+        console.error('Error clearing history:', error);
+        showToast('Error clearing history', 'danger');
     }
+}
 
-    function updateStatusDisplay(ping) {
-        const indicator = document.getElementById('statusIndicator');
-        const statusText = document.getElementById('statusText');
-        const statusTime = document.getElementById('statusTime');
-        const responseTime = document.getElementById('responseTime');
-        const packetLoss = document.getElementById('packetLoss');
-        const card = document.getElementById('statusCard');
+function showToast(message, type = 'info') {
+    const alertColors = {
+        'success': 'bg-green-50 border-green-200 text-green-800',
+        'danger': 'bg-red-50 border-red-200 text-red-800',
+        'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
+        'info': 'bg-blue-50 border-blue-200 text-blue-800'
+    };
+    const alertClass = alertColors[type] || alertColors.info;
 
-        if (ping.online) {
-            indicator.className = 'status-indicator online';
-            indicator.innerHTML = '<i class="fas fa-check"></i>';
-            statusText.textContent = 'Online';
-            statusText.className = 'text-success';
-            card.className = 'card device-status-card status-online';
+    const alertHtml = `
+        <div class="fixed top-4 right-4 z-50 ${alertClass} border rounded-lg p-4 shadow-lg max-w-md animate-slide-in">
+            <div class="flex items-start gap-3">
+                <div class="flex-1 text-sm font-medium">${message}</div>
+                <button onclick="this.parentElement.parentElement.remove()" class="text-current opacity-50 hover:opacity-100">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
 
-            responseTime.textContent = ping.avg_rtt ? ping.avg_rtt.toFixed(2) : '-';
-            packetLoss.textContent = ping.packet_loss !== undefined ? ping.packet_loss.toFixed(1) : '-';
-        } else {
-            indicator.className = 'status-indicator offline';
-            indicator.innerHTML = '<i class="fas fa-times"></i>';
-            statusText.textContent = 'Offline';
-            statusText.className = 'text-danger';
-            card.className = 'card device-status-card status-offline';
-
-            responseTime.textContent = '-';
-            packetLoss.textContent = '100';
-        }
-
-        statusTime.textContent = 'Last checked: ' + ping.timestamp;
-    }
-
-    async function updateStatistics() {
-        try {
-            const response = await fetch('/tg100/api/statistics');
-            const data = await response.json();
-
-            if (data.success) {
-                const stats = data.statistics;
-                document.getElementById('totalChecks').textContent = stats.total_checks;
-                document.getElementById('onlineCount').textContent = stats.online_count;
-                document.getElementById('offlineCount').textContent = stats.offline_count;
-                document.getElementById('uptimePercent').textContent = stats.uptime_percentage + '%';
-            }
-        } catch (error) {
-            console.error('Error fetching statistics:', error);
-        }
-    }
-
-    async function updateHistory() {
-        try {
-            const response = await fetch('/tg100/api/history');
-            const data = await response.json();
-
-            if (data.success) {
-                updateHistoryTable(data.history);
-                updateChart(data.history);
-            }
-        } catch (error) {
-            console.error('Error fetching history:', error);
-        }
-    }
-
-    function updateHistoryTable(history) {
-        const tbody = document.getElementById('historyTableBody');
-
-        if (history.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No data yet</td></tr>';
-            return;
-        }
-
-        // Show last 20 entries
-        const recentHistory = history.slice(-20).reverse();
-
-        tbody.innerHTML = recentHistory.map(entry => `
-            <tr>
-                <td>
-                    <span class="status-dot ${entry.online ? 'online' : 'offline'}"></span>
-                    ${entry.online ? '<span class="text-success">Online</span>' : '<span class="text-danger">Offline</span>'}
-                </td>
-                <td>${entry.timestamp}</td>
-                <td>${entry.avg_rtt ? entry.avg_rtt.toFixed(2) + ' ms' : '-'}</td>
-                <td>${entry.packet_loss !== undefined ? entry.packet_loss.toFixed(1) + '%' : '-'}</td>
-            </tr>
-        `).join('');
-    }
-
-    function updateChart(history) {
-        if (!pingChart) return;
-
-        // Show last 30 entries
-        const recentHistory = history.slice(-30);
-
-        const labels = recentHistory.map(h => {
-            const time = h.timestamp.split(' ')[1];
-            return time;
-        });
-
-        const data = recentHistory.map(h => h.avg_rtt || null);
-
-        pingChart.data.labels = labels;
-        pingChart.data.datasets[0].data = data;
-        pingChart.update();
-    }
-
-    async function clearHistory() {
-        if (!confirm('Are you sure you want to clear ping history?')) {
-            return;
-        }
-
-        try {
-            const response = await fetch('/tg100/api/clear-history', { method: 'POST' });
-            const data = await response.json();
-
-            if (data.success) {
-                showToast('History cleared', 'success');
-                updateStatistics();
-                updateHistory();
-            }
-        } catch (error) {
-            console.error('Error clearing history:', error);
-            showToast('Error clearing history', 'danger');
-        }
-    }
+    setTimeout(() => {
+        const alert = document.querySelector('.animate-slide-in');
+        if (alert) alert.remove();
+    }, 5000);
+}
 </script>
 {% endblock %}

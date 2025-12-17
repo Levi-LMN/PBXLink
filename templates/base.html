@@ -5,576 +5,305 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sibasi PBX{% endblock %}</title>
 
-<!--    icon-->
-    <link rel="icon" href="https://pbs.twimg.com/profile_images/1577613897879769088/TZc7ioyi_400x400.jpg">
+    <!-- Icon -->
+    <link rel="icon" href="../static/img/sibasifavicon.png">
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        'primary-dark': '#1e40af',
+                    }
+                }
+            }
+        }
+    </script>
 
     <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1e40af;
-            --sidebar-width: 240px;
-            --sidebar-bg: #ffffff;
-            --border: #e5e7eb;
-            --text-primary: #111827;
-            --text-secondary: #6b7280;
-            --bg-page: #f9fafb;
-            --hover-bg: #f3f4f6;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 14px;
-            color: var(--text-primary);
-            background: var(--bg-page);
-        }
-
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: var(--sidebar-width);
-            background: var(--sidebar-bg);
-            border-right: 1px solid var(--border);
-            overflow-y: auto;
-            z-index: 1000;
-            transition: transform 0.3s ease;
-        }
-
-        .sidebar-header {
-            padding: 1.25rem 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            text-decoration: none;
-        }
-
-        .brand-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--primary);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.1rem;
-        }
-
-        .brand-text h4 {
-            margin: 0;
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .brand-text small {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-
-        /* Navigation */
-        .sidebar-nav {
-            padding: 1rem 0.75rem;
-        }
-
-        .nav-section-title {
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-            padding: 0.5rem 0.75rem;
-            margin-top: 1rem;
-            letter-spacing: 0.5px;
-        }
-
-        .nav-section-title:first-child {
-            margin-top: 0;
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            padding: 0.625rem 0.75rem;
-            display: flex;
-            align-items: center;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-bottom: 0.25rem;
-            transition: all 0.15s ease;
-        }
-
-        .nav-link:hover {
-            color: var(--text-primary);
-            background: var(--hover-bg);
-        }
-
-        .nav-link.active {
-            color: var(--primary);
-            background: #eff6ff;
-        }
-
-        .nav-link i {
-            width: 18px;
-            margin-right: 0.75rem;
-            font-size: 1rem;
-        }
-
-        /* User Section */
-        .user-section {
-            padding: 1rem;
-            border-top: 1px solid var(--border);
-            margin-top: auto;
-        }
-
-        .user-info-compact {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.15s ease;
-        }
-
-        .user-info-compact:hover {
-            background: var(--hover-bg);
-        }
-
-        .user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .user-details {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .user-name {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .user-role-text {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin: 0;
-        }
-
-        .btn-logout {
-            width: 100%;
-            background: transparent;
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
-            padding: 0.5rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-top: 0.5rem;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .btn-logout:hover {
-            background: #fef2f2;
-            border-color: #fecaca;
-            color: #dc2626;
-        }
-
-        /* Main Content */
-        .main-content {
-            margin-left: var(--sidebar-width);
-            min-height: 100vh;
-            transition: margin-left 0.3s ease;
-        }
-
-        /* Top Bar */
-        .top-bar {
-            background: white;
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .top-bar h5 {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0;
-        }
-
-        .top-bar-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .btn-icon {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-
-        .btn-icon:hover {
-            background: var(--hover-bg);
-            color: var(--text-primary);
-        }
-
-        .menu-toggle {
-            display: none;
-        }
-
-        .current-time {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
-
-        /* Content Area */
-        .content-area {
-            padding: 1.5rem;
-        }
-
-        /* Cards */
-        .card {
-            border: 1px solid var(--border);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            border-radius: 8px;
-            background: white;
-        }
-
-        .card-header {
-            background: white;
-            border-bottom: 1px solid var(--border);
-            padding: 1rem 1.25rem;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .card-body {
-            padding: 1.25rem;
-        }
-
-        /* Buttons */
-        .btn {
-            font-size: 0.875rem;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-weight: 500;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            border-color: var(--primary-dark);
-        }
-
-        /* Tables */
-        .table {
-            font-size: 0.875rem;
-        }
-
-        .table th {
-            font-weight: 600;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-secondary);
-            border-bottom: 1px solid var(--border);
-        }
-
-        /* Badges */
-        .badge {
-            padding: 0.25rem 0.625rem;
-            font-weight: 500;
-            font-size: 0.75rem;
-            border-radius: 4px;
-        }
-
-        /* Alerts */
-        .alert {
-            font-size: 0.875rem;
-            padding: 0.875rem 1rem;
-            border-radius: 6px;
-            border: 1px solid;
-        }
-
-        /* Scrollbar */
-        .sidebar::-webkit-scrollbar {
+        .sidebar-scroll::-webkit-scrollbar {
             width: 5px;
         }
 
-        .sidebar::-webkit-scrollbar-track {
+        .sidebar-scroll::-webkit-scrollbar-track {
             background: transparent;
         }
 
-        .sidebar::-webkit-scrollbar-thumb {
-            background: var(--border);
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #e5e7eb;
             border-radius: 3px;
         }
 
-        /* Mobile Styles */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-
-            .sidebar.show {
-                transform: translateX(0);
-                box-shadow: 0 0 0 100vmax rgba(0,0,0,0.5);
-            }
-
-            .main-content {
-                margin-left: 0;
-            }
-
-            .menu-toggle {
-                display: flex;
-            }
-
-            .top-bar {
-                padding: 0.875rem 1rem;
-            }
-
-            .content-area {
-                padding: 1rem;
-            }
-
-            .current-time {
-                display: none;
-            }
+        .nav-link-item {
+            transition: all 0.2s ease;
         }
 
-        /* Overlay for mobile */
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
+        .nav-link-item:hover {
+            transform: translateX(3px);
+        }
+
+        .nav-link-active::before {
+            content: '';
+            position: absolute;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 999;
-        }
-
-        .overlay.show {
-            display: block;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 65%;
+            background: #2563eb;
+            border-radius: 0 4px 4px 0;
         }
     </style>
 
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <!-- Overlay -->
-    <div class="overlay" id="overlay"></div>
+<body class="bg-gray-50 text-gray-900 text-[13px] antialiased">
+
+    <!-- Mobile Overlay -->
+    <div id="overlay" class="hidden fixed inset-0 bg-black/50 z-40 md:hidden"></div>
 
     <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="/" class="brand">
-                <div class="brand-icon">
-                    <i class="fas fa-phone-alt"></i>
+    <aside id="sidebar" class="fixed top-0 left-0 h-screen w-56 bg-white border-r border-gray-100 z-50 -translate-x-full md:translate-x-0 transition-transform duration-300 flex flex-col sidebar-scroll overflow-y-auto">
+
+        <!-- Brand Header -->
+        <div class="p-5 border-b border-gray-100">
+            <a href="/" class="flex items-center gap-2.5 group">
+                <div class="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white group-hover:bg-blue-700 transition-colors overflow-hidden">
+                    <img src="../static/img/sibasifavicon.png" alt="Sibasi Logo" class="w-6 h-6 object-contain">
                 </div>
-                <div class="brand-text">
-                    <h4>Sibasi PBX</h4>
-                    <small>Communication Hub</small>
+                <div>
+                    <h4 class="text-sm font-bold text-gray-900">Sibasi PBX</h4>
+                    <p class="text-[10px] text-gray-500">Communication Hub</p>
                 </div>
             </a>
         </div>
 
-        <nav class="sidebar-nav">
-            <div class="nav-section-title">Main</div>
-            <a class="nav-link {% if request.endpoint and request.endpoint == 'index' %}active{% endif %}" href="/">
-                <i class="fas fa-home"></i>
-                <span>Dashboard</span>
-            </a>
-            <a class="nav-link {% if request.endpoint and 'cdr' in request.endpoint %}active{% endif %}" href="/cdr/">
-                <i class="fas fa-chart-line"></i>
-                <span>Call Records</span>
-            </a>
-            <a class="nav-link {% if request.endpoint and 'extensions' in request.endpoint %}active{% endif %}" href="/extensions/">
-                <i class="fas fa-phone"></i>
-                <span>Extensions</span>
-            </a>
+        <!-- Search -->
+        <div class="px-4 py-3">
+            <div class="relative">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]"></i>
+                <input
+                    type="text"
+                    id="sidebarSearch"
+                    placeholder="Search..."
+                    class="w-full pl-8 pr-3 py-2 text-xs bg-gray-50 border-0 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-colors placeholder:text-gray-400"
+                >
+            </div>
+        </div>
 
-            <div class="nav-section-title">Services</div>
-            <a class="nav-link {% if request.endpoint and 'wireguard' in request.endpoint %}active{% endif %}" href="/wireguard/">
-                <i class="fas fa-shield-alt"></i>
-                <span>WireGuard VPN</span>
-            </a>
-            <a class="nav-link {% if request.endpoint and 'ai_agent' in request.endpoint %}active{% endif %}" href="/ai_agent/">
-                <i class="fas fa-robot"></i>
-                <span>AI Agent</span>
-            </a>
-            <a class="nav-link {% if request.endpoint and 'tg100' in request.endpoint %}active{% endif %}" href="/tg100/">
-                <i class="fas fa-server"></i>
-                <span>TG100 Gateway</span>
-            </a>
+        <!-- Navigation -->
+        <nav class="flex-1 px-3 py-2">
+            <!-- Main Section -->
+            <div class="mb-5">
+                <p class="px-3 mb-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Menu</p>
+
+                <a href="/" class="nav-link-item relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 {% if request.endpoint and request.endpoint == 'index' %}nav-link-active bg-blue-50 text-blue-600{% endif %} mb-0.5">
+                    <i class="fas fa-th-large w-4 text-center text-sm"></i>
+                    <span class="font-medium text-xs">Dashboard</span>
+                </a>
+
+                <a href="/cdr/" class="nav-link-item relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 {% if request.endpoint and 'cdr' in request.endpoint %}nav-link-active bg-blue-50 text-blue-600{% endif %} mb-0.5">
+                    <i class="fas fa-chart-line w-4 text-center text-sm"></i>
+                    <span class="font-medium text-xs">Call Records</span>
+                </a>
+
+                <a href="/extensions/" class="nav-link-item relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 {% if request.endpoint and 'extensions' in request.endpoint %}nav-link-active bg-blue-50 text-blue-600{% endif %} mb-0.5">
+                    <i class="fas fa-phone w-4 text-center text-sm"></i>
+                    <span class="font-medium text-xs">Extensions</span>
+                </a>
+            </div>
+
+            <!-- Services Section -->
+            <div class="mb-5">
+                <p class="px-3 mb-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Services</p>
+
+                <a href="/wireguard/" class="nav-link-item relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 {% if request.endpoint and 'wireguard' in request.endpoint %}nav-link-active bg-blue-50 text-blue-600{% endif %} mb-0.5">
+                    <i class="fas fa-shield-alt w-4 text-center text-sm"></i>
+                    <span class="font-medium text-xs">WireGuard VPN</span>
+                </a>
+
+                <a href="/ai_agent/" class="nav-link-item relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 {% if request.endpoint and 'ai_agent' in request.endpoint %}nav-link-active bg-blue-50 text-blue-600{% endif %} mb-0.5">
+                    <i class="fas fa-robot w-4 text-center text-sm"></i>
+                    <span class="font-medium text-xs">AI Agent</span>
+                </a>
+
+                <a href="/tg100/" class="nav-link-item relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 {% if request.endpoint and 'tg100' in request.endpoint %}nav-link-active bg-blue-50 text-blue-600{% endif %} mb-0.5">
+                    <i class="fas fa-server w-4 text-center text-sm"></i>
+                    <span class="font-medium text-xs">TG100 Gateway</span>
+                </a>
+            </div>
 
             {% if session.user and session.user.role == 'admin' %}
-            <div class="nav-section-title">System</div>
-            <a class="nav-link {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}" href="/admin/">
-                <i class="fas fa-users-cog"></i>
-                <span>Admin Panel</span>
-            </a>
+            <!-- System Section -->
+            <div>
+                <p class="px-3 mb-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">System</p>
+
+                <a href="/admin/" class="nav-link-item relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 {% if request.endpoint and 'admin' in request.endpoint %}nav-link-active bg-blue-50 text-blue-600{% endif %} mb-0.5">
+                    <i class="fas fa-users-cog w-4 text-center text-sm"></i>
+                    <span class="font-medium text-xs">Admin Panel</span>
+                </a>
+            </div>
             {% endif %}
         </nav>
 
+        <!-- User Section -->
         {% if session.user %}
-        <div class="user-section">
-            <div class="user-info-compact">
-                <div class="user-avatar">
-                    {{ session.user.name[0].upper() }}
-                </div>
-                <div class="user-details">
-                    <p class="user-name">{{ session.user.name }}</p>
-                    <p class="user-role-text">{{ session.user.role|capitalize }}</p>
+        <div class="p-4 border-t border-gray-100">
+            <div class="bg-gray-50 rounded-xl p-2.5 mb-2 cursor-pointer hover:bg-gray-100 transition-colors">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-semibold text-xs">
+                        {{ session.user.name[0].upper() }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-semibold text-gray-900 truncate">{{ session.user.name }}</p>
+                        <p class="text-[10px] text-gray-500">{{ session.user.role|capitalize }}</p>
+                    </div>
                 </div>
             </div>
-            <button class="btn-logout" onclick="logout()">
-                <i class="fas fa-sign-out-alt"></i> Sign Out
+            <button onclick="logout()" class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors">
+                <i class="fas fa-sign-out-alt text-[10px]"></i>
+                <span>Sign Out</span>
             </button>
         </div>
         {% endif %}
-    </div>
+    </aside>
 
     <!-- Main Content -->
-    <div class="main-content">
+    <div class="md:ml-56 min-h-screen transition-all duration-300">
+
         <!-- Top Bar -->
-        <div class="top-bar">
-            <div class="d-flex align-items-center gap-3">
-                <button class="btn-icon menu-toggle" onclick="toggleSidebar()">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h5>{% block page_title %}Dashboard{% endblock %}</h5>
+        <header class="sticky top-0 z-30 bg-white border-b border-gray-100">
+            <div class="px-4 md:px-6 py-3.5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar()" class="md:hidden w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors">
+                        <i class="fas fa-bars text-sm"></i>
+                    </button>
+                    <div>
+                        <h5 class="text-base font-bold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h5>
+                        <p class="text-[11px] text-gray-500 mt-0.5">{% block page_subtitle %}Plan, prioritize, and accomplish your tasks with ease.{% endblock %}</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="window.location.reload()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors" title="Refresh">
+                        <i class="fas fa-sync-alt text-xs"></i>
+                    </button>
+                </div>
             </div>
-            <div class="top-bar-actions">
-                <span class="current-time">
-                    <i class="far fa-clock"></i>
-                    <span id="current-time"></span>
-                </span>
-                <button class="btn-icon" onclick="window.location.reload()" title="Refresh">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
-            </div>
-        </div>
+        </header>
 
         <!-- Content Area -->
-        <div class="content-area">
+        <main class="p-4 md:p-5">
+            <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <div class="mb-5 space-y-2">
+                        {% for category, message in messages %}
+                        <div class="flex items-start gap-2.5 p-3 bg-white border {% if category == 'success' %}border-green-200 bg-green-50{% elif category == 'error' %}border-red-200 bg-red-50{% elif category == 'warning' %}border-yellow-200 bg-yellow-50{% else %}border-blue-200 bg-blue-50{% endif %} rounded-lg">
+                            <i class="fas {% if category == 'success' %}fa-check-circle text-green-600{% elif category == 'error' %}fa-exclamation-circle text-red-600{% elif category == 'warning' %}fa-exclamation-triangle text-yellow-600{% else %}fa-info-circle text-blue-600{% endif %} text-sm mt-0.5"></i>
+                            <div class="flex-1">
+                                <p class="text-xs text-gray-900 font-medium">{{ message }}</p>
+                            </div>
+                            <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
                 {% endif %}
             {% endwith %}
 
+            <!-- Page Content -->
             {% block content %}{% endblock %}
-        </div>
+        </main>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
-        // Update time
-        function updateTime() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            const el = document.getElementById('current-time');
-            if (el) el.textContent = timeStr;
-        }
-        updateTime();
-        setInterval(updateTime, 60000);
+        // Toggle sidebar (mobile)
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
 
-        // Logout
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+
+        // Close sidebar when clicking overlay
+        document.getElementById('overlay').addEventListener('click', toggleSidebar);
+
+        // Logout function
         function logout() {
-            if (confirm('Sign out?')) {
+            if (confirm('Are you sure you want to sign out?')) {
                 window.location.href = '{{ url_for("auth.logout") }}';
             }
         }
 
-        // Toggle sidebar (mobile)
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('show');
-            document.getElementById('overlay').classList.toggle('show');
-        }
+        // Search functionality
+        document.getElementById('sidebarSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const navLinks = document.querySelectorAll('.nav-link-item');
 
-        // Close on overlay click
-        document.getElementById('overlay').addEventListener('click', toggleSidebar);
+            navLinks.forEach(link => {
+                const text = link.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    link.classList.remove('hidden');
+                } else {
+                    link.classList.add('hidden');
+                }
+            });
 
-        // Toast notifications
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `alert alert-${type} position-fixed top-0 end-0 m-3`;
-            toast.style.zIndex = '9999';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
+            // Hide section titles if all items are hidden
+            const sections = document.querySelectorAll('nav > div');
+            sections.forEach(section => {
+                const visibleLinks = section.querySelectorAll('.nav-link-item:not(.hidden)');
+                if (visibleLinks.length === 0) {
+                    section.classList.add('hidden');
+                } else {
+                    section.classList.remove('hidden');
+                }
+            });
+        });
 
-        // Auto-dismiss alerts
+        // Auto-dismiss flash messages
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
-                document.querySelectorAll('.alert:not(.alert-permanent)').forEach(alert => {
-                    const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
-                    bsAlert.close();
+                document.querySelectorAll('[class*="animate-"]').forEach(el => {
+                    if (el.closest('main')) {
+                        el.style.transition = 'opacity 0.3s ease-out';
+                        el.style.opacity = '0';
+                        setTimeout(() => el.remove(), 300);
+                    }
                 });
             }, 5000);
         });
+
+        // Close sidebar on navigation (mobile)
+        if (window.innerWidth < 768) {
+            document.querySelectorAll('.nav-link-item').forEach(link => {
+                link.addEventListener('click', () => {
+                    const sidebar = document.getElementById('sidebar');
+                    const overlay = document.getElementById('overlay');
+                    sidebar.classList.add('-translate-x-full');
+                    overlay.classList.add('hidden');
+                });
+            });
+        }
     </script>
 
     {% block extra_js %}{% endblock %}

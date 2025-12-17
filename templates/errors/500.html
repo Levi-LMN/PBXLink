@@ -7,27 +7,39 @@
 
 {% block title %}500 - Server Error{% endblock %}
 {% block page_title %}Server Error{% endblock %}
+{% block page_subtitle %}Something went wrong on our end{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card text-center">
-            <div class="card-body py-5">
-                <i class="fas fa-exclamation-triangle fa-5x text-danger mb-4"></i>
-                <h1 class="display-4">500</h1>
-                <h4 class="mb-3">Internal Server Error</h4>
-                <p class="text-muted mb-4">
-                    Something went wrong on our end. We're working to fix it.
-                    Please try again later.
-                </p>
-                <div class="d-flex gap-2 justify-content-center">
-                    <a href="/" class="btn btn-primary">
-                        <i class="fas fa-home me-2"></i>Go to Dashboard
-                    </a>
-                    <button onclick="window.location.reload()" class="btn btn-outline-secondary">
-                        <i class="fas fa-sync-alt me-2"></i>Reload Page
-                    </button>
-                </div>
+<div class="flex items-center justify-center min-h-[60vh]">
+    <div class="max-w-md w-full">
+        <div class="bg-white rounded-xl border border-gray-100 p-8 text-center">
+            <!-- Icon -->
+            <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-exclamation-triangle text-red-600 text-3xl"></i>
+            </div>
+
+            <!-- Error Code -->
+            <h1 class="text-6xl font-bold text-gray-900 mb-3">500</h1>
+
+            <!-- Title -->
+            <h2 class="text-xl font-bold text-gray-900 mb-2">Internal Server Error</h2>
+
+            <!-- Message -->
+            <p class="text-sm text-gray-600 mb-6">
+                Something went wrong on our end. We're working to fix it.
+                <br>Please try again later.
+            </p>
+
+            <!-- Actions -->
+            <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                <a href="/" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors inline-flex items-center justify-center gap-2">
+                    <i class="fas fa-home text-[10px]"></i>
+                    <span>Go to Dashboard</span>
+                </a>
+                <button onclick="window.location.reload()" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors inline-flex items-center justify-center gap-2">
+                    <i class="fas fa-sync-alt text-[10px]"></i>
+                    <span>Reload Page</span>
+                </button>
             </div>
         </div>
     </div>

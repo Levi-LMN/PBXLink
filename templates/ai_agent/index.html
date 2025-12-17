@@ -1,211 +1,161 @@
 {% extends "base.html" %}
 
-{% block title %}AI Agent page- FreePBX Management{% endblock %}
+{% block title %}AI Agent - Sibasi PBX{% endblock %}
 {% block page_title %}AI Agent Management{% endblock %}
-
-{% block extra_css %}
-<style>
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-    .pulse { animation: pulse 2s infinite; }
-
-    @keyframes heartbeat {
-        0%, 100% { transform: scale(1); }
-        10%, 30% { transform: scale(1.2); }
-        20%, 40% { transform: scale(1); }
-    }
-    .heartbeat-icon { animation: heartbeat 1.5s infinite; }
-
-    .log-viewer {
-        background: #1e293b;
-        color: #e2e8f0;
-        font-family: 'Courier New', monospace;
-        font-size: 0.75rem;
-        height: 400px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        padding: 1rem;
-    }
-
-    .log-line.error { color: #fca5a5; }
-    .log-line.warning { color: #fcd34d; }
-    .log-line.info { color: #93c5fd; }
-
-    .transcript-line { padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 6px; }
-    .transcript-line.user { background: #eff6ff; border-left: 3px solid #0d6efd; }
-    .transcript-line.ai { background: #f0fdf4; border-left: 3px solid #198754; }
-    .speaker-label { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 0.25rem; }
-</style>
-{% endblock %}
+{% block page_subtitle %}Monitor and control AI agent service{% endblock %}
 
 {% block content %}
-<div class="row g-4">
+<div class="space-y-4">
     <!-- Status Overview -->
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <h5 class="mb-1"><i class="fas fa-robot text-primary me-2"></i>Service Status</h5>
-                        <small class="text-muted">Real-time AI Agent monitoring</small>
-                    </div>
-                    <div id="status-badge-container">
-                        <span class="badge bg-secondary"><span class="pulse">●</span> Checking...</span>
-                    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-4">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h5 class="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                        <i class="fas fa-robot text-blue-600"></i>Service Status
+                    </h5>
+                    <small class="text-xs text-gray-500">Real-time AI Agent monitoring</small>
                 </div>
-
-                <div id="alert-container"></div>
-
-                <div class="row g-3">
-                    <div class="col-6 col-md-3">
-                        <div class="text-center p-3 bg-light rounded">
-                            <i class="fas fa-clock text-primary mb-2"></i>
-                            <div class="fw-bold" id="uptime">-</div>
-                            <small class="text-muted">Uptime</small>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-center p-3 bg-light rounded">
-                            <i class="fas fa-hashtag text-primary mb-2"></i>
-                            <div class="fw-bold" id="pid">-</div>
-                            <small class="text-muted">Process ID</small>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-center p-3 bg-light rounded">
-                            <i class="fas fa-phone-alt text-primary mb-2"></i>
-                            <div class="fw-bold" id="active-calls">-</div>
-                            <small class="text-muted">Active Calls</small>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="text-center p-3 bg-light rounded">
-                            <i class="fas fa-chart-line text-primary mb-2"></i>
-                            <div class="fw-bold" id="total-calls">-</div>
-                            <small class="text-muted">Total Calls</small>
-                        </div>
-                    </div>
+                <div id="status-badge-container">
+                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-600">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400 mr-2 animate-pulse"></span>Checking...
+                    </span>
                 </div>
+            </div>
 
-                <div id="heartbeat-container" class="mt-3 d-none">
-                    <div class="alert alert-success d-flex align-items-center">
-                        <i class="fas fa-heartbeat heartbeat-icon me-2"></i>
-                        <span>Last heartbeat: <strong id="heartbeat-time">-</strong></span>
-                    </div>
-                </div>
+            <div id="alert-container"></div>
 
-                <div class="mt-4 d-flex flex-wrap gap-2">
-                    <button class="btn btn-success" id="btn-start" onclick="startService()">
-                        <i class="fas fa-play me-2"></i>Start
-                    </button>
-                    <button class="btn btn-danger" id="btn-stop" onclick="stopService()" disabled>
-                        <i class="fas fa-stop me-2"></i>Stop
-                    </button>
-                    <button class="btn btn-warning" id="btn-restart" onclick="restartService()" disabled>
-                        <i class="fas fa-redo me-2"></i>Restart
-                    </button>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div class="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                    <i class="fas fa-clock text-blue-600 mb-2"></i>
+                    <div class="text-base font-bold text-gray-900" id="uptime">-</div>
+                    <small class="text-xs text-gray-500">Uptime</small>
                 </div>
+                <div class="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                    <i class="fas fa-hashtag text-blue-600 mb-2"></i>
+                    <div class="text-base font-bold text-gray-900" id="pid">-</div>
+                    <small class="text-xs text-gray-500">Process ID</small>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                    <i class="fas fa-phone-alt text-blue-600 mb-2"></i>
+                    <div class="text-base font-bold text-gray-900" id="active-calls">-</div>
+                    <small class="text-xs text-gray-500">Active Calls</small>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                    <i class="fas fa-chart-line text-blue-600 mb-2"></i>
+                    <div class="text-base font-bold text-gray-900" id="total-calls">-</div>
+                    <small class="text-xs text-gray-500">Total Calls</small>
+                </div>
+            </div>
+
+            <div id="heartbeat-container" class="hidden bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+                <i class="fas fa-heartbeat text-green-600"></i>
+                <span class="text-xs text-green-700">Last heartbeat: <strong id="heartbeat-time">-</strong></span>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <button class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors" id="btn-start" onclick="startService()">
+                    <i class="fas fa-play mr-2"></i>Start
+                </button>
+                <button class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors" id="btn-stop" onclick="stopService()" disabled>
+                    <i class="fas fa-stop mr-2"></i>Stop
+                </button>
+                <button class="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-xs font-semibold transition-colors" id="btn-restart" onclick="restartService()" disabled>
+                    <i class="fas fa-redo mr-2"></i>Restart
+                </button>
             </div>
         </div>
-    </div>
 
-    <!-- Configuration -->
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-cog text-primary me-2"></i>Configuration
+        <!-- Configuration -->
+        <div class="bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-cog text-blue-600"></i>Configuration
+                </h6>
             </div>
-            <div class="card-body">
-                <div class="list-group list-group-flush">
-                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>Azure OpenAI</span>
-                        <span id="azure-status" class="badge bg-secondary">
+            <div class="p-4">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="text-xs text-gray-700">Azure OpenAI</span>
+                        <span id="azure-status" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600">
                             <i class="fas fa-circle-notch fa-spin"></i>
                         </span>
                     </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>Azure Speech</span>
-                        <span id="speech-status" class="badge bg-secondary">
+                    <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="text-xs text-gray-700">Azure Speech</span>
+                        <span id="speech-status" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600">
                             <i class="fas fa-circle-notch fa-spin"></i>
                         </span>
                     </div>
-                    <div class="list-group-item d-flex justify-content-between align-items-center px-0">
-                        <span>Dataverse</span>
-                        <span id="dataverse-status" class="badge bg-secondary">
+                    <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <span class="text-xs text-gray-700">Dataverse</span>
+                        <span id="dataverse-status" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600">
                             <i class="fas fa-circle-notch fa-spin"></i>
                         </span>
                     </div>
                 </div>
-                <button class="btn btn-outline-primary btn-sm w-100 mt-3" onclick="refreshStatus()">
-                    <i class="fas fa-sync-alt me-2"></i>Refresh Status
+                <button class="w-full mt-4 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold transition-colors" onclick="refreshStatus()">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh Status
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Recent Conversations -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-history text-primary me-2"></i>Recent Conversations</span>
-                <button class="btn btn-sm btn-outline-primary" onclick="loadCalls()">
-                    <i class="fas fa-sync-alt me-2"></i>Refresh
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-history text-blue-600"></i>Recent Conversations
+            </h6>
+            <button class="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-semibold transition-colors" onclick="loadCalls()">
+                <i class="fas fa-sync-alt mr-1"></i>Refresh
+            </button>
+        </div>
+        <div class="p-4">
+            <!-- Filters -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                <input type="text" class="px-3 py-2 text-xs border border-gray-200 rounded-lg" id="filter-caller" placeholder="Caller Number">
+                <select class="px-3 py-2 text-xs border border-gray-200 rounded-lg" id="filter-limit">
+                    <option value="10">10 calls</option>
+                    <option value="25" selected>25 calls</option>
+                    <option value="50">50 calls</option>
+                    <option value="100">100 calls</option>
+                </select>
+                <button class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors" onclick="loadCalls()">
+                    <i class="fas fa-filter mr-2"></i>Apply
                 </button>
             </div>
-            <div class="card-body">
-                <!-- Filters -->
-                <div class="row g-2 mb-3">
-                    <div class="col-md-3">
-                        <input type="text" class="form-control form-control-sm" id="filter-caller" placeholder="Caller Number">
-                    </div>
-                    <div class="col-md-2">
-                        <select class="form-select form-select-sm" id="filter-limit">
-                            <option value="10">10 calls</option>
-                            <option value="25" selected>25 calls</option>
-                            <option value="50">50 calls</option>
-                            <option value="100">100 calls</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-sm btn-primary w-100" onclick="loadCalls()">
-                            <i class="fas fa-filter me-2"></i>Apply
-                        </button>
-                    </div>
-                </div>
 
-                <!-- Calls List -->
-                <div id="calls-container">
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-primary" role="status"></div>
-                        <p class="text-muted mt-2">Loading conversations...</p>
-                    </div>
+            <!-- Calls List -->
+            <div id="calls-container">
+                <div class="flex flex-col items-center justify-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+                    <p class="text-xs text-gray-500">Loading conversations...</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- System Logs -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-terminal text-primary me-2"></i>System Logs</span>
-                <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-secondary" onclick="refreshLogs()">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button class="btn btn-outline-secondary" onclick="toggleAutoScroll()">
-                        <i class="fas fa-arrow-down" id="autoscroll-icon"></i>
-                    </button>
-                </div>
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h6 class="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-terminal text-blue-600"></i>System Logs
+            </h6>
+            <div class="flex items-center gap-1">
+                <button class="w-7 h-7 flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded" onclick="refreshLogs()">
+                    <i class="fas fa-sync-alt text-xs"></i>
+                </button>
+                <button class="w-7 h-7 flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded" onclick="toggleAutoScroll()">
+                    <i class="fas fa-arrow-down text-xs" id="autoscroll-icon"></i>
+                </button>
             </div>
-            <div class="card-body p-0">
-                <div class="log-viewer rounded" id="log-viewer">
-                    <div class="text-center py-5">
-                        <div class="spinner-border text-light" role="status"></div>
-                        <p class="mt-2 opacity-75">Loading logs...</p>
-                    </div>
+        </div>
+        <div class="p-0">
+            <div class="bg-gray-900 text-gray-200 font-mono text-xs h-96 overflow-y-auto whitespace-pre-wrap p-4" id="log-viewer">
+                <div class="text-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mb-3 mx-auto"></div>
+                    <p class="text-gray-400">Loading logs...</p>
                 </div>
             </div>
         </div>
@@ -213,29 +163,30 @@
 </div>
 
 <!-- Call Details Modal -->
-<div class="modal fade" id="callModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-comments text-primary me-2"></i>Call Details
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="modal-content"></div>
+<div class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto" id="callModal">
+    <div class="bg-white rounded-xl max-w-3xl w-full mx-4 my-8">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h5 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-comments text-blue-600"></i>Call Details
+            </h5>
+            <button onclick="closeCallModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
+        <div class="p-4 max-h-[70vh] overflow-y-auto" id="modal-content"></div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 let autoScroll = true;
 let statusCheckInterval;
-let callsModal;
+
+function closeCallModal() { document.getElementById('callModal').classList.add('hidden'); }
 
 document.addEventListener('DOMContentLoaded', function() {
-    callsModal = new bootstrap.Modal(document.getElementById('callModal'));
     updateStatus();
     updateLogs();
     loadCalls();
@@ -280,8 +231,8 @@ async function updateStatus() {
         const isRunning = status.running;
 
         document.getElementById('status-badge-container').innerHTML = isRunning ?
-            '<span class="badge bg-success"><span class="pulse">●</span> Running</span>' :
-            '<span class="badge bg-danger"><span class="pulse">●</span> Stopped</span>';
+            '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-green-50 text-green-600"><span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 animate-pulse"></span>Running</span>' :
+            '<span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-red-50 text-red-600"><span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></span>Stopped</span>';
 
         document.getElementById('uptime').textContent = formatUptime(status.uptime_seconds);
         document.getElementById('pid').textContent = status.pid || '-';
@@ -289,34 +240,44 @@ async function updateStatus() {
         document.getElementById('total-calls').textContent = status.total_calls || 0;
 
         if (isRunning && status.last_heartbeat) {
-            document.getElementById('heartbeat-container').classList.remove('d-none');
+            document.getElementById('heartbeat-container').classList.remove('hidden');
             document.getElementById('heartbeat-time').textContent = formatTimestamp(status.last_heartbeat);
         } else {
-            document.getElementById('heartbeat-container').classList.add('d-none');
+            document.getElementById('heartbeat-container').classList.add('hidden');
         }
 
         document.getElementById('btn-start').disabled = isRunning;
         document.getElementById('btn-stop').disabled = !isRunning;
         document.getElementById('btn-restart').disabled = !isRunning;
 
-        document.getElementById('azure-status').innerHTML = env.azure_openai_configured ?
-            '<i class="fas fa-check-circle"></i> OK' : '<i class="fas fa-times-circle"></i> Missing';
-        document.getElementById('azure-status').className = env.azure_openai_configured ? 'badge bg-success' : 'badge bg-danger';
+        const updateConfigStatus = (id, configured) => {
+            const el = document.getElementById(id);
+            if (configured) {
+                el.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-50 text-green-600';
+                el.innerHTML = '<i class="fas fa-check-circle mr-1"></i>OK';
+            } else {
+                el.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-600';
+                el.innerHTML = '<i class="fas fa-times-circle mr-1"></i>Missing';
+            }
+        };
 
-        document.getElementById('speech-status').innerHTML = env.azure_speech_configured ?
-            '<i class="fas fa-check-circle"></i> OK' : '<i class="fas fa-times-circle"></i> Missing';
-        document.getElementById('speech-status').className = env.azure_speech_configured ? 'badge bg-success' : 'badge bg-danger';
+        updateConfigStatus('azure-status', env.azure_openai_configured);
+        updateConfigStatus('speech-status', env.azure_speech_configured);
 
-        document.getElementById('dataverse-status').innerHTML = env.dataverse_configured ?
-            '<i class="fas fa-check-circle"></i> OK' : '<i class="fas fa-info-circle"></i> Optional';
-        document.getElementById('dataverse-status').className = env.dataverse_configured ? 'badge bg-success' : 'badge bg-secondary';
+        const dataverseEl = document.getElementById('dataverse-status');
+        if (env.dataverse_configured) {
+            dataverseEl.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-50 text-green-600';
+            dataverseEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>OK';
+        } else {
+            dataverseEl.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600';
+            dataverseEl.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Optional';
+        }
 
         if (!env.azure_openai_configured || !env.azure_speech_configured) {
             document.getElementById('alert-container').innerHTML = `
-                <div class="alert alert-warning alert-dismissible fade show">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Azure credentials not configured. Service cannot start.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <div class="bg-yellow-50 border-l-2 border-yellow-500 rounded p-3 mb-4 flex items-start gap-2">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5"></i>
+                    <span class="text-xs text-yellow-800">Azure credentials not configured. Service cannot start.</span>
                 </div>`;
         } else {
             document.getElementById('alert-container').innerHTML = '';
@@ -339,48 +300,54 @@ async function loadCalls() {
 
         if (!data.success || !data.calls || data.calls.length === 0) {
             container.innerHTML = `
-                <div class="text-center py-5 text-muted">
-                    <i class="fas fa-phone-slash fa-3x mb-3 opacity-25"></i>
-                    <p>No conversations found</p>
+                <div class="text-center py-8">
+                    <i class="fas fa-phone-slash text-4xl text-gray-300 mb-3"></i>
+                    <p class="text-xs text-gray-500">No conversations found</p>
                 </div>`;
             return;
         }
 
-        let html = '<div class="list-group">';
+        let html = '<div class="space-y-2">';
         data.calls.forEach(call => {
-            const intentClass = call.intent === 'transfer_requested' ? 'warning' :
-                               call.intent === 'ticket_created' ? 'info' : 'success';
+            const intentColors = {
+                transfer_requested: 'yellow',
+                ticket_created: 'blue',
+                general: 'green'
+            };
+            const intentColor = intentColors[call.intent] || 'green';
+
             html += `
-                <a href="#" class="list-group-item list-group-item-action" onclick="showCallDetails('${call.call_id}'); return false;">
-                    <div class="d-flex w-100 justify-content-between">
-                        <div>
-                            <h6 class="mb-1">
-                                <i class="fas fa-user me-2"></i>${call.caller_name || 'Unknown Caller'}
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 cursor-pointer transition-colors" onclick="showCallDetails('${call.call_id}')">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h6 class="text-xs font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                                <i class="fas fa-user text-blue-600"></i>
+                                ${call.caller_name || 'Unknown Caller'}
                             </h6>
-                            <small class="text-muted">${call.caller_number || 'No number'}</small>
+                            <small class="text-xs text-gray-500">${call.caller_number || 'No number'}</small>
                         </div>
-                        <div class="text-end">
-                            <small class="text-muted">${new Date(call.call_start).toLocaleString()}</small>
-                            <br><strong>${formatDuration(call.call_duration)}</strong>
+                        <div class="text-right">
+                            <small class="text-xs text-gray-500 block mb-1">${new Date(call.call_start).toLocaleString()}</small>
+                            <strong class="text-xs text-gray-900">${formatDuration(call.call_duration)}</strong>
                         </div>
                     </div>
-                    <div class="mt-2">
-                        ${call.intent ? `<span class="badge bg-${intentClass} me-1">${call.intent.replace('_', ' ')}</span>` : ''}
-                        ${call.transferred_to ? '<span class="badge bg-warning me-1"><i class="fas fa-exchange-alt me-1"></i>Transferred</span>' : ''}
-                        ${call.turns_count ? `<span class="badge bg-info me-1">${call.turns_count} turns</span>` : ''}
-                        ${call.avg_confidence ? `<span class="badge bg-secondary me-1">${Math.round(call.avg_confidence * 100)}% confidence</span>` : ''}
+                    <div class="mt-2 flex flex-wrap gap-1">
+                        ${call.intent ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-${intentColor}-50 text-${intentColor}-600">${call.intent.replace('_', ' ')}</span>` : ''}
+                        ${call.transferred_to ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-yellow-50 text-yellow-600"><i class="fas fa-exchange-alt mr-1"></i>Transferred</span>' : ''}
+                        ${call.turns_count ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-600">${call.turns_count} turns</span>` : ''}
                     </div>
-                    ${call.summary ? `<p class="mb-1 mt-2 small">${call.summary}</p>` : ''}
-                </a>`;
+                    ${call.summary ? `<p class="mt-2 text-xs text-gray-600">${call.summary}</p>` : ''}
+                </div>
+            `;
         });
         html += '</div>';
         container.innerHTML = html;
     } catch (error) {
         console.error('Failed to load calls:', error);
         document.getElementById('calls-container').innerHTML = `
-            <div class="text-center py-5 text-danger">
-                <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
-                <p>Failed to load conversations</p>
+            <div class="text-center py-8">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-300 mb-3"></i>
+                <p class="text-xs text-red-600">Failed to load conversations</p>
             </div>`;
     }
 }
@@ -389,110 +356,84 @@ async function showCallDetails(callId) {
     try {
         const response = await fetch(`/admin/api/ai-agent-calls/${callId}`);
         const data = await response.json();
-        if (!data.success) {
-            showToast('Failed to load call details', 'danger');
-            return;
-        }
+        if (!data.success) return;
 
         const call = data.call;
         let html = `
-            <div class="row g-3 mb-4">
-                <div class="col-md-4">
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <small class="text-muted d-block mb-1">Caller</small>
-                            <strong>${call.caller_name || 'Unknown'}</strong>
-                        </div>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <small class="text-xs text-gray-500 block mb-1">Caller</small>
+                    <strong class="text-sm text-gray-900">${call.caller_name || 'Unknown'}</strong>
                 </div>
-                <div class="col-md-4">
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <small class="text-muted d-block mb-1">Number</small>
-                            <strong>${call.caller_number || '-'}</strong>
-                        </div>
-                    </div>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <small class="text-xs text-gray-500 block mb-1">Number</small>
+                    <strong class="text-sm text-gray-900">${call.caller_number || '-'}</strong>
                 </div>
-                <div class="col-md-4">
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <small class="text-muted d-block mb-1">Duration</small>
-                            <strong>${formatDuration(call.call_duration)}</strong>
-                        </div>
-                    </div>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <small class="text-xs text-gray-500 block mb-1">Duration</small>
+                    <strong class="text-sm text-gray-900">${formatDuration(call.call_duration)}</strong>
                 </div>
             </div>
 
             ${call.summary ? `
             <div class="mb-4">
-                <h6><i class="fas fa-file-alt text-primary me-2"></i>Summary</h6>
-                <div class="alert alert-info">${call.summary}</div>
+                <h6 class="text-xs font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <i class="fas fa-file-alt text-blue-600"></i>Summary
+                </h6>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">${call.summary}</div>
             </div>` : ''}
 
             ${call.transcript ? `
             <div class="mb-4">
-                <h6><i class="fas fa-comments text-primary me-2"></i>Full Transcript</h6>
-                <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
+                <h6 class="text-xs font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <i class="fas fa-comments text-blue-600"></i>Full Transcript
+                </h6>
+                <div class="border border-gray-200 rounded-lg p-3 max-h-80 overflow-y-auto space-y-2">
                     ${parseTranscript(call.transcript)}
-                </div>
-            </div>` : ''}
-
-            ${call.functions_called && call.functions_called.length > 0 ? `
-            <div class="mb-4">
-                <h6><i class="fas fa-cogs text-primary me-2"></i>Functions Called</h6>
-                <div class="list-group">
-                    ${call.functions_called.map(fn => `
-                        <div class="list-group-item">
-                            <strong>${fn.function}</strong>
-                            ${fn.args ? `<div class="small text-muted mt-1">Args: ${JSON.stringify(fn.args)}</div>` : ''}
-                        </div>
-                    `).join('')}
                 </div>
             </div>` : ''}
         `;
 
         document.getElementById('modal-content').innerHTML = html;
-        callsModal.show();
+        document.getElementById('callModal').classList.remove('hidden');
     } catch (error) {
         console.error('Failed to load call details:', error);
-        showToast('Failed to load call details', 'danger');
     }
 }
 
 function parseTranscript(transcript) {
-    if (!transcript) return '<p class="text-muted">No transcript available</p>';
+    if (!transcript) return '<p class="text-xs text-gray-500">No transcript available</p>';
     const lines = transcript.split('\n').filter(line => line.trim());
     let html = '';
     lines.forEach(line => {
         if (line.startsWith('USER:')) {
-            html += `<div class="transcript-line user mb-2">
-                <div class="speaker-label text-primary">User</div>
-                <div>${line.replace('USER:', '').trim()}</div>
+            html += `<div class="bg-blue-50 border-l-2 border-blue-500 rounded p-2">
+                <div class="text-xs font-semibold text-blue-900 mb-1">User</div>
+                <div class="text-xs text-blue-800">${line.replace('USER:', '').trim()}</div>
             </div>`;
         } else if (line.startsWith('AI:')) {
-            html += `<div class="transcript-line ai mb-2">
-                <div class="speaker-label text-success">AI Assistant</div>
-                <div>${line.replace('AI:', '').trim()}</div>
+            html += `<div class="bg-green-50 border-l-2 border-green-500 rounded p-2">
+                <div class="text-xs font-semibold text-green-900 mb-1">AI Assistant</div>
+                <div class="text-xs text-green-800">${line.replace('AI:', '').trim()}</div>
             </div>`;
         }
     });
-    return html || '<p class="text-muted">No transcript available</p>';
+    return html || '<p class="text-xs text-gray-500">No transcript available</p>';
 }
 
 async function startService() {
     const btn = document.getElementById('btn-start');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
+    btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span>Starting...';
     try {
         const response = await fetch('/ai_agent/api/start', { method: 'POST' });
         const data = await response.json();
-        showToast(data.success ? 'AI Agent started' : 'Failed to start: ' + data.message,
-                 data.success ? 'success' : 'danger');
+        showToast(data.success ? 'AI Agent started' : 'Failed to start: ' + data.message, data.success ? 'success' : 'danger');
         if (data.success) setTimeout(updateStatus, 2000);
     } catch (error) {
         showToast('Error: ' + error.message, 'danger');
     } finally {
-        btn.innerHTML = '<i class="fas fa-play me-2"></i>Start';
+        btn.innerHTML = '<i class="fas fa-play mr-2"></i>Start';
         btn.disabled = false;
     }
 }
@@ -501,17 +442,16 @@ async function stopService() {
     if (!confirm('Stop AI Agent service?')) return;
     const btn = document.getElementById('btn-stop');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Stopping...';
+    btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span>Stopping...';
     try {
         const response = await fetch('/ai_agent/api/stop', { method: 'POST' });
         const data = await response.json();
-        showToast(data.success ? 'AI Agent stopped' : 'Failed to stop: ' + data.message,
-                 data.success ? 'success' : 'danger');
+        showToast(data.success ? 'AI Agent stopped' : 'Failed to stop: ' + data.message, data.success ? 'success' : 'danger');
         if (data.success) setTimeout(updateStatus, 1000);
     } catch (error) {
         showToast('Error: ' + error.message, 'danger');
     } finally {
-        btn.innerHTML = '<i class="fas fa-stop me-2"></i>Stop';
+        btn.innerHTML = '<i class="fas fa-stop mr-2"></i>Stop';
         btn.disabled = false;
     }
 }
@@ -520,17 +460,16 @@ async function restartService() {
     if (!confirm('Restart AI Agent service?')) return;
     const btn = document.getElementById('btn-restart');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Restarting...';
+    btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span>Restarting...';
     try {
         const response = await fetch('/ai_agent/api/restart', { method: 'POST' });
         const data = await response.json();
-        showToast(data.success ? 'AI Agent restarted' : 'Failed to restart: ' + data.message,
-                 data.success ? 'success' : 'danger');
+        showToast(data.success ? 'AI Agent restarted' : 'Failed to restart: ' + data.message, data.success ? 'success' : 'danger');
         if (data.success) setTimeout(updateStatus, 3000);
     } catch (error) {
         showToast('Error: ' + error.message, 'danger');
     } finally {
-        btn.innerHTML = '<i class="fas fa-redo me-2"></i>Restart';
+        btn.innerHTML = '<i class="fas fa-redo mr-2"></i>Restart';
         btn.disabled = false;
     }
 }
@@ -547,15 +486,15 @@ async function updateLogs() {
         const viewer = document.getElementById('log-viewer');
 
         if (!data.success || !data.logs || data.logs.length === 0) {
-            viewer.innerHTML = '<div class="text-center py-5 opacity-75">No logs available</div>';
+            viewer.innerHTML = '<div class="text-center py-8 text-gray-400">No logs available</div>';
             return;
         }
 
         const html = data.logs.map(line => {
-            let className = 'log-line';
-            if (line.includes('ERROR') || line.includes('❌')) className += ' error';
-            else if (line.includes('WARNING') || line.includes('⚠️')) className += ' warning';
-            else if (line.includes('INFO') || line.includes('✅')) className += ' info';
+            let className = 'text-gray-300';
+            if (line.includes('ERROR')) className = 'text-red-400';
+            else if (line.includes('WARNING')) className = 'text-yellow-400';
+            else if (line.includes('INFO')) className = 'text-blue-400';
             return `<div class="${className}">${escapeHtml(line)}</div>`;
         }).join('');
 
@@ -572,7 +511,7 @@ function refreshLogs() {
 
 function toggleAutoScroll() {
     autoScroll = !autoScroll;
-    document.getElementById('autoscroll-icon').className = autoScroll ? 'fas fa-arrow-down' : 'fas fa-pause';
+    document.getElementById('autoscroll-icon').className = autoScroll ? 'fas fa-arrow-down text-xs' : 'fas fa-pause text-xs';
 }
 
 function escapeHtml(text) {
@@ -582,9 +521,13 @@ function escapeHtml(text) {
 }
 
 function showToast(message, type = 'success') {
+    const colors = {
+        success: 'bg-green-50 text-green-600 border-green-200',
+        danger: 'bg-red-50 text-red-600 border-red-200',
+        info: 'bg-blue-50 text-blue-600 border-blue-200'
+    };
     const toast = document.createElement('div');
-    toast.className = `alert alert-${type} position-fixed top-0 end-0 m-3`;
-    toast.style.zIndex = '9999';
+    toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-xs font-medium border ${colors[type]}`;
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);

@@ -1,169 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - FreePBX Management{% endblock %}
+{% block title %}Dashboard - Sibasi PBX{% endblock %}
 {% block page_title %}Dashboard Overview{% endblock %}
+{% block page_subtitle %}Complete PBX system management with real-time monitoring{% endblock %}
 
 {% block content %}
-<style>
-    .stat-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        border: 1px solid #e2e8f0;
-        transition: box-shadow 0.2s ease;
-    }
-
-    .stat-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    }
-
-    .stat-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-    }
-
-    .stat-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 0.25rem;
-    }
-
-    .stat-label {
-        color: #64748b;
-        font-size: 0.875rem;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .service-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.4rem 0.8rem;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        font-weight: 500;
-    }
-
-    .service-status.online {
-        background: rgba(25,135,84,0.1);
-        color: #198754;
-    }
-
-    .service-status.offline {
-        background: rgba(220,53,69,0.1);
-        color: #dc3545;
-    }
-
-    .status-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-    }
-
-    .status-dot.online {
-        background: #198754;
-    }
-
-    .status-dot.offline {
-        background: #dc3545;
-    }
-
-    .activity-item {
-        padding: 1rem;
-        border-left: 2px solid #e2e8f0;
-        background: #f8fafc;
-        border-radius: 6px;
-        margin-bottom: 0.75rem;
-    }
-
-    .activity-item:hover {
-        border-left-color: #0d6efd;
-        background: #f1f5f9;
-    }
-
-    .quick-action-btn {
-        background: #0d6efd;
-        border: none;
-        border-radius: 6px;
-        padding: 0.75rem 1rem;
-        color: white;
-        font-weight: 500;
-        transition: background 0.2s ease;
-    }
-
-    .quick-action-btn:hover {
-        background: #0a58ca;
-        color: white;
-    }
-
-    .feature-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1.5rem;
-        border: 1px solid #e2e8f0;
-        height: 100%;
-    }
-
-    .feature-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-    }
-
-    .progress {
-        height: 6px;
-        border-radius: 4px;
-        background: #f1f5f9;
-    }
-
-    .progress-bar {
-        border-radius: 4px;
-    }
-
-    .service-item {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 1rem;
-    }
-
-    .service-detail {
-        font-size: 0.75rem;
-        color: #64748b;
-        margin-top: 0.5rem;
-    }
-</style>
-
-<div class="row g-4">
+<div class="space-y-4">
     <!-- Welcome Card -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="mb-2">
-                    <i class="fas fa-tachometer-alt text-primary me-2"></i>
-                    Welcome to FreePBX Management
+    <div class="bg-white rounded-xl border border-gray-100 p-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h5 class="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+                    <i class="fas fa-tachometer-alt text-blue-600"></i>
+                    Welcome to Sibasi PBX
                     {% if session.user %}
                     , {{ session.user.name.split()[0] }}
                     {% endif %}
                 </h5>
-                <p class="text-muted mb-0">
-                    Complete PBX system management with real-time monitoring and analytics.
+                <p class="text-xs text-gray-500">
+                    Complete PBX system management with real-time monitoring and analytics
                     {% if session.user %}
-                    <span class="badge bg-primary ms-2">{{ session.user.role|capitalize }} Access</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-600 ml-2">
+                        {{ session.user.role|capitalize }} Access
+                    </span>
                     {% endif %}
                 </p>
             </div>
@@ -171,118 +30,114 @@
     </div>
 
     <!-- Statistics Cards -->
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #eff6ff; color: #0d6efd;">
-                <i class="fas fa-phone"></i>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-phone text-blue-600"></i>
+                </div>
+                <span class="text-xs text-gray-500">7 Days</span>
             </div>
-            <h3 class="stat-value" id="total-calls">-</h3>
-            <p class="stat-label mb-0">Total Calls (7d)</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="total-calls">-</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Total Calls</p>
         </div>
-    </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #f0fdf4; color: #198754;">
-                <i class="fas fa-users"></i>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-users text-green-600"></i>
+                </div>
             </div>
-            <h3 class="stat-value" id="total-extensions">-</h3>
-            <p class="stat-label mb-0">Extensions</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="total-extensions">-</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Extensions</p>
         </div>
-    </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #fffbeb; color: #ffc107;">
-                <i class="fas fa-shield-alt"></i>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-shield-alt text-yellow-600"></i>
+                </div>
             </div>
-            <h3 class="stat-value" id="vpn-users">-</h3>
-            <p class="stat-label mb-0">VPN Users</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="vpn-users">-</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">VPN Users</p>
         </div>
-    </div>
 
-    <div class="col-md-6 col-lg-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: #f0f9ff; color: #0dcaf0;">
-                <i class="fas fa-clock"></i>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 bg-cyan-50 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-clock text-cyan-600"></i>
+                </div>
             </div>
-            <h3 class="stat-value" id="avg-duration">-</h3>
-            <p class="stat-label mb-0">Avg Call Time</p>
+            <h3 class="text-2xl font-bold text-gray-900 mb-1" id="avg-duration">-</h3>
+            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Avg Call Time</p>
         </div>
     </div>
 
     <!-- System Services -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-server text-primary me-2"></i>
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-server text-blue-600"></i>
                 System Services
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6 col-lg-3">
-                        <div class="service-item">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="small text-muted">FreePBX API</div>
-                                <i class="fas fa-plug text-muted"></i>
-                            </div>
-                            <div class="service-status" id="api-status-indicator">
-                                <span class="status-dot"></span>
-                                <span>Checking...</span>
-                            </div>
-                        </div>
+            </h6>
+        </div>
+        <div class="p-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500">FreePBX API</span>
+                        <i class="fas fa-plug text-gray-400 text-xs"></i>
                     </div>
-                    <div class="col-md-6 col-lg-3">
-                        <div class="service-item">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="small text-muted">SSH Connection</div>
-                                <i class="fas fa-terminal text-muted"></i>
-                            </div>
-                            <div class="service-status" id="ssh-status-indicator">
-                                <span class="status-dot"></span>
-                                <span>Checking...</span>
-                            </div>
-                            <div class="service-detail" id="ssh-uptime">
-                                <i class="fas fa-hourglass-half me-1"></i>
-                                <span>Uptime: -</span>
-                            </div>
-                        </div>
+                    <div class="flex items-center gap-2 text-xs" id="api-status-indicator">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                        <span class="text-gray-600">Checking...</span>
                     </div>
-                    <div class="col-md-6 col-lg-3">
-                        <div class="service-item">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="small text-muted">AI Agent</div>
-                                <i class="fas fa-robot text-muted"></i>
-                            </div>
-                            <div class="service-status" id="ai-agent-status">
-                                <span class="status-dot"></span>
-                                <span>Checking...</span>
-                            </div>
-                        </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500">SSH Connection</span>
+                        <i class="fas fa-terminal text-gray-400 text-xs"></i>
                     </div>
-                    <div class="col-md-6 col-lg-3">
-                        <div class="service-item">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="small text-muted">TG100 Gateway</div>
-                                <i class="fas fa-network-wired text-muted"></i>
-                            </div>
-                            <div class="service-status" id="tg100-status">
-                                <span class="status-dot"></span>
-                                <span>Checking...</span>
-                            </div>
-                        </div>
+                    <div class="flex items-center gap-2 text-xs mb-1" id="ssh-status-indicator">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                        <span class="text-gray-600">Checking...</span>
                     </div>
-                    <div class="col-md-6 col-lg-3">
-                        <div class="service-item">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div class="small text-muted">WireGuard VPN</div>
-                                <i class="fas fa-shield-alt text-muted"></i>
-                            </div>
-                            <div class="service-status" id="wireguard-status">
-                                <span class="status-dot"></span>
-                                <span>Checking...</span>
-                            </div>
-                        </div>
+                    <div class="text-xs text-gray-400" id="ssh-uptime">
+                        <i class="fas fa-hourglass-half mr-1"></i>Uptime: -
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500">AI Agent</span>
+                        <i class="fas fa-robot text-gray-400 text-xs"></i>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs" id="ai-agent-status">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                        <span class="text-gray-600">Checking...</span>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500">TG100 Gateway</span>
+                        <i class="fas fa-network-wired text-gray-400 text-xs"></i>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs" id="tg100-status">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                        <span class="text-gray-600">Checking...</span>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500">WireGuard VPN</span>
+                        <i class="fas fa-shield-alt text-gray-400 text-xs"></i>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs" id="wireguard-status">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                        <span class="text-gray-600">Checking...</span>
                     </div>
                 </div>
             </div>
@@ -290,152 +145,83 @@
     </div>
 
     <!-- Quick Actions -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-bolt text-primary me-2"></i>
+    <div class="bg-white rounded-xl border border-gray-100">
+        <div class="px-4 py-3 border-b border-gray-100">
+            <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-bolt text-blue-600"></i>
                 Quick Actions
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <a href="/cdr/" class="btn quick-action-btn w-100">
-                            <i class="fas fa-chart-line me-2"></i>
-                            Call Records
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="/extensions/" class="btn quick-action-btn w-100">
-                            <i class="fas fa-phone me-2"></i>
-                            Manage Extensions
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="/wireguard/" class="btn quick-action-btn w-100">
-                            <i class="fas fa-shield-alt me-2"></i>
-                            VPN Management
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="/ai_agent/" class="btn quick-action-btn w-100">
-                            <i class="fas fa-robot me-2"></i>
-                            AI Agent
-                        </a>
-                    </div>
-                </div>
+            </h6>
+        </div>
+        <div class="p-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <a href="/cdr/" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Call Records</span>
+                </a>
+                <a href="/extensions/" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors">
+                    <i class="fas fa-phone"></i>
+                    <span>Extensions</span>
+                </a>
+                <a href="/wireguard/" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>VPN</span>
+                </a>
+                <a href="/ai_agent/" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors">
+                    <i class="fas fa-robot"></i>
+                    <span>AI Agent</span>
+                </a>
             </div>
         </div>
     </div>
 
     <!-- Recent Activity & Extension Status -->
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-history text-primary me-2"></i>
-                Recent Call Activity
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-history text-blue-600"></i>
+                    Recent Call Activity
+                </h6>
             </div>
-            <div class="card-body">
+            <div class="p-4">
                 <div id="recent-activity">
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-primary mb-3" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="text-muted mb-0">Loading recent activity...</p>
+                    <div class="flex flex-col items-center justify-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+                        <p class="text-xs text-gray-500">Loading recent activity...</p>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-info-circle text-primary me-2"></i>
-                Extension Status
+        <div class="bg-white rounded-xl border border-gray-100">
+            <div class="px-4 py-3 border-b border-gray-100">
+                <h6 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-info-circle text-blue-600"></i>
+                    Extension Status
+                </h6>
             </div>
-            <div class="card-body">
+            <div class="p-4">
                 <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted small">Online</span>
-                        <span class="badge bg-success" id="online-extensions">0</span>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500">Online</span>
+                        <span class="px-2 py-0.5 bg-green-50 text-green-600 rounded text-xs font-semibold" id="online-extensions">0</span>
                     </div>
-                    <div class="progress">
-                        <div class="progress-bar bg-success" id="online-progress" style="width: 0%"></div>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted small">Offline</span>
-                        <span class="badge bg-danger" id="offline-extensions">0</span>
-                    </div>
-                    <div class="progress">
-                        <div class="progress-bar bg-danger" id="offline-progress" style="width: 0%"></div>
+                    <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-green-500 transition-all duration-300" id="online-progress" style="width: 0%"></div>
                     </div>
                 </div>
-                <div class="mt-4">
-                    <a href="/extensions/" class="btn btn-outline-primary w-100">
-                        <i class="fas fa-cog me-2"></i>
-                        Manage Extensions
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Features Overview -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-star text-primary me-2"></i>
-                Platform Features
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <div class="feature-card">
-                            <div class="feature-icon" style="background: #eff6ff; color: #0d6efd;">
-                                <i class="fas fa-chart-bar"></i>
-                            </div>
-                            <h6 class="fw-bold mb-2">Call Analytics</h6>
-                            <p class="text-muted small mb-0">
-                                Detailed call records and statistics with advanced filtering.
-                            </p>
-                        </div>
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-gray-500">Offline</span>
+                        <span class="px-2 py-0.5 bg-red-50 text-red-600 rounded text-xs font-semibold" id="offline-extensions">0</span>
                     </div>
-                    <div class="col-md-3">
-                        <div class="feature-card">
-                            <div class="feature-icon" style="background: #f0fdf4; color: #198754;">
-                                <i class="fas fa-users"></i>
-                            </div>
-                            <h6 class="fw-bold mb-2">Extension Management</h6>
-                            <p class="text-muted small mb-0">
-                                Create and manage extensions with real-time monitoring.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="feature-card">
-                            <div class="feature-icon" style="background: #fffbeb; color: #ffc107;">
-                                <i class="fas fa-shield-alt"></i>
-                            </div>
-                            <h6 class="fw-bold mb-2">VPN Management</h6>
-                            <p class="text-muted small mb-0">
-                                WireGuard VPN with QR codes and peer management.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="feature-card">
-                            <div class="feature-icon" style="background: #f0f9ff; color: #0dcaf0;">
-                                <i class="fas fa-robot"></i>
-                            </div>
-                            <h6 class="fw-bold mb-2">AI Agent</h6>
-                            <p class="text-muted small mb-0">
-                                Intelligent call handling with automated responses.
-                            </p>
-                        </div>
+                    <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-red-500 transition-all duration-300" id="offline-progress" style="width: 0%"></div>
                     </div>
                 </div>
+                <a href="/extensions/" class="block w-full text-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-cog mr-2"></i>Manage Extensions
+                </a>
             </div>
         </div>
     </div>
@@ -448,13 +234,13 @@
         const element = document.getElementById(elementId);
         if (!element) return;
 
-        const statusClass = isOnline ? 'online' : 'offline';
+        const statusClass = isOnline ? 'bg-green-500' : 'bg-red-500';
         const statusText = label || (isOnline ? 'Online' : 'Offline');
+        const textColor = isOnline ? 'text-green-600' : 'text-red-600';
 
-        element.className = `service-status ${statusClass}`;
         element.innerHTML = `
-            <span class="status-dot ${statusClass}"></span>
-            <span>${statusText}</span>
+            <span class="w-1.5 h-1.5 rounded-full ${statusClass}"></span>
+            <span class="${textColor}">${statusText}</span>
         `;
     }
 
@@ -513,60 +299,57 @@
             const container = document.getElementById('recent-activity');
 
             if (data.calls && data.calls.length > 0) {
-                let html = '';
+                let html = '<div class="space-y-2">';
                 data.calls.forEach(call => {
-                    const statusColor = call.disposition === 'ANSWERED' ? 'success' :
-                                       call.disposition === 'NO ANSWER' ? 'warning' : 'danger';
-                    const statusIcon = call.disposition === 'ANSWERED' ? 'check-circle' :
-                                      call.disposition === 'NO ANSWER' ? 'clock' : 'times-circle';
+                    const statusColor = call.disposition === 'ANSWERED' ? 'green' :
+                                       call.disposition === 'NO ANSWER' ? 'yellow' : 'red';
 
                     html += `
-                        <div class="activity-item">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="flex-grow-1">
-                                    <h6 class="mb-1">
-                                        <i class="fas fa-phone me-2 text-primary"></i>
+                        <div class="p-3 bg-gray-50 border-l-2 border-${statusColor}-500 rounded">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <h6 class="text-xs font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                                        <i class="fas fa-phone text-blue-600"></i>
                                         ${call.source} → ${call.destination}
                                     </h6>
-                                    <small class="text-muted">
-                                        <i class="far fa-clock me-1"></i>
+                                    <small class="text-xs text-gray-500">
+                                        <i class="far fa-clock mr-1"></i>
                                         ${new Date(call.calldate).toLocaleString()}
                                     </small>
                                 </div>
-                                <div class="text-end ms-3">
-                                    <span class="badge bg-${statusColor}">
-                                        <i class="fas fa-${statusIcon} me-1"></i>
+                                <div class="text-right ml-3">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-${statusColor}-50 text-${statusColor}-600">
                                         ${call.disposition}
                                     </span>
                                     <br>
-                                    <small class="text-muted">${call.duration_formatted}</small>
+                                    <small class="text-xs text-gray-500">${call.duration_formatted}</small>
                                 </div>
                             </div>
                         </div>
                     `;
                 });
+                html += '</div>';
                 container.innerHTML = html;
             } else {
                 container.innerHTML = `
-                    <div class="text-center py-4">
-                        <i class="fas fa-info-circle fa-2x text-muted mb-3 opacity-50"></i>
-                        <p class="text-muted mb-0">No recent call activity</p>
+                    <div class="text-center py-8">
+                        <i class="fas fa-info-circle text-4xl text-gray-300 mb-3"></i>
+                        <p class="text-xs text-gray-500">No recent call activity</p>
                     </div>
                 `;
             }
         } catch (error) {
             console.error('Error loading recent activity:', error);
             document.getElementById('recent-activity').innerHTML = `
-                <div class="text-center py-4">
-                    <i class="fas fa-exclamation-triangle fa-2x text-warning mb-3"></i>
-                    <p class="text-muted mb-0">Unable to load recent activity</p>
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-4xl text-yellow-400 mb-3"></i>
+                    <p class="text-xs text-gray-500">Unable to load recent activity</p>
                 </div>
             `;
         }
     }
 
     async function testConnection() {
-        updateServiceStatus('api-status-indicator', false, 'Testing...');
         try {
             const response = await fetch('/api/test');
             const data = await response.json();
@@ -578,61 +361,37 @@
     }
 
     async function testSSH() {
-        updateServiceStatus('ssh-status-indicator', false, 'Testing...');
         const uptimeElement = document.getElementById('ssh-uptime');
-
         try {
             const response = await fetch('/api/ssh-test');
             const data = await response.json();
             updateServiceStatus('ssh-status-indicator', data.status === 'success');
 
             if (data.status === 'success' && data.uptime) {
-                uptimeElement.innerHTML = `
-                    <i class="fas fa-hourglass-half me-1"></i>
-                    <span>Uptime: ${data.uptime}</span>
-                `;
-            } else {
-                uptimeElement.innerHTML = `
-                    <i class="fas fa-hourglass-half me-1"></i>
-                    <span>Uptime: -</span>
-                `;
+                uptimeElement.innerHTML = `<i class="fas fa-hourglass-half mr-1"></i>Uptime: ${data.uptime}`;
             }
         } catch (error) {
             updateServiceStatus('ssh-status-indicator', false);
-            uptimeElement.innerHTML = `
-                <i class="fas fa-hourglass-half me-1"></i>
-                <span>Uptime: -</span>
-            `;
             console.error('SSH connection failed:', error);
         }
     }
 
-    // AI Agent status check
     async function testAIAgent() {
-        updateServiceStatus('ai-agent-status', false, 'Checking...');
         try {
             const response = await fetch('/ai_agent/api/status');
             const data = await response.json();
-
             if (data.success && data.status) {
-                const isRunning = data.status.running;
-
-                if (isRunning) {
-                    updateServiceStatus('ai-agent-status', true, 'Online');
-                } else {
-                    updateServiceStatus('ai-agent-status', false, 'Offline');
-                }
+                updateServiceStatus('ai-agent-status', data.status.running);
             } else {
-                updateServiceStatus('ai-agent-status', false, 'Error');
+                updateServiceStatus('ai-agent-status', false);
             }
         } catch (error) {
-            updateServiceStatus('ai-agent-status', false, 'Error');
+            updateServiceStatus('ai-agent-status', false);
             console.error('AI Agent check failed:', error);
         }
     }
 
     async function testTG100() {
-        updateServiceStatus('tg100-status', false, 'Pinging...');
         try {
             const response = await fetch('/tg100/api/quick-ping');
             const data = await response.json();
@@ -644,7 +403,6 @@
     }
 
     async function testWireGuard() {
-        updateServiceStatus('wireguard-status', false, 'Checking...');
         try {
             const response = await fetch('/api/wireguard-status');
             const data = await response.json();
@@ -655,7 +413,6 @@
         }
     }
 
-    // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
         loadStats();
         loadExtensionStats();
@@ -667,7 +424,6 @@
         testTG100();
         testWireGuard();
 
-        // Refresh every 30 seconds
         setInterval(() => {
             loadStats();
             loadExtensionStats();

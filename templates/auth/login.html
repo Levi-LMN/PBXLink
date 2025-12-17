@@ -5,452 +5,180 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In - Sibasi PBX</title>
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+
+        .feature-card {
+            transition: all 0.2s ease;
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #fafbfc;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .login-container {
-            width: 100%;
-            max-width: 900px;
-        }
-
-        .login-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-            overflow: hidden;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            border: 1px solid #d1d5db;
-        }
-
-        .login-left {
-            background: #f9fafb;
-            padding: 3rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            border-right: 2px solid #d1d5db;
-        }
-
-        .logo-section {
-            margin-bottom: 2.5rem;
-        }
-
-        .logo-container {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 1.25rem;
-            background: #3b82f6;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo-container i {
-            font-size: 1.75rem;
-            color: white;
-        }
-
-        .logo-section h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-            color: #111827;
-        }
-
-        .logo-section .subtitle {
-            font-size: 0.9rem;
-            color: #6b7280;
-        }
-
-        .features {
-            display: flex;
-            flex-direction: column;
-            gap: 1.25rem;
-        }
-
-        .feature-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.875rem;
-        }
-
-        .feature-icon {
-            width: 36px;
-            height: 36px;
-            background: white;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .feature-icon i {
-            color: #3b82f6;
-            font-size: 0.95rem;
-        }
-
-        .feature-text h3 {
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 0.125rem;
-            color: #111827;
-        }
-
-        .feature-text p {
-            font-size: 0.8rem;
-            color: #6b7280;
-            margin: 0;
-            line-height: 1.4;
-        }
-
-        .login-right {
-            padding: 3rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .login-header {
-            margin-bottom: 2rem;
-        }
-
-        .login-header h2 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #111827;
-            margin-bottom: 0.5rem;
-        }
-
-        .login-header p {
-            color: #6b7280;
-            font-size: 0.9rem;
-        }
-
-        .alert {
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            border: none;
-            font-size: 0.875rem;
-            padding: 1rem 1.25rem;
-        }
-
-        .alert-danger {
-            background: #fef2f2;
-            color: #991b1b;
-            border-left: 3px solid #dc2626;
-        }
-
-        .btn-microsoft {
-            background: #2f2f2f;
-            color: white;
-            padding: 0.95rem 1.75rem;
-            border-radius: 8px;
-            border: none;
-            width: 100%;
-            font-size: 0.95rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s ease;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        .btn-microsoft:hover {
-            background: #1a1a1a;
-            color: white;
-        }
-
-        .btn-microsoft i {
-            margin-right: 0.625rem;
-            font-size: 1.1rem;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            margin: 1.75rem 0;
-            color: #9ca3af;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: '';
-            flex: 1;
-            border-bottom: 1.5px solid #d1d5db;
-        }
-
-        .divider span {
-            padding: 0 1rem;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .security-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.875rem;
-            padding: 1rem;
-            background: #f9fafb;
-            border-radius: 8px;
-            border: 1.5px solid #cbd5e1;
-        }
-
-        .security-badge i {
-            color: #3b82f6;
-            font-size: 1.25rem;
-        }
-
-        .security-badge .text {
-            text-align: left;
-        }
-
-        .security-badge .title {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: #111827;
-            margin: 0 0 0.125rem 0;
-        }
-
-        .security-badge .subtitle {
-            font-size: 0.75rem;
-            color: #6b7280;
-            margin: 0;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 1.75rem;
-        }
-
-        .footer-text {
-            font-size: 0.8rem;
-            color: #6b7280;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .footer-text i {
-            font-size: 0.85rem;
-            color: #9ca3af;
-        }
-
-        /* Tablet */
-        @media (max-width: 992px) {
-            .login-card {
-                max-width: 600px;
-                margin: 0 auto;
-            }
-
-            .login-left {
-                padding: 2.5rem;
-            }
-
-            .login-right {
-                padding: 2.5rem;
-            }
-        }
-
-        /* Mobile */
-        @media (max-width: 768px) {
-            .login-card {
-                grid-template-columns: 1fr;
-                max-width: 500px;
-            }
-
-            .login-left {
-                padding: 2rem;
-                border-right: none;
-                border-bottom: 2px solid #d1d5db;
-            }
-
-            .logo-section {
-                margin-bottom: 2rem;
-            }
-
-            .logo-section h1 {
-                font-size: 1.5rem;
-            }
-
-            .features {
-                gap: 1rem;
-            }
-
-            .login-right {
-                padding: 2rem;
-            }
-
-            .login-header h2 {
-                font-size: 1.35rem;
-            }
-        }
-
-        /* Small Mobile */
-        @media (max-width: 480px) {
-            body {
-                padding: 15px;
-            }
-
-            .login-left,
-            .login-right {
-                padding: 1.5rem;
-            }
-
-            .logo-container {
-                width: 56px;
-                height: 56px;
-            }
-
-            .logo-container i {
-                font-size: 1.5rem;
-            }
-
-            .logo-section h1 {
-                font-size: 1.35rem;
-            }
-
-            .btn-microsoft {
-                padding: 0.875rem 1.5rem;
-                font-size: 0.9rem;
-            }
+        .feature-card:hover {
+            transform: translateX(2px);
         }
     </style>
 </head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <!-- Left Section -->
-            <div class="login-left">
-                <div class="logo-section">
-                    <div class="logo-container">
-                        <i class="fas fa-phone-volume"></i>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
+
+<div class="w-full max-w-4xl">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="grid md:grid-cols-2">
+
+            <!-- LEFT SECTION -->
+            <div class="p-10 bg-gradient-to-br from-blue-50 to-blue-100/50 border-r border-gray-200">
+                <div class="mb-10">
+                    <div class="w-12 h-12 bg-white border border-blue-200 rounded-xl flex items-center justify-center mb-4 shadow-sm overflow-hidden">
+                        <img src="../static/img/sibasifavicon.png" alt="Sibasi Logo" class="w-8 h-8 object-contain">
                     </div>
-                    <h1>Sibasi PBX</h1>
-                    <p class="subtitle">Management Dashboard</p>
+                    <h1 class="text-xl font-semibold text-gray-900">Sibasi PBX</h1>
+                    <p class="text-sm text-gray-600">Unified Communications Platform</p>
                 </div>
 
-                <div class="features">
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-shield-halved"></i>
+                <div class="space-y-4">
+                    <div class="feature-card flex gap-4">
+                        <div class="w-9 h-9 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-chart-line text-blue-600 text-sm"></i>
                         </div>
-                        <div class="feature-text">
-                            <h3>Secure Authentication</h3>
-                            <p>Protected by Azure Active Directory with enterprise-grade security</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-users-gear"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h3>Role Management</h3>
-                            <p>Control user access and permissions with granular role settings</p>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900">Call Records & Analytics</h3>
+                            <p class="text-xs text-gray-500 leading-relaxed">
+                                Track and analyze all your communication data
+                            </p>
                         </div>
                     </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-clock-rotate-left"></i>
+
+                    <div class="feature-card flex gap-4">
+                        <div class="w-9 h-9 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-phone text-blue-600 text-sm"></i>
                         </div>
-                        <div class="feature-text">
-                            <h3>Activity Monitoring</h3>
-                            <p>Comprehensive logs to track all system activities and changes</p>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900">Extension Management</h3>
+                            <p class="text-xs text-gray-500 leading-relaxed">
+                                Configure and monitor phone extensions
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="feature-card flex gap-4">
+                        <div class="w-9 h-9 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-shield-alt text-blue-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900">WireGuard VPN</h3>
+                            <p class="text-xs text-gray-500 leading-relaxed">
+                                Secure network connectivity for remote access
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="feature-card flex gap-4">
+                        <div class="w-9 h-9 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-robot text-blue-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900">AI Agent Integration</h3>
+                            <p class="text-xs text-gray-500 leading-relaxed">
+                                Intelligent call handling and automation
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="feature-card flex gap-4">
+                        <div class="w-9 h-9 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-server text-blue-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900">TG100 Gateway</h3>
+                            <p class="text-xs text-gray-500 leading-relaxed">
+                                Enterprise-grade GSM gateway management
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="feature-card flex gap-4">
+                        <div class="w-9 h-9 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-users-cog text-blue-600 text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900">Admin Panel</h3>
+                            <p class="text-xs text-gray-500 leading-relaxed">
+                                Role management and system controls
+                            </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Section -->
-            <div class="login-right">
-                <div class="login-header">
-                    <h2>Welcome Back</h2>
-                    <p>Sign in to access your dashboard</p>
+            <!-- RIGHT SECTION -->
+            <div class="p-10">
+                <div class="mb-8">
+                    <h2 class="text-xl font-semibold text-gray-900">Welcome back</h2>
+                    <p class="text-sm text-gray-500">
+                        Sign in to access your dashboard
+                    </p>
                 </div>
 
-                <!-- Error Message -->
                 {% if error %}
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        <span>{{ error }}</span>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <div class="mb-5 flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <i class="fas fa-exclamation-circle text-red-600"></i>
+                    <span class="text-sm text-red-700">{{ error }}</span>
                 </div>
                 {% endif %}
 
-                <!-- Login Button -->
-                <a href="{{ url_for('auth.login') }}" class="btn-microsoft" id="loginBtn">
-                    <i class="fab fa-microsoft"></i>
-                    <span>Sign in with Microsoft</span>
+                <!-- SIGN IN BUTTON -->
+                <a href="{{ url_for('auth.login') }}"
+                   class="w-full flex items-center justify-center gap-3 px-5 py-3
+                          bg-blue-600 text-white rounded-lg text-sm font-medium
+                          hover:bg-blue-700 transition-colors shadow-sm">
+                    <i class="fab fa-microsoft text-lg"></i>
+                    Sign in with Microsoft
                 </a>
 
-                <!-- Divider -->
-                <div class="divider">
-                    <span>Secure Access</span>
+                <!-- DIVIDER -->
+                <div class="flex items-center my-8">
+                    <div class="flex-1 h-px bg-gray-200"></div>
+                    <span class="px-4 text-xs text-gray-400 uppercase tracking-wide">
+                        Secure Access
+                    </span>
+                    <div class="flex-1 h-px bg-gray-200"></div>
                 </div>
 
-                <!-- Security Badge -->
-                <div class="security-badge">
-                    <i class="fas fa-lock"></i>
-                    <div class="text">
-                        <p class="title">Enterprise Security</p>
-                        <p class="subtitle">Your data is encrypted and secure</p>
+                <!-- SECURITY NOTE -->
+                <div class="flex items-center gap-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                    <i class="fas fa-lock text-blue-600 text-lg"></i>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">
+                            Enterprise Security
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            Azure AD authentication with encrypted sessions
+                        </p>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="footer">
-            <p class="footer-text">
-                <i class="fas fa-shield-halved"></i>
-                <span>Protected by enterprise-grade security standards</span>
-            </p>
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- FOOTER -->
+    <div class="text-center mt-6">
+        <p class="text-xs text-gray-500 flex items-center justify-center gap-2">
+            <i class="fas fa-shield-halved text-blue-600"></i>
+            <span>
+                A product of
+                <a href="https://sibasi.com" class="text-blue-600 hover:underline">
+                    Sibasi Limited
+                </a>
+            </span>
+        </p>
+    </div>
+</div>
 
-    <script>
-        // Auto-dismiss alerts
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(function() {
-                const alerts = document.querySelectorAll('.alert');
-                alerts.forEach(alert => {
-                    const bsAlert = new bootstrap.Alert(alert);
-                    bsAlert.close();
-                });
-            }, 6000);
-        });
-    </script>
 </body>
 </html>
