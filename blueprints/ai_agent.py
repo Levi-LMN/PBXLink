@@ -108,12 +108,13 @@ def restart_service():
 def get_logs():
     """Get recent agent logs"""
     try:
-        lines = request.args.get('lines', 50, type=int)
+        lines = request.args.get('lines', 100, type=int)
         logs = ai_service.get_logs(lines)
 
         return jsonify({
             'success': True,
             'logs': logs,
+            'count': len(logs),
             'log_file': ai_service.get_status().get('log_file')
         })
 
@@ -131,7 +132,7 @@ def get_config():
     try:
         config = {
             'agent_path': str(ai_service.agent_path),
-            'log_file': str(ai_service.log_file),
+            'log_file': str(ai_service.log_file) if ai_service.log_file else None,
             'environment': {
                 'AZURE_OPENAI_ENDPOINT': os.environ.get('AZURE_OPENAI_ENDPOINT', 'Not set'),
                 'AZURE_OPENAI_DEPLOYMENT': os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini'),
@@ -153,5 +154,3 @@ def get_config():
             'success': False,
             'error': str(e)
         }), 500
-
-    # tail -f /opt/PBXLink/blueprints/logs/agent.log

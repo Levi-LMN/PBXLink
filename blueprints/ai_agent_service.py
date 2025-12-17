@@ -1,12 +1,12 @@
 """
-AI Agent Service Manager - Complete Working Version
-Runs agent.py as an independent subprocess without interference
+AI Agent Service Manager - Complete Working Version with Proper Logging
 """
 
 import subprocess
 import logging
 import os
 import time
+import tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -42,12 +42,36 @@ class AIAgentService:
             if not self.agent_path:
                 raise FileNotFoundError("agent.py not found")
 
-        # Setup log file
-        log_dir = Path("/var/log/ai_agent")
-        log_dir.mkdir(exist_ok=True, parents=True)
-        self.log_file = log_dir / "agent.log"
+        # Setup log file - try multiple locations
+        log_locations = [
+            Path("/var/log/ai_agent"),
+            Path("/tmp/ai_agent"),
+            self.agent_path.parent / "logs",
+            Path(tempfile.gettempdir()) / "ai_agent"
+        ]
+
+        for log_dir in log_locations:
+            try:
+                log_dir.mkdir(exist_ok=True, parents=True)
+                # Test write permission
+                test_file = log_dir / ".write_test"
+                test_file.write_text("test")
+                test_file.unlink()
+                # Success - use this location
+                self.log_file = log_dir / "agent.log"
+                logger.info(f"Using log directory: {log_dir}")
+                break
+            except (PermissionError, OSError) as e:
+                logger.debug(f"Cannot use {log_dir}: {e}")
+                continue
+
+        if not self.log_file:
+            # Last resort - use temp file
+            self.log_file = Path(tempfile.mktemp(suffix=".log", prefix="ai_agent_"))
+            logger.warning(f"Using temp log file: {self.log_file}")
 
         logger.info(f"AI Agent Service initialized: {self.agent_path}")
+        logger.info(f"Log file: {self.log_file}")
 
     def start(self):
         """Start the AI agent service"""
@@ -62,19 +86,34 @@ class AIAgentService:
                 return False, f"Missing: {', '.join(missing)}"
 
             logger.info(f"Starting AI Agent: {self.agent_path}")
+            logger.info(f"Logs will be written to: {self.log_file}")
 
-            # Open log file
-            log_handle = open(self.log_file, 'a')
+            # Open log file for writing
+            try:
+                log_handle = open(self.log_file, 'a', buffering=1)  # Line buffered
+            except Exception as e:
+                logger.error(f"Cannot open log file: {e}")
+                return False, f"Cannot create log file: {e}"
+
+            # Prepare environment
+            env = os.environ.copy()
+            env['PYTHONUNBUFFERED'] = '1'
 
             # Start process - completely detached from Flask
-            self.process = subprocess.Popen(
-                ['python3', str(self.agent_path)],
-                stdout=log_handle,
-                stderr=log_handle,
-                env=os.environ.copy(),
-                cwd=str(self.agent_path.parent),
-                start_new_session=True  # Detach from parent
-            )
+            try:
+                self.process = subprocess.Popen(
+                    ['python3', str(self.agent_path)],
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout
+                    env=env,
+                    cwd=str(self.agent_path.parent),
+                    start_new_session=True,  # Detach from parent
+                    close_fds=True
+                )
+            except Exception as e:
+                log_handle.close()
+                logger.error(f"Failed to start process: {e}")
+                return False, f"Process start failed: {e}"
 
             self.running = True
             self.start_time = datetime.utcnow()
@@ -84,11 +123,12 @@ class AIAgentService:
 
             if self.process.poll() is not None:
                 self.running = False
-                return False, "Agent failed to start"
+                log_handle.close()
+                return False, f"Agent failed to start (exit code: {self.process.returncode})"
 
             logger.info(f"✅ AI Agent started (PID: {self.process.pid})")
-            logger.info(f"📋 Logs: {self.log_file}")
-            return True, f"Service started (PID: {self.process.pid})"
+            logger.info(f"📋 Logs: tail -f {self.log_file}")
+            return True, f"Service started (PID: {self.process.pid}). Logs: {self.log_file}"
 
         except Exception as e:
             logger.error(f"Failed to start: {e}")
@@ -105,15 +145,21 @@ class AIAgentService:
 
             if self.process:
                 # Send SIGTERM for graceful shutdown
-                self.process.terminate()
+                try:
+                    self.process.terminate()
+                except Exception as e:
+                    logger.warning(f"Terminate failed: {e}")
 
                 # Wait up to 10 seconds
                 try:
                     self.process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
                     logger.warning("Force killing agent")
-                    self.process.kill()
-                    self.process.wait()
+                    try:
+                        self.process.kill()
+                        self.process.wait()
+                    except:
+                        pass
 
             self.running = False
             self.start_time = None
@@ -131,7 +177,7 @@ class AIAgentService:
         logger.info("Restarting AI Agent...")
 
         success, message = self.stop()
-        if not success and "not running" not in message:
+        if not success and "not running" not in message.lower():
             return False, f"Stop failed: {message}"
 
         time.sleep(2)
@@ -144,19 +190,28 @@ class AIAgentService:
                 'running': False,
                 'uptime_seconds': None,
                 'pid': None,
-                'log_file': str(self.log_file)
+                'log_file': str(self.log_file) if self.log_file else None
             }
 
         # Check if actually running
-        poll = self.process.poll()
-        if poll is not None:
+        try:
+            poll = self.process.poll()
+            if poll is not None:
+                self.running = False
+                return {
+                    'running': False,
+                    'uptime_seconds': None,
+                    'pid': None,
+                    'exit_code': poll,
+                    'log_file': str(self.log_file)
+                }
+        except:
             self.running = False
             return {
                 'running': False,
                 'uptime_seconds': None,
                 'pid': None,
-                'exit_code': poll,
-                'log_file': str(self.log_file)
+                'log_file': str(self.log_file) if self.log_file else None
             }
 
         uptime = None
@@ -170,18 +225,18 @@ class AIAgentService:
             'log_file': str(self.log_file)
         }
 
-    def get_logs(self, lines=50):
+    def get_logs(self, lines=100):
         """Get recent log lines"""
         try:
-            if not self.log_file.exists():
+            if not self.log_file or not Path(self.log_file).exists():
                 return []
 
             with open(self.log_file, 'r') as f:
                 all_lines = f.readlines()
-                return [line.strip() for line in all_lines[-lines:]]
+                return [line.strip() for line in all_lines[-lines:] if line.strip()]
         except Exception as e:
             logger.error(f"Error reading logs: {e}")
-            return []
+            return [f"Error reading logs: {e}"]
 
     def __del__(self):
         """Cleanup"""
