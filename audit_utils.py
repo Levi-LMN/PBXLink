@@ -33,12 +33,12 @@ def log_action(action, resource_type, resource_id=None, details=None):
     try:
         # Get current user
         if 'user' not in session:
-            logger.warning("Attempted to log action without authenticated user")
+            logger.debug("Attempted to log action without authenticated user")
             return
 
         user = User.query.filter_by(email=session['user']['email']).first()
         if not user:
-            logger.warning(f"User not found: {session['user']['email']}")
+            logger.debug(f"User not found: {session['user']['email']}")
             return
 
         # Convert details to JSON string if dict
@@ -59,7 +59,7 @@ def log_action(action, resource_type, resource_id=None, details=None):
         db.session.add(audit_entry)
         db.session.commit()
 
-        logger.info(f"Audit: {user.email} {action} {resource_type} {resource_id or ''}")
+        logger.debug(f"Audit: {user.email} {action} {resource_type} {resource_id or ''}")
 
     except Exception as e:
         logger.error(f"Error logging audit action: {str(e)}")
@@ -128,7 +128,7 @@ def cleanup_old_audit_logs(retention_days=AUDIT_LOG_RETENTION_DAYS):
 
                 db.session.commit()
                 deleted += len(batch)
-                logger.info(f"Deleted {deleted}/{count} old audit logs")
+                logger.debug(f"Deleted {deleted}/{count} old audit logs")
 
             logger.info(f"Cleanup complete: Deleted {count} audit logs older than {retention_days} days")
             return count
@@ -157,8 +157,8 @@ def cleanup_old_ai_agent_logs(retention_days=AI_AGENT_LOG_RETENTION_DAYS):
     try:
         cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
 
-        # Query old logs
-        old_logs = AIAgentCallLog.query.filter(AIAgentCallLog.call_date < cutoff_date).all()
+        # FIXED: Use call_start instead of call_date
+        old_logs = AIAgentCallLog.query.filter(AIAgentCallLog.call_start < cutoff_date).all()
         count = len(old_logs)
 
         if count > 0:
@@ -173,7 +173,7 @@ def cleanup_old_ai_agent_logs(retention_days=AI_AGENT_LOG_RETENTION_DAYS):
 
                 db.session.commit()
                 deleted += len(batch)
-                logger.info(f"Deleted {deleted}/{count} old AI agent call logs")
+                logger.debug(f"Deleted {deleted}/{count} old AI agent call logs")
 
             logger.info(f"Cleanup complete: Deleted {count} AI agent logs older than {retention_days} days")
             return count
@@ -240,10 +240,11 @@ def get_log_statistics():
             stats['audit_logs']['oldest_age_days'] = (datetime.utcnow() - oldest_audit.timestamp).days
 
         # Get oldest AI agent log
-        oldest_ai = AIAgentCallLog.query.order_by(AIAgentCallLog.call_date.asc()).first()
+        # FIXED: Use call_start instead of call_date
+        oldest_ai = AIAgentCallLog.query.order_by(AIAgentCallLog.call_start.asc()).first()
         if oldest_ai:
-            stats['ai_agent_logs']['oldest_entry'] = oldest_ai.call_date.isoformat()
-            stats['ai_agent_logs']['oldest_age_days'] = (datetime.utcnow() - oldest_ai.call_date).days
+            stats['ai_agent_logs']['oldest_entry'] = oldest_ai.call_start.isoformat()
+            stats['ai_agent_logs']['oldest_age_days'] = (datetime.utcnow() - oldest_ai.call_start).days
 
         return stats
 
@@ -273,7 +274,7 @@ class LogCleanupScheduler:
     def start(self):
         """Start the background cleanup scheduler"""
         if self.running:
-            logger.warning("Log cleanup scheduler already running")
+            logger.debug("Log cleanup scheduler already running")
             return
 
         self.running = True
@@ -325,7 +326,7 @@ def init_log_cleanup(app):
 
 
 # ============================================================================
-# AI AGENT CALL LOGGING (existing functions)
+# AI AGENT CALL LOGGING
 # ============================================================================
 
 def log_ai_agent_call(call_id, caller_number, intent, summary, **kwargs):
@@ -359,7 +360,7 @@ def log_ai_agent_call(call_id, caller_number, intent, summary, **kwargs):
         db.session.add(call_log)
         db.session.commit()
 
-        logger.info(f"Logged AI agent call: {call_id} from {caller_number}")
+        logger.debug(f"Logged AI agent call: {call_id} from {caller_number}")
         return call_log
 
     except Exception as e:
@@ -385,9 +386,10 @@ def get_ai_agent_call_logs(limit=100, caller_number=None):
         query = AIAgentCallLog.query
 
         if caller_number:
-            query = query.filter_by(caller_number=caller_number)
+            query = query.filter(AIAgentCallLog.caller_number.contains(caller_number))
 
-        logs = query.order_by(AIAgentCallLog.call_date.desc()).limit(limit).all()
+        # FIXED: Use call_start instead of call_date
+        logs = query.order_by(AIAgentCallLog.call_start.desc()).limit(limit).all()
         return [log.to_dict() for log in logs]
 
     except Exception as e:
