@@ -1,6 +1,5 @@
 """
-AI Agent Blueprint - Fresh Implementation
-Simple interface to control the standalone AI agent service
+AI Agent Blueprint - Complete Working Version
 """
 
 from flask import Blueprint, render_template, jsonify, request
@@ -11,10 +10,8 @@ logger = logging.getLogger(__name__)
 
 ai_agent_bp = Blueprint('ai_agent', __name__)
 
-# Import service manager
 from blueprints.ai_agent_service import get_ai_service
 
-# Get service instance
 ai_service = get_ai_service()
 
 
@@ -30,7 +27,6 @@ def get_status():
     try:
         status = ai_service.get_status()
 
-        # Add environment check
         env_status = {
             'azure_openai_configured': bool(os.environ.get('AZURE_OPENAI_ENDPOINT')),
             'azure_speech_configured': bool(os.environ.get('AZURE_SPEECH_KEY')),
@@ -108,12 +104,34 @@ def restart_service():
         }), 500
 
 
+@ai_agent_bp.route('/api/logs', methods=['GET'])
+def get_logs():
+    """Get recent agent logs"""
+    try:
+        lines = request.args.get('lines', 50, type=int)
+        logs = ai_service.get_logs(lines)
+
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'log_file': ai_service.get_status().get('log_file')
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting logs: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @ai_agent_bp.route('/api/config', methods=['GET'])
 def get_config():
     """Get configuration status"""
     try:
         config = {
             'agent_path': str(ai_service.agent_path),
+            'log_file': str(ai_service.log_file),
             'environment': {
                 'AZURE_OPENAI_ENDPOINT': os.environ.get('AZURE_OPENAI_ENDPOINT', 'Not set'),
                 'AZURE_OPENAI_DEPLOYMENT': os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o-mini'),

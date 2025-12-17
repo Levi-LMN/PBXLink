@@ -1,50 +1,31 @@
 """
-AI Agent Service Manager - Fixed Implementation
-Properly captures both stdout AND stderr for debugging
+AI Agent Service Manager - Complete Working Version
+Runs agent.py as an independent subprocess without interference
 """
 
-import asyncio
-import threading
-import logging
 import subprocess
-import signal
+import logging
 import os
 import time
 from pathlib import Path
 from datetime import datetime
-from queue import Queue, Empty
 
 logger = logging.getLogger(__name__)
 
 
 class AIAgentService:
-    """Manages the AI agent as a subprocess service"""
+    """Manages the AI agent as a completely independent subprocess"""
 
     def __init__(self, agent_script_path=None):
-        """
-        Initialize AI Agent Service
-
-        Args:
-            agent_script_path: Path to agent.py (defaults to same directory)
-        """
         self.process = None
         self.running = False
         self.start_time = None
-        self.stdout_thread = None
-        self.stderr_thread = None
-        self._stop_event = threading.Event()
-
-        # Output queues for better monitoring
-        self.stdout_queue = Queue()
-        self.stderr_queue = Queue()
-        self.last_output = []  # Store last 50 lines
-        self.max_output_lines = 50
+        self.log_file = None
 
         # Find agent.py
         if agent_script_path:
             self.agent_path = Path(agent_script_path)
         else:
-            # Look in current directory or blueprints/ai_agent/
             current_dir = Path(__file__).parent
             candidates = [
                 current_dir / "agent.py",
@@ -59,11 +40,14 @@ class AIAgentService:
                     break
 
             if not self.agent_path:
-                raise FileNotFoundError(
-                    "agent.py not found. Please provide agent_script_path"
-                )
+                raise FileNotFoundError("agent.py not found")
 
-        logger.info(f"AI Agent Service initialized with: {self.agent_path}")
+        # Setup log file
+        log_dir = Path("/var/log/ai_agent")
+        log_dir.mkdir(exist_ok=True, parents=True)
+        self.log_file = log_dir / "agent.log"
+
+        logger.info(f"AI Agent Service initialized: {self.agent_path}")
 
     def start(self):
         """Start the AI agent service"""
@@ -71,73 +55,43 @@ class AIAgentService:
             return False, "Service already running"
 
         try:
-            # Validate environment variables
-            required_vars = [
-                'AZURE_OPENAI_ENDPOINT',
-                'AZURE_OPENAI_API_KEY',
-                'AZURE_SPEECH_KEY'
-            ]
-
-            missing = [var for var in required_vars if not os.environ.get(var)]
+            # Validate environment
+            required = ['AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_KEY', 'AZURE_SPEECH_KEY']
+            missing = [v for v in required if not os.environ.get(v)]
             if missing:
-                return False, f"Missing environment variables: {', '.join(missing)}"
+                return False, f"Missing: {', '.join(missing)}"
 
-            # Start the agent as a subprocess
             logger.info(f"Starting AI Agent: {self.agent_path}")
 
-            # CRITICAL FIX: Use unbuffered output and capture both stdout/stderr
-            env = os.environ.copy()
-            env['PYTHONUNBUFFERED'] = '1'  # Force unbuffered output
+            # Open log file
+            log_handle = open(self.log_file, 'a')
 
+            # Start process - completely detached from Flask
             self.process = subprocess.Popen(
-                ['python', '-u', str(self.agent_path)],  # -u for unbuffered
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env,
-                bufsize=0,  # Unbuffered
-                universal_newlines=True
+                ['python3', str(self.agent_path)],
+                stdout=log_handle,
+                stderr=log_handle,
+                env=os.environ.copy(),
+                cwd=str(self.agent_path.parent),
+                start_new_session=True  # Detach from parent
             )
 
             self.running = True
             self.start_time = datetime.utcnow()
-            self._stop_event.clear()
-            self.last_output = []
 
-            # Start BOTH stdout and stderr monitor threads
-            self.stdout_thread = threading.Thread(
-                target=self._monitor_stdout,
-                daemon=True
-            )
-            self.stderr_thread = threading.Thread(
-                target=self._monitor_stderr,
-                daemon=True
-            )
-
-            self.stdout_thread.start()
-            self.stderr_thread.start()
-
-            # Wait a moment to check if it started successfully
-            time.sleep(2)
+            # Wait to verify it started
+            time.sleep(3)
 
             if self.process.poll() is not None:
-                # Process died immediately - get error output
-                error_lines = []
-                try:
-                    while True:
-                        line = self.stderr_queue.get_nowait()
-                        error_lines.append(line)
-                except Empty:
-                    pass
-
                 self.running = False
-                error_msg = '\n'.join(error_lines) if error_lines else "Unknown error"
-                return False, f"Agent process failed to start:\n{error_msg}"
+                return False, "Agent failed to start"
 
-            logger.info("✅ AI Agent Service started successfully")
-            return True, "Service started successfully"
+            logger.info(f"✅ AI Agent started (PID: {self.process.pid})")
+            logger.info(f"📋 Logs: {self.log_file}")
+            return True, f"Service started (PID: {self.process.pid})"
 
         except Exception as e:
-            logger.error(f"Failed to start AI Agent: {e}")
+            logger.error(f"Failed to start: {e}")
             self.running = False
             return False, str(e)
 
@@ -147,173 +101,98 @@ class AIAgentService:
             return False, "Service not running"
 
         try:
-            logger.info("Stopping AI Agent Service...")
-
-            self._stop_event.set()
+            logger.info("Stopping AI Agent...")
 
             if self.process:
-                # Try graceful shutdown first
-                self.process.send_signal(signal.SIGINT)
+                # Send SIGTERM for graceful shutdown
+                self.process.terminate()
 
-                # Wait up to 5 seconds for graceful shutdown
+                # Wait up to 10 seconds
                 try:
-                    self.process.wait(timeout=5)
+                    self.process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
-                    # Force kill if still running
-                    logger.warning("Force killing AI Agent process")
+                    logger.warning("Force killing agent")
                     self.process.kill()
                     self.process.wait()
 
             self.running = False
             self.start_time = None
 
-            # Wait for monitor threads
-            if self.stdout_thread and self.stdout_thread.is_alive():
-                self.stdout_thread.join(timeout=2)
-            if self.stderr_thread and self.stderr_thread.is_alive():
-                self.stderr_thread.join(timeout=2)
-
-            logger.info("✅ AI Agent Service stopped")
-            return True, "Service stopped successfully"
+            logger.info("✅ AI Agent stopped")
+            return True, "Service stopped"
 
         except Exception as e:
-            logger.error(f"Error stopping AI Agent: {e}")
+            logger.error(f"Error stopping: {e}")
             self.running = False
             return False, str(e)
 
     def restart(self):
-        """Restart the AI agent service"""
-        logger.info("Restarting AI Agent Service...")
+        """Restart the service"""
+        logger.info("Restarting AI Agent...")
 
         success, message = self.stop()
-        if not success:
-            return False, f"Failed to stop: {message}"
+        if not success and "not running" not in message:
+            return False, f"Stop failed: {message}"
 
-        time.sleep(1)  # Brief pause
-
+        time.sleep(2)
         return self.start()
 
     def get_status(self):
-        """Get service status with recent output"""
+        """Get service status"""
         if not self.running or not self.process:
             return {
                 'running': False,
                 'uptime_seconds': None,
                 'pid': None,
-                'return_code': self.process.returncode if self.process else None,
-                'last_output': self.last_output[-10:] if self.last_output else []
+                'log_file': str(self.log_file)
             }
 
-        # Check if process is actually alive
-        poll_result = self.process.poll()
-        if poll_result is not None:
-            # Process died
+        # Check if actually running
+        poll = self.process.poll()
+        if poll is not None:
             self.running = False
-
-            # Get error output
-            error_lines = []
-            try:
-                while True:
-                    line = self.stderr_queue.get_nowait()
-                    error_lines.append(line)
-            except Empty:
-                pass
-
             return {
                 'running': False,
                 'uptime_seconds': None,
                 'pid': None,
-                'return_code': poll_result,
-                'last_output': self.last_output[-10:] if self.last_output else [],
-                'error_output': error_lines[-10:] if error_lines else []
+                'exit_code': poll,
+                'log_file': str(self.log_file)
             }
 
         uptime = None
         if self.start_time:
-            uptime = (datetime.utcnow() - self.start_time).seconds
+            uptime = int((datetime.utcnow() - self.start_time).total_seconds())
 
         return {
             'running': True,
             'uptime_seconds': uptime,
             'pid': self.process.pid,
-            'return_code': None,
-            'last_output': self.last_output[-10:] if self.last_output else []
+            'log_file': str(self.log_file)
         }
 
-    def get_recent_logs(self, lines=50):
-        """Get recent log output"""
-        return self.last_output[-lines:] if self.last_output else []
-
-    def _monitor_stdout(self):
-        """Monitor stdout (runs in background thread)"""
-        if not self.process:
-            return
-
+    def get_logs(self, lines=50):
+        """Get recent log lines"""
         try:
-            for line in iter(self.process.stdout.readline, ''):
-                if self._stop_event.is_set():
-                    break
-                if line:
-                    clean_line = line.rstrip()
+            if not self.log_file.exists():
+                return []
 
-                    # Store in queue
-                    self.stdout_queue.put(clean_line)
-
-                    # Store in last_output
-                    self.last_output.append(clean_line)
-                    if len(self.last_output) > self.max_output_lines:
-                        self.last_output.pop(0)
-
-                    # Log it
-                    logger.info(f"[AI Agent] {clean_line}")
-
+            with open(self.log_file, 'r') as f:
+                all_lines = f.readlines()
+                return [line.strip() for line in all_lines[-lines:]]
         except Exception as e:
-            if not self._stop_event.is_set():
-                logger.error(f"Error monitoring stdout: {e}")
-
-    def _monitor_stderr(self):
-        """Monitor stderr (runs in background thread) - CRITICAL for debugging"""
-        if not self.process:
-            return
-
-        try:
-            for line in iter(self.process.stderr.readline, ''):
-                if self._stop_event.is_set():
-                    break
-                if line:
-                    clean_line = line.rstrip()
-
-                    # Store in queue
-                    self.stderr_queue.put(clean_line)
-
-                    # Store in last_output with ERROR prefix
-                    error_msg = f"ERROR: {clean_line}"
-                    self.last_output.append(error_msg)
-                    if len(self.last_output) > self.max_output_lines:
-                        self.last_output.pop(0)
-
-                    # Log as ERROR
-                    logger.error(f"[AI Agent ERROR] {clean_line}")
-
-            # Check return code when stderr closes
-            self.process.wait()
-
-            if not self._stop_event.is_set() and self.process.returncode != 0:
-                logger.error(f"AI Agent process exited with code: {self.process.returncode}")
-                self.running = False
-
-        except Exception as e:
-            if not self._stop_event.is_set():
-                logger.error(f"Error monitoring stderr: {e}")
-                self.running = False
+            logger.error(f"Error reading logs: {e}")
+            return []
 
     def __del__(self):
-        """Cleanup on deletion"""
+        """Cleanup"""
         if self.running:
-            self.stop()
+            try:
+                self.stop()
+            except:
+                pass
 
 
-# Global service instance
+# Global instance
 _ai_service = None
 
 
