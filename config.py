@@ -59,6 +59,10 @@ class Config:
     # Superuser email
     SUPERUSER_EMAIL = os.environ.get('SUPERUSER_EMAIL', '')
 
+    # Microsoft Teams Notifications
+    TEAMS_WEBHOOK_URL = os.environ.get('TEAMS_WEBHOOK_URL', '')
+    ENABLE_TEAMS_NOTIFICATIONS = os.environ.get('ENABLE_TEAMS_NOTIFICATIONS', 'false').lower() == 'true'
+
     # Logging
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
     LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

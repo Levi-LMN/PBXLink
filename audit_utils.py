@@ -2,15 +2,18 @@
 Audit logging with automatic cleanup
 audit_utils.py
 Provides functions to log user actions and manage log retention
+FIXED: Added proper log size calculation using database analysis
 """
 
 from flask import request, session
-from models import db, AuditLog, User
+from models import db, AuditLog, User, AIAgentCallLog
 from datetime import datetime, timedelta
+from sqlalchemy import func, text
 import logging
 import json
 import threading
 import time
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -152,12 +155,10 @@ def cleanup_old_ai_agent_logs(retention_days=AI_AGENT_LOG_RETENTION_DAYS):
     Returns:
         Number of logs deleted
     """
-    from models import AIAgentCallLog
-
     try:
         cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
 
-        # FIXED: Use call_start instead of call_date
+        # Use call_start for filtering
         old_logs = AIAgentCallLog.query.filter(AIAgentCallLog.call_start < cutoff_date).all()
         count = len(old_logs)
 
@@ -210,47 +211,185 @@ def cleanup_all_logs():
     return stats
 
 
-def get_log_statistics():
+def estimate_table_size(model_class):
     """
-    Get statistics about current log storage
+    Estimate the total size of a database table in bytes
+
+    This function analyzes the table structure and calculates an
+    approximate size based on column types and record count.
+
+    Args:
+        model_class: SQLAlchemy model class (e.g., AuditLog, AIAgentCallLog)
 
     Returns:
-        Dictionary with log counts and oldest entries
+        tuple: (estimated_size_bytes, row_count)
     """
-    from models import AIAgentCallLog
-
     try:
+        # Get row count
+        row_count = model_class.query.count()
+
+        if row_count == 0:
+            return 0, 0
+
+        # Base overhead per row (SQLite/PostgreSQL overhead)
+        base_overhead = 24
+
+        # Column size mapping
+        total_row_size = base_overhead
+
+        # Analyze each column
+        for column in model_class.__table__.columns:
+            col_type_str = str(column.type).upper()
+
+            # Integer types
+            if 'INTEGER' in col_type_str or 'INT' in col_type_str:
+                if 'BIG' in col_type_str:
+                    total_row_size += 8
+                else:
+                    total_row_size += 4
+
+            # String/VARCHAR types
+            elif 'VARCHAR' in col_type_str or 'STRING' in col_type_str:
+                if hasattr(column.type, 'length') and column.type.length:
+                    # Use actual length, but average at 60% capacity
+                    total_row_size += int(column.type.length * 0.6)
+                else:
+                    # Default for unlimited VARCHAR
+                    total_row_size += 100
+
+            # Text types (can be large)
+            elif 'TEXT' in col_type_str:
+                # Estimate based on typical usage
+                # Details and transcripts can be large
+                if column.name in ['details', 'transcript', 'summary']:
+                    total_row_size += 500
+                else:
+                    total_row_size += 200
+
+            # DateTime/Timestamp
+            elif 'DATE' in col_type_str or 'TIME' in col_type_str:
+                total_row_size += 8
+
+            # Float/Real/Numeric
+            elif 'FLOAT' in col_type_str or 'REAL' in col_type_str or 'NUMERIC' in col_type_str:
+                total_row_size += 8
+
+            # Boolean
+            elif 'BOOLEAN' in col_type_str or 'BOOL' in col_type_str:
+                total_row_size += 1
+
+            # Default for unknown types
+            else:
+                total_row_size += 50
+
+        # Calculate total size
+        total_size = total_row_size * row_count
+
+        # Add index overhead (approximately 20% of data size)
+        total_size = int(total_size * 1.2)
+
+        return total_size, row_count
+
+    except Exception as e:
+        logger.error(f"Error estimating table size for {model_class.__name__}: {e}")
+        # Return conservative estimate
+        row_count = model_class.query.count() if hasattr(model_class, 'query') else 0
+        return row_count * 1000, row_count  # 1KB per row fallback
+
+
+def get_database_file_size():
+    """
+    Get the actual database file size (for SQLite)
+
+    Returns:
+        int: Size in bytes, or 0 if unable to determine
+    """
+    try:
+        # Get database URI from current app
+        from flask import current_app
+        db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
+
+        # Check if it's SQLite
+        if db_uri.startswith('sqlite:///'):
+            db_path = db_uri.replace('sqlite:///', '')
+            if os.path.exists(db_path):
+                return os.path.getsize(db_path)
+
+        return 0
+    except Exception as e:
+        logger.debug(f"Could not get database file size: {e}")
+        return 0
+
+
+def get_log_statistics():
+    """
+    Get comprehensive statistics about current log storage
+
+    Returns:
+        Dictionary with log counts, sizes, and metadata
+    """
+    try:
+        # Get table size estimates
+        audit_size_bytes, audit_count = estimate_table_size(AuditLog)
+        ai_agent_size_bytes, ai_agent_count = estimate_table_size(AIAgentCallLog)
+
+        # Convert to MB
+        audit_size_mb = audit_size_bytes / (1024 * 1024)
+        ai_agent_size_mb = ai_agent_size_bytes / (1024 * 1024)
+        total_size_mb = audit_size_mb + ai_agent_size_mb
+
+        # Get oldest entries
+        oldest_audit = AuditLog.query.order_by(AuditLog.timestamp.asc()).first()
+        oldest_ai_agent = AIAgentCallLog.query.order_by(AIAgentCallLog.call_start.asc()).first()
+
+        # Calculate ages
+        audit_age_days = None
+        if oldest_audit:
+            audit_age_days = (datetime.utcnow() - oldest_audit.timestamp).days
+
+        ai_agent_age_days = None
+        if oldest_ai_agent:
+            ai_agent_age_days = (datetime.utcnow() - oldest_ai_agent.call_start).days
+
+        # Get database file size (if SQLite)
+        db_file_size = get_database_file_size()
+        db_file_size_mb = db_file_size / (1024 * 1024) if db_file_size > 0 else None
+
         stats = {
             'audit_logs': {
-                'total_count': AuditLog.query.count(),
-                'oldest_entry': None,
+                'count': audit_count,
+                'size_mb': round(audit_size_mb, 2),
+                'oldest_entry': oldest_audit.timestamp.isoformat() if oldest_audit else None,
+                'oldest_age_days': audit_age_days,
                 'retention_days': AUDIT_LOG_RETENTION_DAYS
             },
             'ai_agent_logs': {
-                'total_count': AIAgentCallLog.query.count(),
-                'oldest_entry': None,
+                'count': ai_agent_count,
+                'size_mb': round(ai_agent_size_mb, 2),
+                'oldest_entry': oldest_ai_agent.call_start.isoformat() if oldest_ai_agent else None,
+                'oldest_age_days': ai_agent_age_days,
                 'retention_days': AI_AGENT_LOG_RETENTION_DAYS
-            }
+            },
+            'total_logs': audit_count + ai_agent_count,
+            'total_size_mb': round(total_size_mb, 2),
+            'database_file_size_mb': round(db_file_size_mb, 2) if db_file_size_mb else None,
+            'cleanup_interval_hours': CLEANUP_CHECK_HOURS
         }
 
-        # Get oldest audit log
-        oldest_audit = AuditLog.query.order_by(AuditLog.timestamp.asc()).first()
-        if oldest_audit:
-            stats['audit_logs']['oldest_entry'] = oldest_audit.timestamp.isoformat()
-            stats['audit_logs']['oldest_age_days'] = (datetime.utcnow() - oldest_audit.timestamp).days
-
-        # Get oldest AI agent log
-        # FIXED: Use call_start instead of call_date
-        oldest_ai = AIAgentCallLog.query.order_by(AIAgentCallLog.call_start.asc()).first()
-        if oldest_ai:
-            stats['ai_agent_logs']['oldest_entry'] = oldest_ai.call_start.isoformat()
-            stats['ai_agent_logs']['oldest_age_days'] = (datetime.utcnow() - oldest_ai.call_start).days
+        logger.debug(f"Log statistics: {audit_count} audit logs ({audit_size_mb:.2f} MB), "
+                    f"{ai_agent_count} AI logs ({ai_agent_size_mb:.2f} MB)")
 
         return stats
 
     except Exception as e:
-        logger.error(f"Error getting log statistics: {str(e)}")
-        return {}
+        logger.error(f"Error getting log statistics: {str(e)}", exc_info=True)
+        return {
+            'audit_logs': {'count': 0, 'size_mb': 0.0, 'retention_days': AUDIT_LOG_RETENTION_DAYS},
+            'ai_agent_logs': {'count': 0, 'size_mb': 0.0, 'retention_days': AI_AGENT_LOG_RETENTION_DAYS},
+            'total_logs': 0,
+            'total_size_mb': 0.0,
+            'cleanup_interval_hours': CLEANUP_CHECK_HOURS
+        }
 
 
 # ============================================================================
@@ -280,7 +419,7 @@ class LogCleanupScheduler:
         self.running = True
         self.thread = threading.Thread(target=self._run_scheduler, daemon=True)
         self.thread.start()
-        logger.info(f"Log cleanup scheduler started (running every {CLEANUP_CHECK_HOURS} hours)")
+        logger.info(f"✅ Log cleanup scheduler started (running every {CLEANUP_CHECK_HOURS} hours)")
 
     def stop(self):
         """Stop the background cleanup scheduler"""
@@ -322,7 +461,7 @@ def init_log_cleanup(app):
         app: Flask application instance
     """
     log_cleanup_scheduler.init_app(app)
-    logger.info("Log cleanup system initialized")
+    logger.info("✅ Log cleanup system initialized")
 
 
 # ============================================================================
@@ -340,8 +479,6 @@ def log_ai_agent_call(call_id, caller_number, intent, summary, **kwargs):
         summary: Summary of the conversation
         **kwargs: Additional fields (transcript, sentiment, actions_taken, etc.)
     """
-    from models import AIAgentCallLog
-
     try:
         call_log = AIAgentCallLog(
             call_id=call_id,
@@ -380,15 +517,13 @@ def get_ai_agent_call_logs(limit=100, caller_number=None):
     Returns:
         List of call log dictionaries
     """
-    from models import AIAgentCallLog
-
     try:
         query = AIAgentCallLog.query
 
         if caller_number:
             query = query.filter(AIAgentCallLog.caller_number.contains(caller_number))
 
-        # FIXED: Use call_start instead of call_date
+        # Use call_start for ordering
         logs = query.order_by(AIAgentCallLog.call_start.desc()).limit(limit).all()
         return [log.to_dict() for log in logs]
 

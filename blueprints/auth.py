@@ -1,6 +1,7 @@
 """
 Azure AD Authentication Blueprint
 Handles Microsoft OAuth login and user session management
+FIXED: Case-insensitive email lookup for user authentication
 """
 
 from flask import Blueprint, redirect, url_for, session, request, jsonify, current_app, render_template, flash
@@ -11,6 +12,7 @@ from datetime import datetime
 from models import db, User, UserRole
 from urllib.parse import urlencode
 import secrets
+from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
 
@@ -148,15 +150,32 @@ def callback():
             logger.error("No email found in user info")
             return redirect(url_for('auth.login_page', error='Unable to retrieve email from Microsoft account'))
 
+        # CRITICAL FIX: Normalize email to lowercase for case-insensitive comparison
+        email = email.lower().strip()
+
+        logger.info(f"Azure AD login attempt for email: {email}")
+
         # Check if user is superuser
         superuser_email = current_app.config.get('SUPERUSER_EMAIL')
-        is_superuser = superuser_email and email.lower() == superuser_email.lower()
+        is_superuser = superuser_email and email == superuser_email.lower().strip()
 
-        # Look up user in database
-        user = User.query.filter_by(email=email).first()
+        # CRITICAL FIX: Case-insensitive lookup using func.lower()
+        user = User.query.filter(func.lower(User.email) == email).first()
+
+        # DEBUG: Log user lookup result
+        if user:
+            logger.info(f"User found in database: {user.email}, is_active={user.is_active}, role={user.role.value}")
+        else:
+            logger.warning(f"User NOT found in database for email: {email}")
+            # List all users for debugging
+            all_users = User.query.all()
+            logger.info(f"Database contains {len(all_users)} users:")
+            for u in all_users:
+                logger.info(f"  - {u.email} (active={u.is_active}, role={u.role.value})")
 
         # Authorization logic
         if is_superuser:
+            logger.info(f"Superuser login detected: {email}")
             # Superuser can always log in
             if not user:
                 # Create superuser account if it doesn't exist
@@ -168,6 +187,7 @@ def callback():
                     is_active=True
                 )
                 db.session.add(user)
+                db.session.commit()
                 logger.info(f"Created superuser account: {email}")
             else:
                 # Ensure superuser always has admin role and is active
@@ -175,16 +195,17 @@ def callback():
                 user.is_active = True
                 user.name = user_info.get('displayName', user.name)
                 user.azure_id = user_info.get('id')
+                db.session.commit()
                 logger.info(f"Superuser {email} logged in")
         else:
             # Regular users must exist in database and be active
             if not user:
-                logger.warning(f"Login attempt by user not in database: {email}")
+                logger.warning(f"Login rejected - user not in database: {email}")
                 return redirect(url_for('auth.login_page',
-                    error='Your account has not been created yet. Please contact your administrator to request access.'))
+                    error=f'Your account ({email}) has not been created yet. Please contact your administrator to request access.'))
 
             if not user.is_active:
-                logger.warning(f"Login attempt by inactive user: {email}")
+                logger.warning(f"Login rejected - user inactive: {email}")
                 return redirect(url_for('auth.login_page',
                     error='Your account has been deactivated. Please contact your administrator.'))
 
@@ -192,6 +213,8 @@ def callback():
             user.name = user_info.get('displayName', user.name)
             if not user.azure_id:
                 user.azure_id = user_info.get('id')
+            db.session.commit()
+            logger.info(f"Regular user {email} logged in successfully")
 
         # Update last login
         user.last_login = datetime.utcnow()
@@ -220,7 +243,7 @@ def callback():
         return redirect(url_for('auth.login_page',
             error='Authentication failed. Please try again later.'))
     except Exception as e:
-        logger.error(f"Unexpected error during authentication: {str(e)}")
+        logger.error(f"Unexpected error during authentication: {str(e)}", exc_info=True)
         return redirect(url_for('auth.login_page',
             error='An unexpected error occurred. Please try again.'))
 

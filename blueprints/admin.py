@@ -1,10 +1,11 @@
 """
-Admin Blueprint
-Manages users, roles, audit logs, and log cleanup
+Admin Blueprint - COMPLETE WORKING VERSION
+Manages users, roles, audit logs, log cleanup, and service monitoring
 Only accessible by admin users
+FIXED: User deletion, case-insensitive email lookups, application context issues
 """
 
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, session, current_app
 import logging
 from models import db, User, UserRole, AuditLog, AIAgentCallLog
 from blueprints.auth import login_required, permission_required, get_current_user
@@ -20,7 +21,11 @@ from audit_utils import (
     AI_AGENT_LOG_RETENTION_DAYS,
     CLEANUP_CHECK_HOURS
 )
+# FIX: Import from blueprints directory
+from blueprints.service_monitor import service_monitor
+from blueprints.teams_notifier import teams_notifier
 from datetime import datetime, timedelta
+from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +47,19 @@ def index():
         details='Accessed admin dashboard'
     )
     return render_template('admin/index.html')
+
+
+@admin_bp.route('/monitoring')
+@login_required
+@permission_required('view')
+def monitoring():
+    """Service monitoring page"""
+    log_action(
+        action='view',
+        resource_type='monitoring_page',
+        details='Accessed service monitoring page'
+    )
+    return render_template('admin/monitoring.html')
 
 
 # ============================================================================
@@ -67,7 +85,7 @@ def list_users():
             'users': [user.to_dict() for user in users]
         })
     except Exception as e:
-        logger.error(f"Error listing users: {str(e)}")
+        logger.error(f"Error listing users: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -80,7 +98,8 @@ def create_user():
         data = request.get_json()
 
         # Validate required fields
-        email = data.get('email', '').strip()
+        # CRITICAL FIX: Normalize email to lowercase
+        email = data.get('email', '').strip().lower()
         name = data.get('name', '').strip()
         role = data.get('role', 'VIEWER').upper()
 
@@ -103,12 +122,12 @@ def create_user():
                 'error': f'Invalid role. Must be one of: {", ".join([r.name for r in UserRole])}'
             }), 400
 
-        # Check if user already exists
-        existing_user = User.query.filter_by(email=email).first()
+        # CRITICAL FIX: Case-insensitive check if user already exists
+        existing_user = User.query.filter(func.lower(User.email) == email).first()
         if existing_user:
             return jsonify({
                 'success': False,
-                'error': 'A user with this email already exists'
+                'error': f'A user with this email already exists (ID: {existing_user.id}, Active: {existing_user.is_active})'
             }), 400
 
         # Create new user
@@ -116,7 +135,7 @@ def create_user():
             email=email,
             name=name,
             role=UserRole[role],
-            is_active=True,
+            is_active=True,  # CRITICAL FIX: Explicitly set to True
             azure_id=data.get('azure_id')  # Optional Azure AD ID
         )
 
@@ -131,20 +150,21 @@ def create_user():
             {
                 'email': email,
                 'name': name,
-                'role': role
+                'role': role,
+                'is_active': True
             }
         )
 
-        logger.info(f"Created new user: {email} with role {role}")
+        logger.info(f"✅ Created new user: {email} with role {role}, is_active=True, ID={new_user.id}")
 
         return jsonify({
             'success': True,
-            'message': f'User {email} created successfully',
+            'message': f'User {email} created successfully and is ready to log in',
             'user': new_user.to_dict()
         }), 201
 
     except Exception as e:
-        logger.error(f"Error creating user: {str(e)}")
+        logger.error(f"❌ Error creating user: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -169,7 +189,7 @@ def get_user(user_id):
             'user': user.to_dict()
         })
     except Exception as e:
-        logger.error(f"Error getting user: {str(e)}")
+        logger.error(f"Error getting user: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -192,10 +212,12 @@ def update_user(user_id):
 
         # Update email if provided
         if 'email' in data and data['email'].strip():
-            new_email = data['email'].strip()
-            # Check if email is already taken by another user
+            # CRITICAL FIX: Normalize email to lowercase
+            new_email = data['email'].strip().lower()
+
+            # CRITICAL FIX: Case-insensitive check if email is already taken by another user
             existing = User.query.filter(
-                User.email == new_email,
+                func.lower(User.email) == new_email,
                 User.id != user_id
             ).first()
             if existing:
@@ -213,7 +235,7 @@ def update_user(user_id):
 
             # Log the action
             log_action('update', 'user', user_id, changes)
-            logger.info(f"Updated user {user_id}: {changes}")
+            logger.info(f"✅ Updated user {user_id}: {changes}")
 
             return jsonify({
                 'success': True,
@@ -227,7 +249,7 @@ def update_user(user_id):
             }), 400
 
     except Exception as e:
-        logger.error(f"Error updating user: {str(e)}")
+        logger.error(f"❌ Error updating user: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -261,7 +283,7 @@ def update_user_role(user_id):
             {'old_role': old_role, 'new_role': new_role}
         )
 
-        logger.info(f"Updated user {user.email} role from {old_role} to {new_role}")
+        logger.info(f"✅ Updated user {user.email} role from {old_role} to {new_role}")
 
         return jsonify({
             'success': True,
@@ -270,7 +292,7 @@ def update_user_role(user_id):
         })
 
     except Exception as e:
-        logger.error(f"Error updating user role: {str(e)}")
+        logger.error(f"❌ Error updating user role: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -294,7 +316,7 @@ def update_user_active(user_id):
 
         # Prevent admin from deactivating themselves
         current_user = get_current_user()
-        if current_user.id == user_id and not is_active:
+        if current_user and current_user.id == user_id and not is_active:
             return jsonify({
                 'success': False,
                 'error': 'You cannot deactivate your own account'
@@ -314,7 +336,7 @@ def update_user_active(user_id):
         )
 
         status = 'activated' if is_active else 'deactivated'
-        logger.info(f"User {user.email} {status}")
+        logger.info(f"✅ User {user.email} {status}")
 
         return jsonify({
             'success': True,
@@ -323,7 +345,7 @@ def update_user_active(user_id):
         })
 
     except Exception as e:
-        logger.error(f"Error updating user status: {str(e)}")
+        logger.error(f"❌ Error updating user status: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -332,39 +354,50 @@ def update_user_active(user_id):
 @login_required
 @permission_required('delete')
 def delete_user(user_id):
-    """Delete a user (soft delete by deactivating)"""
+    """Delete a user (actually deletes from database)"""
     try:
         user = User.query.get_or_404(user_id)
 
         # Prevent admin from deleting themselves
         current_user = get_current_user()
-        if current_user.id == user_id:
+        if current_user and current_user.id == user_id:
             return jsonify({
                 'success': False,
                 'error': 'You cannot delete your own account'
             }), 400
 
-        # Soft delete by deactivating
-        user.is_active = False
+        # Store user info before deletion for logging
+        user_email = user.email
+        user_name = user.name
+
+        # CRITICAL FIX: Actually delete the user from database
+        db.session.delete(user)
         db.session.commit()
 
-        # Log the action
-        log_action(
-            'delete',
-            'user',
-            user_id,
-            {'email': user.email, 'name': user.name}
-        )
+        # Log the action - note: we can't use user_id as resource_id since user is deleted
+        # Use current_user context for logging
+        if current_user:
+            log_entry = AuditLog(
+                user_id=current_user.id,
+                action='delete',
+                resource_type='user',
+                resource_id=str(user_id),
+                details=f'Deleted user: {user_email} ({user_name})',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')[:500]
+            )
+            db.session.add(log_entry)
+            db.session.commit()
 
-        logger.info(f"Deleted (deactivated) user: {user.email}")
+        logger.info(f"✅ DELETED user ID {user_id}: {user_email} ({user_name})")
 
         return jsonify({
             'success': True,
-            'message': 'User deleted successfully'
+            'message': f'User {user_email} deleted successfully'
         })
 
     except Exception as e:
-        logger.error(f"Error deleting user: {str(e)}")
+        logger.error(f"❌ Error deleting user: {str(e)}", exc_info=True)
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -411,7 +444,7 @@ def list_audit_logs():
         })
 
     except Exception as e:
-        logger.error(f"Error listing audit logs: {str(e)}")
+        logger.error(f"Error listing audit logs: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -430,7 +463,6 @@ def audit_log_stats():
         ).count()
 
         # Actions by user
-        from sqlalchemy import func
         actions_by_user = db.session.query(
             User.email,
             User.name,
@@ -469,7 +501,7 @@ def audit_log_stats():
         })
 
     except Exception as e:
-        logger.error(f"Error getting audit log stats: {str(e)}")
+        logger.error(f"Error getting audit log stats: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -504,7 +536,7 @@ def list_ai_agent_calls():
         })
 
     except Exception as e:
-        logger.error(f"Error listing AI agent calls: {str(e)}")
+        logger.error(f"Error listing AI agent calls: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -529,7 +561,7 @@ def get_ai_agent_call(call_id):
         })
 
     except Exception as e:
-        logger.error(f"Error getting AI agent call: {str(e)}")
+        logger.error(f"Error getting AI agent call: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -542,11 +574,9 @@ def ai_agent_call_stats():
         days = request.args.get('days', 7, type=int)
         start_date = datetime.utcnow() - timedelta(days=days)
 
-        from sqlalchemy import func
-
         # Total calls
         total_calls = AIAgentCallLog.query.filter(
-            AIAgentCallLog.call_date >= start_date
+            AIAgentCallLog.call_start >= start_date
         ).count()
 
         # Calls by intent
@@ -554,14 +584,14 @@ def ai_agent_call_stats():
             AIAgentCallLog.intent,
             func.count(AIAgentCallLog.id).label('count')
         ).filter(
-            AIAgentCallLog.call_date >= start_date
+            AIAgentCallLog.call_start >= start_date
         ).group_by(AIAgentCallLog.intent).all()
 
         # Average duration
         avg_duration = db.session.query(
             func.avg(AIAgentCallLog.call_duration)
         ).filter(
-            AIAgentCallLog.call_date >= start_date
+            AIAgentCallLog.call_start >= start_date
         ).scalar()
 
         # Sentiment distribution
@@ -569,7 +599,7 @@ def ai_agent_call_stats():
             AIAgentCallLog.sentiment,
             func.count(AIAgentCallLog.id).label('count')
         ).filter(
-            AIAgentCallLog.call_date >= start_date
+            AIAgentCallLog.call_start >= start_date
         ).group_by(AIAgentCallLog.sentiment).all()
 
         log_action(
@@ -595,7 +625,7 @@ def ai_agent_call_stats():
         })
 
     except Exception as e:
-        logger.error(f"Error getting AI agent call stats: {str(e)}")
+        logger.error(f"Error getting AI agent call stats: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -624,7 +654,7 @@ def get_log_stats():
         })
 
     except Exception as e:
-        logger.error(f"Error getting log statistics: {e}")
+        logger.error(f"Error getting log statistics: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -660,7 +690,7 @@ def manual_cleanup_audit():
         })
 
     except Exception as e:
-        logger.error(f"Error in manual audit log cleanup: {e}")
+        logger.error(f"Error in manual audit log cleanup: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -696,7 +726,7 @@ def manual_cleanup_ai_agent():
         })
 
     except Exception as e:
-        logger.error(f"Error in manual AI agent log cleanup: {e}")
+        logger.error(f"Error in manual AI agent log cleanup: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -730,7 +760,7 @@ def manual_cleanup_all():
         })
 
     except Exception as e:
-        logger.error(f"Error in manual log cleanup: {e}")
+        logger.error(f"Error in manual log cleanup: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)
@@ -761,7 +791,120 @@ def get_retention_config():
         })
 
     except Exception as e:
-        logger.error(f"Error getting retention config: {e}")
+        logger.error(f"Error getting retention config: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+# ============================================================================
+# SERVICE MONITORING & TEAMS NOTIFICATIONS
+# ============================================================================
+
+@admin_bp.route('/api/monitoring/status')
+@login_required
+@permission_required('view')
+def get_monitoring_status():
+    """Get status of all monitored services"""
+    try:
+        status = service_monitor.get_all_status()
+
+        log_action(
+            action='view',
+            resource_type='service_monitoring_status',
+            details={
+                'total_services': len(status),
+                'services': list(status.keys())
+            }
+        )
+
+        return jsonify({
+            'status': 'success',
+            'monitoring_active': service_monitor.running,
+            'services': status
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting monitoring status: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@admin_bp.route('/api/monitoring/test-notification', methods=['POST'])
+@login_required
+@permission_required('edit')
+def test_teams_notification():
+    """Send a test notification to Teams"""
+    try:
+        data = request.get_json() or {}
+        message = data.get('message', 'This is a test notification from FreePBX Dashboard')
+
+        success = teams_notifier.send_notification(
+            title="Test Notification",
+            message=message,
+            severity="info",
+            service_name="FreePBX Dashboard",
+            additional_info={
+                'Test': 'Yes',
+                'Sent By': session.get('user', {}).get('email', 'Unknown')
+            }
+        )
+
+        log_action(
+            action='test',
+            resource_type='teams_notification',
+            details={
+                'success': success,
+                'message': message
+            }
+        )
+
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'Test notification sent successfully'
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to send test notification. Check webhook URL.'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error sending test notification: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@admin_bp.route('/api/monitoring/webhook-config')
+@login_required
+@permission_required('view')
+def get_webhook_config():
+    """Get Teams webhook configuration status"""
+    try:
+        webhook_configured = bool(current_app.config.get('TEAMS_WEBHOOK_URL'))
+        notifications_enabled = current_app.config.get('ENABLE_TEAMS_NOTIFICATIONS', False)
+
+        log_action(
+            action='view',
+            resource_type='teams_webhook_config',
+            details='Viewed Teams webhook configuration'
+        )
+
+        return jsonify({
+            'status': 'success',
+            'webhook_configured': webhook_configured,
+            'notifications_enabled': notifications_enabled,
+            'monitoring_active': service_monitor.running
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting webhook config: {e}", exc_info=True)
         return jsonify({
             'status': 'error',
             'message': str(e)
