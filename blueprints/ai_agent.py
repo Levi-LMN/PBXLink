@@ -153,3 +153,5 @@ def get_config():
             'success': False,
             'error': str(e)
         }), 500
+
+    # tail -f /opt/PBXLink/blueprints/logs/agent.log
