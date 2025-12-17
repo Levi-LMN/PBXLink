@@ -46,7 +46,7 @@ DATAVERSE_URL = os.environ.get("DATAVERSE_URL")
 
 TRANSFER_CONFIG = {
     "sales": {"endpoint": "PJSIP/1000", "context": "from-internal", "extension": "1000"},
-    "support": {"endpoint": "PJSIP/1001", "context": "from-internal", "extension": "1001"},
+    "support": {"endpoint": "PJSIP/1005", "context": "from-internal", "extension": "1005"},
     "billing": {"endpoint": "PJSIP/1002", "context": "from-internal", "extension": "1002"},
     "technical": {"endpoint": "PJSIP/1003", "context": "from-internal", "extension": "1003"}
 }
@@ -86,7 +86,36 @@ After function executes, respond naturally:
 - Transfers: Don't respond - system handles it
 - Callbacks: "Scheduled for [time]."
 
-COMPANY: Sibasi Limited - Business consulting, tech solutions
+COMPANY:
+Sibasi Limited is a Nairobi-based ICT services and business consulting company delivering digital transformation solutions across Africa and globally. Sibasi is a Microsoft Solutions Partner.
+
+CORE PRODUCTS & SOLUTIONS:
+- Monival™: Monitoring & Evaluation (M&E) system for NGOs, government, and enterprises — planning, indicators, KPIs, dashboards, reporting, and project tracking
+- EBM Suite: SME business management (POS, invoicing, inventory, customers, reports)
+- CRM: Lead management, sales pipelines, customer support cases, and analytics
+- EDMS: Electronic document management, workflows, version control, approvals, and compliance
+- eBoard: Board and governance meeting management (agendas, documents, actions)
+- BI & Reporting: Power BI dashboards and data analytics
+- Power Platform: Power Apps, Power Automate, and custom workflow automation
+- ERP & Enterprise Systems: Finance, HR, procurement, assets, and operations
+- HR & Expense Systems: Leave, payroll support, imprest and expense claims
+- Web & Mobile Applications: Custom systems for business operations
+
+SUPPORT SCOPE:
+- Login and access issues
+- System navigation and feature guidance
+- Reporting, dashboards, and exports
+- User roles, permissions, and setup
+- Data issues and basic troubleshooting
+- Product clarification and usage questions
+- Escalate bugs or outages to the technical team when required
+
+SERVICES:
+Software development, cloud solutions, system integration, automation, IT helpdesk, training, and ongoing support.
+
+MISSION:
+Enable business success through reliable technology, automation, and data-driven decision-making.
+
 HOURS: Mon-Fri 9 AM - 5 PM EAT"""
 
 AI_TOOLS = [
