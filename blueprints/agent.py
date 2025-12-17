@@ -8,8 +8,10 @@ import azure.cognitiveservices.speech as speechsdk
 from msal import ConfidentialClientApplication
 from dotenv import load_dotenv
 from urllib.parse import quote
+from agent_db_logger import AgentDatabaseLogger
 
 load_dotenv()
+db_logger = AgentDatabaseLogger()
 
 
 class ColoredFormatter(logging.Formatter):
@@ -658,6 +660,15 @@ class Call:
         self.should_end = False
         active_calls.add(self)
 
+        # NEW: Track conversation for database
+        self.turn_count = 0
+        self.transcript_lines = []
+        self.functions_used = []
+        self.no_speech_count = 0
+        self.unclear_count = 0
+        self.confidences = []
+        self.call_start_time = time.time()
+
     async def alive(self):
         if not self.active or shutdown_flag.is_set():
             self.active = False
@@ -731,7 +742,7 @@ class Call:
 
 
 async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
-    """Main call handler with optimized timing"""
+    """Main call handler with database logging"""
     global total_calls_processed
 
     caller_id = ch.json.get('caller', {}).get('number', 'Unknown')
@@ -739,6 +750,14 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
     c = Call(ch, cl, ai, cache, ssh, transcriber, customer_data, ari_client)
 
     total_calls_processed += 1
+
+    # Log call start to database
+    db_logger.log_call_start(
+        call_id=c.id,
+        caller_number=caller_id,
+        caller_name=customer_data.get('name'),
+        customer_data=customer_data
+    )
 
     try:
         await ch.answer()
@@ -769,11 +788,15 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
         else:
             time_greeting = 'Good evening'
 
-        print(f"🕐 EAT Time: {eat_time.strftime('%H:%M')} → Using: {time_greeting}")
+        print(f"🕒 EAT Time: {eat_time.strftime('%H:%M')} → Using: {time_greeting}")
 
         generic = f"{time_greeting}, thank you for calling Sibasi Limited. How can I help you today?"
-        if not await c.speak(generic): return
+        if not await c.speak(generic):
+            db_logger.log_call_error(c.id, "Failed to speak greeting")
+            return
+
         c.conv.add_assistant(generic)
+        c.transcript_lines.append(f"AI: {generic}")
 
         await asyncio.sleep(BEEP_DELAY_AFTER_SPEAK)
         await c.ch.play(media="sound:beep")
@@ -785,16 +808,24 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
         for turn in range(6):
             if not await c.alive() or c.should_end: break
 
+            c.turn_count += 1
+            turn_start = time.time()
+
             rec = await c.record()
             await c.ch.play(media="sound:beep")
             await asyncio.sleep(0.1)
 
             if not rec:
                 no_speech += 1
+                c.no_speech_count += 1
                 if no_speech >= 2:
-                    await c.speak("Having trouble hearing you. Call back if needed.")
+                    msg = "Having trouble hearing you. Call back if needed."
+                    await c.speak(msg)
+                    c.transcript_lines.append(f"AI: {msg}")
                     break
-                await c.speak("Didn't catch that. Go ahead.")
+                msg = "Didn't catch that. Go ahead."
+                await c.speak(msg)
+                c.transcript_lines.append(f"AI: {msg}")
                 await asyncio.sleep(BEEP_DELAY_AFTER_SPEAK)
                 await c.ch.play(media="sound:beep")
                 await asyncio.sleep(BEEP_PAUSE_AFTER)
@@ -805,33 +836,77 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
 
             if not text or len(text) < 3:
                 consecutive_unclear += 1
+                c.unclear_count += 1
                 if consecutive_unclear >= 2:
-                    await c.speak("Let me have someone call you back.")
+                    msg = "Let me have someone call you back."
+                    await c.speak(msg)
+                    c.transcript_lines.append(f"AI: {msg}")
                     break
-                await c.speak("Could you repeat that?")
+                msg = "Could you repeat that?"
+                await c.speak(msg)
+                c.transcript_lines.append(f"AI: {msg}")
                 await asyncio.sleep(BEEP_DELAY_AFTER_SPEAK)
                 await c.ch.play(media="sound:beep")
                 await asyncio.sleep(BEEP_PAUSE_AFTER)
                 continue
 
             consecutive_unclear = 0
+            c.confidences.append(1.0 if confidence == "high" else 0.5)
+            c.transcript_lines.append(f"USER: {text}")
 
             if len(text.split()) <= 4 and any(
                     p in text.lower() for p in ["bye", "goodbye", "thanks", "thank you", "that's all", "done"]):
-                await c.speak("Anytime! Bye!")
+                msg = "Anytime! Bye!"
+                await c.speak(msg)
+                c.transcript_lines.append(f"AI: {msg}")
                 break
 
             if first_interaction and customer_data.get('name') and customer_data['name'] != "Valued Customer":
                 name_ack = f"Thanks, {customer_data['name'].split()[0]}."
                 c.conv.add_assistant(name_ack)
+                c.transcript_lines.append(f"AI: {name_ack}")
                 first_interaction = False
 
             c.conv.add_user(text)
             resp, fn = await ai.respond(c.conv, confidence, c)
             c.conv.add_assistant(resp)
+            c.transcript_lines.append(f"AI: {resp}")
+
+            # Log this turn to database
+            db_logger.log_turn(
+                call_id=c.id,
+                turn_number=c.turn_count,
+                user_text=text,
+                user_confidence=confidence,
+                ai_text=resp,
+                function_called=fn,
+                function_args=c.conv.action_log[-1].get('args') if fn and c.conv.action_log else None,
+                function_result=c.conv.action_log[-1].get('result') if fn and c.conv.action_log else None
+            )
+
+            if fn:
+                c.functions_used.append({
+                    'function': fn,
+                    'args': c.conv.action_log[-1].get('args') if c.conv.action_log else None,
+                    'result': c.conv.action_log[-1].get('result') if c.conv.action_log else None
+                })
 
             if fn == "transfer_to_agent" and c.conv.action_log and c.conv.action_log[-1].get('result', {}).get(
                     'success'):
+                # Log transfer before ending
+                db_logger.log_call_end(
+                    call_id=c.id,
+                    call_duration=int(time.time() - c.call_start_time),
+                    transcript="\n".join(c.transcript_lines),
+                    summary="Call transferred to agent",
+                    intent="transfer_requested",
+                    functions_called=c.functions_used,
+                    transferred_to=c.conv.action_log[-1].get('args', {}).get('department'),
+                    turns_count=c.turn_count,
+                    no_speech_count=c.no_speech_count,
+                    unclear_count=c.unclear_count,
+                    avg_confidence=sum(c.confidences) / len(c.confidences) if c.confidences else None
+                )
                 return
 
             if fn == "end_call":
@@ -848,16 +923,34 @@ async def handle(ch, cl, ai, cache, ssh, transcriber, ari_client):
             await asyncio.sleep(BEEP_PAUSE_AFTER)
 
         if not c.should_end:
-            await c.speak("Thanks for calling!")
+            msg = "Thanks for calling!"
+            await c.speak(msg)
+            c.transcript_lines.append(f"AI: {msg}")
+
+        # Log call end to database
+        call_duration = int(time.time() - c.call_start_time)
+        db_logger.log_call_end(
+            call_id=c.id,
+            call_duration=call_duration,
+            transcript="\n".join(c.transcript_lines),
+            summary=f"Call completed with {c.turn_count} turns",
+            intent="general_inquiry",  # Could be enhanced with AI analysis
+            sentiment="neutral",  # Could be enhanced with sentiment analysis
+            functions_called=c.functions_used,
+            turns_count=c.turn_count,
+            no_speech_count=c.no_speech_count,
+            unclear_count=c.unclear_count,
+            avg_confidence=sum(c.confidences) / len(c.confidences) if c.confidences else None
+        )
 
         await c.hangup()
 
     except Exception as e:
         logger.error(f"❌ Call error: {e}")
+        db_logger.log_call_error(c.id, str(e))
         await c.hangup()
     finally:
         await c.cleanup()
-
 
 async def shutdown_handler(ssh, ari_client=None):
     """Graceful shutdown"""

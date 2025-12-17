@@ -28,6 +28,7 @@ from blueprints.tg100 import tg100_bp
 from blueprints.auth import auth_bp, login_required
 from blueprints.admin import admin_bp
 from blueprints.ai_agent import ai_agent_bp
+from blueprints.ai_agent_logging import ai_logging_bp
 
 
 
@@ -79,6 +80,7 @@ def create_app(config_name=None):
     app.register_blueprint(tg100_bp, url_prefix='/tg100')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(ai_agent_bp, url_prefix='/ai_agent')
+    app.register_blueprint(ai_logging_bp, url_prefix='/api/ai-agent-logs')
 
     # Global authentication check
     @app.before_request
