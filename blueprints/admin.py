@@ -1,8 +1,6 @@
 """
-Admin Blueprint - COMPLETE WORKING VERSION
-Manages users, roles, audit logs, log cleanup, and service monitoring
-Only accessible by admin users
-FIXED: User deletion, case-insensitive email lookups, application context issues
+Admin Blueprint - FIXED VERSION
+Added Teams notification toggle functionality
 """
 
 from flask import Blueprint, render_template, jsonify, request, session, current_app
@@ -21,7 +19,6 @@ from audit_utils import (
     AI_AGENT_LOG_RETENTION_DAYS,
     CLEANUP_CHECK_HOURS
 )
-# FIX: Import from blueprints directory
 from blueprints.service_monitor import service_monitor
 from blueprints.teams_notifier import teams_notifier
 from datetime import datetime, timedelta
@@ -30,6 +27,9 @@ from sqlalchemy import func
 logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__)
+
+# Global flag for Teams notifications (can be toggled at runtime)
+TEAMS_NOTIFICATIONS_ENABLED = True
 
 
 # ============================================================================
@@ -60,7 +60,6 @@ def monitoring():
         details='Accessed service monitoring page'
     )
     return render_template('admin/monitoring.html')
-
 
 # ============================================================================
 # USER MANAGEMENT ROUTES
@@ -799,6 +798,75 @@ def get_retention_config():
 
 
 # ============================================================================
+# TEAMS NOTIFICATIONS TOGGLE - NEW
+# ============================================================================
+
+@admin_bp.route('/api/monitoring/teams-toggle', methods=['POST'])
+@login_required
+@permission_required('edit')
+def toggle_teams_notifications():
+    """Enable or disable Teams notifications at runtime"""
+    global TEAMS_NOTIFICATIONS_ENABLED
+
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', None)
+
+        if enabled is None:
+            return jsonify({
+                'status': 'error',
+                'message': 'enabled field is required'
+            }), 400
+
+        TEAMS_NOTIFICATIONS_ENABLED = bool(enabled)
+
+        # Log the change
+        log_action(
+            action='toggle_notifications',
+            resource_type='teams_notifications',
+            details={
+                'enabled': TEAMS_NOTIFICATIONS_ENABLED,
+                'changed_by': session.get('user', {}).get('email', 'Unknown')
+            }
+        )
+
+        status_text = 'enabled' if TEAMS_NOTIFICATIONS_ENABLED else 'disabled'
+        logger.info(f"✅ Teams notifications {status_text} by {session.get('user', {}).get('email', 'Unknown')}")
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Teams notifications {status_text}',
+            'enabled': TEAMS_NOTIFICATIONS_ENABLED
+        })
+
+    except Exception as e:
+        logger.error(f"Error toggling Teams notifications: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@admin_bp.route('/api/monitoring/teams-status')
+@login_required
+@permission_required('view')
+def get_teams_notification_status():
+    """Get current Teams notification status"""
+    try:
+        return jsonify({
+            'status': 'success',
+            'enabled': TEAMS_NOTIFICATIONS_ENABLED,
+            'webhook_configured': bool(current_app.config.get('TEAMS_WEBHOOK_URL'))
+        })
+    except Exception as e:
+        logger.error(f"Error getting Teams notification status: {e}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+# ============================================================================
 # SERVICE MONITORING & TEAMS NOTIFICATIONS
 # ============================================================================
 
@@ -822,7 +890,8 @@ def get_monitoring_status():
         return jsonify({
             'status': 'success',
             'monitoring_active': service_monitor.running,
-            'services': status
+            'services': status,
+            'notifications_enabled': TEAMS_NOTIFICATIONS_ENABLED
         })
 
     except Exception as e:
@@ -839,6 +908,12 @@ def get_monitoring_status():
 def test_teams_notification():
     """Send a test notification to Teams"""
     try:
+        if not TEAMS_NOTIFICATIONS_ENABLED:
+            return jsonify({
+                'status': 'error',
+                'message': 'Teams notifications are currently disabled. Enable them first.'
+            }), 400
+
         data = request.get_json() or {}
         message = data.get('message', 'This is a test notification from FreePBX Dashboard')
 
@@ -888,7 +963,6 @@ def get_webhook_config():
     """Get Teams webhook configuration status"""
     try:
         webhook_configured = bool(current_app.config.get('TEAMS_WEBHOOK_URL'))
-        notifications_enabled = current_app.config.get('ENABLE_TEAMS_NOTIFICATIONS', False)
 
         log_action(
             action='view',
@@ -899,7 +973,7 @@ def get_webhook_config():
         return jsonify({
             'status': 'success',
             'webhook_configured': webhook_configured,
-            'notifications_enabled': notifications_enabled,
+            'notifications_enabled': TEAMS_NOTIFICATIONS_ENABLED,
             'monitoring_active': service_monitor.running
         })
 

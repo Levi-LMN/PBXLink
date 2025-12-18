@@ -10,6 +10,30 @@
     <!-- Alert Container -->
     <div id="alert-container"></div>
 
+    <!-- Teams Notification Toggle Card -->
+    <div class="bg-white rounded-xl border border-gray-100 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+                    <i class="fas fa-bell"></i>
+                    Teams Notifications
+                </h2>
+                <p class="text-xs text-gray-500">Control whether service alerts are sent to Microsoft Teams</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-medium text-gray-600" id="toggle-status-text">Loading...</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="teams-toggle" class="sr-only peer" disabled>
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+        </div>
+        <div class="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg p-3">
+            <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+            <strong>Note:</strong> When disabled, service monitoring continues but NO Teams alerts will be sent. Use this to prevent spam during maintenance.
+        </div>
+    </div>
+
     <!-- Actions Card -->
     <div class="bg-white rounded-xl border border-gray-100 p-5">
         <h2 class="text-base font-bold text-gray-900 mb-4">Actions</h2>
@@ -18,7 +42,7 @@
                 <i class="fas fa-sync-alt"></i>
                 <span>Refresh Status</span>
             </button>
-            <button onclick="testNotification()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-2">
+            <button onclick="testNotification()" id="test-notif-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-2">
                 <i class="fas fa-bell"></i>
                 <span>Test Teams Notification</span>
             </button>
@@ -59,15 +83,15 @@
         from { opacity: 0; transform: translateY(-10px); }
         to { opacity: 1; transform: translateY(0); }
     }
-    
+
     .alert-enter {
         animation: fadeIn 0.3s ease-out;
     }
-    
+
     .status-card {
         transition: all 0.2s ease;
     }
-    
+
     .status-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -76,6 +100,93 @@
 
 <script>
 let refreshInterval;
+let teamsNotificationsEnabled = false;
+
+// Teams notification toggle
+async function loadTeamsStatus() {
+    try {
+        const response = await fetch('/admin/api/monitoring/teams-status');
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            teamsNotificationsEnabled = data.enabled;
+            const toggle = document.getElementById('teams-toggle');
+            const statusText = document.getElementById('toggle-status-text');
+            const testBtn = document.getElementById('test-notif-btn');
+
+            toggle.checked = teamsNotificationsEnabled;
+            toggle.disabled = false;
+            statusText.textContent = teamsNotificationsEnabled ? 'Enabled' : 'Disabled';
+            statusText.className = teamsNotificationsEnabled ? 'text-xs font-medium text-green-600' : 'text-xs font-medium text-gray-600';
+
+            // Disable test button if notifications are off
+            if (!teamsNotificationsEnabled) {
+                testBtn.disabled = true;
+                testBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                testBtn.disabled = false;
+                testBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading Teams status:', error);
+    }
+}
+
+async function toggleTeamsNotifications() {
+    const toggle = document.getElementById('teams-toggle');
+    const newState = toggle.checked;
+
+    try {
+        const response = await fetch('/admin/api/monitoring/teams-toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                enabled: newState
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            teamsNotificationsEnabled = newState;
+            const statusText = document.getElementById('toggle-status-text');
+            statusText.textContent = newState ? 'Enabled' : 'Disabled';
+            statusText.className = newState ? 'text-xs font-medium text-green-600' : 'text-xs font-medium text-gray-600';
+
+            // Update test button
+            const testBtn = document.getElementById('test-notif-btn');
+            if (!newState) {
+                testBtn.disabled = true;
+                testBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                testBtn.disabled = false;
+                testBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            showAlert(
+                `✅ Teams notifications ${newState ? 'enabled' : 'disabled'}. ${newState ? 'You will receive alerts.' : 'No alerts will be sent.'}`,
+                newState ? 'success' : 'warning'
+            );
+        } else {
+            // Revert toggle on error
+            toggle.checked = !newState;
+            showAlert('❌ Failed to toggle notifications: ' + data.message, 'error');
+        }
+    } catch (error) {
+        // Revert toggle on error
+        toggle.checked = !newState;
+        showAlert('❌ Error toggling notifications: ' + error.message, 'error');
+    }
+}
+
+// Attach toggle event listener
+document.addEventListener('DOMContentLoaded', function() {
+    const toggle = document.getElementById('teams-toggle');
+    toggle.addEventListener('change', toggleTeamsNotifications);
+});
 
 async function loadStatus() {
     try {
@@ -100,11 +211,11 @@ async function loadConfig() {
         if (data.status === 'success') {
             displayConfig(data);
         } else {
-            document.getElementById('config-container').innerHTML = 
+            document.getElementById('config-container').innerHTML =
                 '<p class="text-xs text-red-600">Error loading configuration</p>';
         }
     } catch (error) {
-        document.getElementById('config-container').innerHTML = 
+        document.getElementById('config-container').innerHTML =
             '<p class="text-xs text-red-600">Failed to load configuration</p>';
     }
 }
@@ -126,7 +237,7 @@ function displayServices(services, monitoringActive) {
 
     for (const [serviceName, serviceInfo] of Object.entries(services)) {
         const status = serviceInfo.status || 'unknown';
-        
+
         // Status styling
         let statusClass, statusBg, statusIcon;
         if (status === 'up') {
@@ -227,6 +338,11 @@ function formatTimestamp(timestamp) {
 }
 
 async function testNotification() {
+    if (!teamsNotificationsEnabled) {
+        showAlert('⚠️ Teams notifications are disabled. Enable them first to send test messages.', 'warning');
+        return;
+    }
+
     try {
         showAlert('Sending test notification...', 'info');
 
@@ -254,12 +370,13 @@ async function testNotification() {
 
 function refreshStatus() {
     loadStatus();
+    loadTeamsStatus();
     showAlert('🔄 Status refreshed', 'success');
 }
 
 function showAlert(message, type) {
     const container = document.getElementById('alert-container');
-    
+
     const alertClasses = {
         'success': 'bg-green-50 text-green-700 border-green-200',
         'error': 'bg-red-50 text-red-700 border-red-200',
@@ -304,6 +421,7 @@ function showAlert(message, type) {
 document.addEventListener('DOMContentLoaded', function() {
     loadStatus();
     loadConfig();
+    loadTeamsStatus();
 
     // Auto-refresh every 30 seconds
     refreshInterval = setInterval(loadStatus, 30000);
