@@ -1,7 +1,7 @@
 """
 Service Monitoring Module - FIXED VERSION
 Monitors critical services and sends Teams alerts on downtime
-NOW RESPECTS THE GLOBAL NOTIFICATION TOGGLE
+NOW USES SAME CHECK METHODS AS DASHBOARD
 """
 
 import threading
@@ -26,6 +26,7 @@ class ServiceMonitor:
         self.thread = None
         self.services = {}
         self.check_interval = 60  # Check every 60 seconds
+        self.app = None  # Store Flask app context
 
     def register_service(
             self,
@@ -58,7 +59,7 @@ class ServiceMonitor:
         self.running = True
         self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.thread.start()
-        logger.info("Service monitor started")
+        logger.info("✅ Service monitor started")
 
     def stop(self):
         """Stop the monitoring thread"""
@@ -71,7 +72,11 @@ class ServiceMonitor:
         """Main monitoring loop"""
         while self.running:
             try:
-                self._check_all_services()
+                if self.app:
+                    with self.app.app_context():
+                        self._check_all_services()
+                else:
+                    self._check_all_services()
             except Exception as e:
                 logger.error(f"Error in monitor loop: {e}")
 
@@ -88,7 +93,7 @@ class ServiceMonitor:
     def _check_service(self, service_name: str, service_info: Dict):
         """Check a single service"""
         check_function = service_info['check_function']
-        current_time = datetime.now()
+        current_time = datetime.utcnow()  # Use UTC consistently
 
         # Run the check
         try:
@@ -168,7 +173,7 @@ class ServiceMonitor:
     def _handle_service_recovery(self, service_name: str, service_info: Dict):
         """Handle service recovery event"""
         if service_info['last_success']:
-            downtime = (datetime.now() - service_info['last_success']).total_seconds()
+            downtime = (datetime.utcnow() - service_info['last_success']).total_seconds()
             downtime_str = self._format_duration(downtime)
         else:
             downtime_str = "Unknown"
@@ -220,8 +225,8 @@ class ServiceMonitor:
         for service_name, service_info in self.services.items():
             status_summary[service_name] = {
                 'status': service_info['status'],
-                'last_check': service_info['last_check'].isoformat() if service_info['last_check'] else None,
-                'last_success': service_info['last_success'].isoformat() if service_info['last_success'] else None,
+                'last_check': service_info['last_check'].isoformat() + 'Z' if service_info['last_check'] else None,
+                'last_success': service_info['last_success'].isoformat() + 'Z' if service_info['last_success'] else None,
                 'consecutive_failures': service_info['consecutive_failures']
             }
 
@@ -229,85 +234,19 @@ class ServiceMonitor:
 
 
 # ============================================================================
-# SERVICE CHECK FUNCTIONS - FIXED TO MATCH DASHBOARD
+# SERVICE CHECK FUNCTIONS - FIXED TO USE SAME METHODS AS DASHBOARD
 # ============================================================================
 
-def check_ai_agent_heartbeat(heartbeat_file: str, max_age_seconds: int = 60) -> bool:
-    """Check if AI Agent is alive by reading heartbeat file"""
-    try:
-        if not os.path.exists(heartbeat_file):
-            logger.debug(f"AI Agent heartbeat file not found: {heartbeat_file}")
-            return False
-
-        with open(heartbeat_file, 'r') as f:
-            heartbeat_data = json.load(f)
-
-        timestamp = heartbeat_data.get('timestamp', 0)
-        age = time.time() - timestamp
-
-        is_alive = age <= max_age_seconds
-        logger.debug(f"AI Agent heartbeat age: {age:.1f}s (threshold: {max_age_seconds}s) - {'alive' if is_alive else 'dead'}")
-        return is_alive
-
-    except Exception as e:
-        logger.error(f"Error checking AI agent heartbeat: {e}")
-        return False
-
-
-def check_wireguard_vpn() -> bool:
-    """Check if WireGuard VPN is running - matches dashboard check"""
-    try:
-        import subprocess
-        result = subprocess.run(
-            ['/usr/bin/sudo', '/usr/bin/systemctl', 'is-active', 'wg-quick@wg0'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        is_active = result.returncode == 0 and 'active' in result.stdout
-        logger.debug(f"WireGuard check: returncode={result.returncode}, output={result.stdout.strip()}, is_active={is_active}")
-        return is_active
-    except Exception as e:
-        logger.error(f"Error checking WireGuard: {e}")
-        return False
-
-
-def check_tg100_device(device_ip: str = '192.168.0.35') -> bool:
-    """Check if TG100 device is reachable - matches dashboard check"""
-    try:
-        import subprocess
-        result = subprocess.run(
-            ['/usr/bin/ping', '-c', '1', '-W', '2', device_ip],
-            capture_output=True,
-            timeout=3
-        )
-        is_online = result.returncode == 0
-        logger.debug(f"TG100 ping check: returncode={result.returncode}, is_online={is_online}")
-        return is_online
-    except Exception as e:
-        logger.error(f"Error checking TG100: {e}")
-        return False
-
-
 def check_freepbx_api() -> bool:
-    """Check if FreePBX API is responding - matches dashboard check"""
+    """Check if FreePBX API is responding - SAME AS DASHBOARD"""
     try:
-        import requests
-        from flask import current_app
+        from blueprints.api_core import api
 
-        # Use the same check as dashboard
-        freepbx_host = current_app.config.get('FREEPBX_HOST')
-        if not freepbx_host:
-            logger.debug("FreePBX host not configured")
-            return False
+        # Try to get access token (same as dashboard /api/test)
+        token = api.get_access_token()
+        is_up = bool(token)
 
-        # Try to access the token endpoint (same as dashboard does)
-        token_url = f"{freepbx_host}/admin/api/api/token"
-        response = requests.get(token_url, timeout=5)
-
-        # API is up if we get ANY response (even 401 is fine, means API is running)
-        is_up = response.status_code in [200, 401, 403]
-        logger.debug(f"FreePBX API check: status={response.status_code}, is_up={is_up}")
+        logger.debug(f"FreePBX API check: has_token={is_up}")
         return is_up
 
     except Exception as e:
@@ -316,14 +255,72 @@ def check_freepbx_api() -> bool:
 
 
 def check_ssh_connection() -> bool:
-    """Check if SSH connection to FreePBX is working - matches dashboard check"""
+    """Check if SSH connection to FreePBX is working - SAME AS DASHBOARD"""
     try:
         from ssh_manager import ssh_manager
+
+        # Use same test as dashboard
         is_connected = ssh_manager.test_connection()
+
         logger.debug(f"SSH connection check: is_connected={is_connected}")
         return is_connected
+
     except Exception as e:
         logger.error(f"Error checking SSH: {e}")
+        return False
+
+
+def check_ai_agent_status() -> bool:
+    """Check if AI Agent is running - SAME AS DASHBOARD"""
+    try:
+        from blueprints.ai_agent_service import get_ai_service
+
+        ai_service = get_ai_service()
+        status = ai_service.get_status()
+
+        is_running = status.get('running', False)
+        logger.debug(f"AI Agent check: is_running={is_running}")
+        return is_running
+
+    except Exception as e:
+        logger.error(f"Error checking AI agent: {e}")
+        return False
+
+
+def check_tg100_device(device_ip: str = '192.168.0.35') -> bool:
+    """Check if TG100 device is reachable - SAME AS DASHBOARD"""
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ['/usr/bin/ping', '-c', '1', '-W', '2', device_ip],
+            capture_output=True,
+            timeout=3
+        )
+
+        is_online = result.returncode == 0
+        logger.debug(f"TG100 ping check: returncode={result.returncode}, is_online={is_online}")
+        return is_online
+
+    except Exception as e:
+        logger.error(f"Error checking TG100: {e}")
+        return False
+
+
+def check_wireguard_vpn() -> bool:
+    """Check if WireGuard VPN is running - SAME AS DASHBOARD"""
+    try:
+        from blueprints.wireguard import wg_manager
+
+        # Use same method as dashboard
+        status = wg_manager.get_wireguard_status()
+        is_active = bool(status)
+
+        logger.debug(f"WireGuard check: has_status={is_active}")
+        return is_active
+
+    except Exception as e:
+        logger.error(f"Error checking WireGuard: {e}")
         return False
 
 
@@ -338,36 +335,11 @@ def init_service_monitor(app, webhook_url: str):
     # Initialize Teams notifier
     init_teams_notifier(webhook_url)
 
+    # Store app context
+    service_monitor.app = app
+
     with app.app_context():
-        # Register services to monitor
-
-        # AI Agent (if heartbeat file is configured)
-        heartbeat_file = os.environ.get('AI_AGENT_HEARTBEAT_FILE')
-        if heartbeat_file:
-            service_monitor.register_service(
-                service_name='AI Voice Agent',
-                check_function=lambda: check_ai_agent_heartbeat(heartbeat_file, max_age_seconds=60),
-                downtime_threshold=120,  # 2 minutes
-                notification_interval=30
-            )
-        else:
-            logger.warning("⚠️ AI Agent heartbeat file not configured - skipping monitoring")
-
-        # WireGuard VPN
-        service_monitor.register_service(
-            service_name='WireGuard VPN',
-            check_function=check_wireguard_vpn,
-            downtime_threshold=180,  # 3 minutes
-            notification_interval=60
-        )
-
-        # TG100 Gateway
-        service_monitor.register_service(
-            service_name='TG100 Gateway',
-            check_function=lambda: check_tg100_device('192.168.0.35'),
-            downtime_threshold=300,  # 5 minutes
-            notification_interval=60
-        )
+        # Register services to monitor - USING DASHBOARD-COMPATIBLE CHECKS
 
         # FreePBX API
         service_monitor.register_service(
@@ -383,6 +355,30 @@ def init_service_monitor(app, webhook_url: str):
             check_function=check_ssh_connection,
             downtime_threshold=180,  # 3 minutes
             notification_interval=30
+        )
+
+        # AI Agent
+        service_monitor.register_service(
+            service_name='AI Voice Agent',
+            check_function=check_ai_agent_status,
+            downtime_threshold=120,  # 2 minutes
+            notification_interval=30
+        )
+
+        # TG100 Gateway
+        service_monitor.register_service(
+            service_name='TG100 Gateway',
+            check_function=lambda: check_tg100_device('192.168.0.35'),
+            downtime_threshold=300,  # 5 minutes
+            notification_interval=60
+        )
+
+        # WireGuard VPN
+        service_monitor.register_service(
+            service_name='WireGuard VPN',
+            check_function=check_wireguard_vpn,
+            downtime_threshold=180,  # 3 minutes
+            notification_interval=60
         )
 
         # Start monitoring

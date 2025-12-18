@@ -2,6 +2,7 @@
 Main application file for FreePBX Dashboard
 FIXED: AI Agent logging endpoints bypass authentication
 ADDED: Service monitoring with Teams notifications
+FIXED: Service monitor always starts (Teams notifications optional)
 FIXED: Import paths for service_monitor
 """
 
@@ -29,7 +30,7 @@ from blueprints.ai_agent_logging import ai_logging_bp
 
 from ssh_manager import init_ssh_manager, ssh_manager
 from audit_utils import init_log_cleanup
-# FIX: Import from blueprints directory
+# Import from blueprints directory
 from blueprints.service_monitor import init_service_monitor
 
 
@@ -54,18 +55,20 @@ def create_app(config_name=None):
     init_ssh_manager(app)
     init_log_cleanup(app)
 
-    # Initialize service monitoring with Teams notifications (if enabled)
-    if app.config.get('ENABLE_TEAMS_NOTIFICATIONS') and app.config.get('TEAMS_WEBHOOK_URL'):
-        try:
-            init_service_monitor(app, app.config['TEAMS_WEBHOOK_URL'])
+    # Initialize service monitoring (ALWAYS initialize, Teams notifications optional)
+    try:
+        webhook_url = app.config.get('TEAMS_WEBHOOK_URL')
+        init_service_monitor(app, webhook_url)
+
+        if app.config.get('ENABLE_TEAMS_NOTIFICATIONS') and webhook_url:
             logger.info("✅ Service monitoring with Teams notifications enabled")
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize service monitoring: {e}")
-    else:
-        if not app.config.get('TEAMS_WEBHOOK_URL'):
-            logger.info("⚠️  Teams notifications disabled - TEAMS_WEBHOOK_URL not configured")
+        elif webhook_url:
+            logger.info("✅ Service monitoring enabled (Teams notifications disabled by config)")
         else:
-            logger.info("ℹ️  Teams notifications disabled - ENABLE_TEAMS_NOTIFICATIONS=false")
+            logger.info("✅ Service monitoring enabled (Teams webhook not configured)")
+
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize service monitoring: {e}")
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/auth')

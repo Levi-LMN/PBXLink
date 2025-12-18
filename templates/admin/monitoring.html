@@ -323,18 +323,37 @@ function displayConfig(config) {
 function formatTimestamp(timestamp) {
     if (!timestamp) return '<span class="text-gray-400">Never</span>';
 
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
+    try {
+        // Parse ISO string with Z suffix (UTC)
+        const date = new Date(timestamp);
 
-    if (diffMins < 1) return '<span class="text-green-600">Just now</span>';
-    if (diffMins < 60) return `<span class="text-gray-600">${diffMins} min${diffMins !== 1 ? 's' : ''} ago</span>`;
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+            console.error('Invalid timestamp:', timestamp);
+            return '<span class="text-red-400">Invalid</span>';
+        }
 
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `<span class="text-gray-600">${diffHours} hr${diffHours !== 1 ? 's' : ''} ago</span>`;
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
 
-    return '<span class="text-gray-600">' + date.toLocaleString() + '</span>';
+        if (diffMins < 0) {
+            return '<span class="text-yellow-400">Future?</span>';
+        } else if (diffMins < 1) {
+            return '<span class="text-green-600">Just now</span>';
+        } else if (diffMins < 60) {
+            return `<span class="text-gray-600">${diffMins} min${diffMins !== 1 ? 's' : ''} ago</span>`;
+        } else if (diffMins < 1440) { // Less than 24 hours
+            const diffHours = Math.floor(diffMins / 60);
+            return `<span class="text-gray-600">${diffHours} hr${diffHours !== 1 ? 's' : ''} ago</span>`;
+        } else {
+            // More than 24 hours - show date
+            return '<span class="text-gray-600">' + date.toLocaleString() + '</span>';
+        }
+    } catch (error) {
+        console.error('Error formatting timestamp:', timestamp, error);
+        return '<span class="text-red-400">Error</span>';
+    }
 }
 
 async function testNotification() {
